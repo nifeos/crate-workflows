@@ -1,0 +1,14 @@
+version: 2
+updates:
+  # The template holds no Rust at its root (sample/ has its own manifest), so only the actions
+  # ecosystem applies here. A crate repository's own dependabot.yml, in scaffold/, covers cargo.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: ci
+    groups:
+      actions:
+        patterns:
+          - "*"
