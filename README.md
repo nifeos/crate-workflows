@@ -191,8 +191,8 @@ script/record-ruling 12 --text "The new dependency is fine: it is no_std and pro
   it. The org Actions endpoints answer 403 to a non-admin token; the fork-policy path answers
   Not Found (measured 2026-10-16). Set it once in the org's Actions settings. A public
   repository's default is approval for first-time outside contributors only.
-- Tag rules: the repository rulesets API refuses ref_name conditions on push-target rulesets
-  ("Target ref_name is not supported for push rulesets", measured live on the throwaway
-  repository), so `apply-settings` reports the tags ruleset as refused and the release workflow's
-  own gate is what keeps a stray tag from mattering. The durable fix is an organization-level
-  push ruleset scoped by repository and ref, which needs an org-scoped token.
+- Tag rules: the repository rulesets API refuses ref_name conditions on push-target rulesets. The
+  measured error is "Target ref_name is not supported for push rulesets", live on the throwaway
+  repository. `apply-settings` therefore reports the tags ruleset as refused, and the release
+  workflow's own gate is what keeps a stray tag from mattering. The durable fix is an
+  organization-level push ruleset scoped by repository and ref, which needs an org-scoped token.
