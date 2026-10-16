@@ -96,13 +96,21 @@ def _normpath(parts):
 
 
 def text_files(root):
-    """{relative path: text} under root, for the extensions a citation can hide in."""
+    """{relative path: text} under root, for the extensions a citation can hide in.
+
+    Repository plumbing is excluded: `.github/` and CONTRIBUTING.md legitimately describe the
+    organization's process (the disclosure line, how contributions are reviewed), and a gate that
+    reads them for nife's vocabulary would refuse the scaffold itself. The crate's own text,
+    source, manifests and patches are what must stand alone.
+    """
     out = {}
     for path in sorted(root.rglob('*')):
         if not path.is_file() or path.suffix not in TEXT:
             continue
         parts = path.relative_to(root).parts
         if any(p in ('.git', 'target', '.crate-workflows') for p in parts):
+            continue
+        if '.github' in parts or path.name == 'CONTRIBUTING.md':
             continue
         try:
             out['/'.join(parts)] = path.read_text()
