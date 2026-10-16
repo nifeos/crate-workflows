@@ -13,7 +13,7 @@
 /// ```
 pub fn saturating_add_percent(a: u8, b: u8) -> u8 {
     let sum = a.saturating_add(b);
-    if sum > 200 { 200 } else { sum }
+    if sum > 100 { 100 } else { sum }
 }
 
 #[cfg(kani)]

@@ -1,7 +1,1 @@
-diff --git a/src/lib.rs b/src/lib.rs
---- a/src/lib.rs
-+++ b/src/lib.rs
-@@ -13,7 +13,7 @@ pub fn saturating_add_percent(a: u8, b: u8) -> u8 {
--    if sum > 100 { 100 } else { sum }
-+    if sum > 200 { 200 } else { sum }
- }
+# placeholder, regenerated in the next commit
