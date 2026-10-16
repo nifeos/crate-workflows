@@ -34,6 +34,16 @@ def api(*args, method='GET', input_=None):
         return {}, None
 
 
+def rulesets_unreadable(repo, err):
+    """The finding for a ruleset read the token could not make, naming its own fix."""
+    if err and ('403' in err or 'Forbidden' in err or 'Must have admin rights' in err):
+        return (f'{repo}: reading the rulesets needs repository Administration read-only, which the '
+                'GITHUB_TOKEN cannot be granted (GitHub refuses the scope in any permissions block). '
+                'Set a SETTINGS_TOKEN secret holding a fine-grained PAT with that scope; an '
+                'organization secret covers every crate repository at once.')
+    return f'rulesets unreadable: {err}'
+
+
 def main(argv):
     args = argv[1:]
     settings = SETTINGS
@@ -85,7 +95,7 @@ def main(argv):
 
     env, err = api(f'repos/{repo}/environments/{s["environment"]["name"]}')
     if env is None:
-        diffs.append(f'environment {s["environment"]["name"]}: unreadable or absent ({err})')
+        diffs.append(rulesets_unreadable(repo, f'environment {s["environment"]["name"]}: {err}'))
     else:
         got = {r.get('reviewer', {}).get('login')
                for r in (env.get('protection_rules') or {}).get('required_reviewers', [])}
@@ -95,7 +105,7 @@ def main(argv):
 
     live_rulesets, err = api(f'repos/{repo}/rulesets?per_page=100')
     if live_rulesets is None:
-        diffs.append(f'rulesets unreadable: {err}')
+        diffs.append(rulesets_unreadable(repo, err))
     else:
         by_name = {r['name']: r for r in live_rulesets}
         for rs in s['rulesets']:

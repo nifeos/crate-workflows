@@ -25,6 +25,7 @@ github-actions ecosystem opens the bumps afterward; the lag check fails closed i
 | .github/pull_request_template.md | the disclosure line first, then what changed |
 | .github/ISSUE_TEMPLATE/ | bug report and feature request forms, blank issues off |
 | CODEOWNERS | the crates-io team owns every path (team name provisional) |
+| caller `weekly.yml` | forwards the `SETTINGS_TOKEN` secret to the template's weekly workflow |
 | CONTRIBUTING.md | disclosure of agent-written work, and how outside contributions are reviewed |
 | SECURITY.md | what a security report means here, and private reporting |
 | CHANGELOG.md | one line per release; the release gate reads nothing from it, people do |

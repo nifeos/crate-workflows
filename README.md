@@ -164,6 +164,12 @@ Record an architect ruling on a pull request:
 - `weekly / semver` and `weekly / stranger` are reports: a semver break between releases is
   deliberate waiting, and the stranger run needs a person, so neither fails a release. The
   per-pull-request semver rule in the labeler is the one that holds a merge.
+- `weekly / settings-drift` reads the rulesets and environments APIs, which need repository
+  Administration read-only. The GITHUB_TOKEN cannot carry that scope: GitHub's parser refuses
+  `administration` in any `permissions` block, at the workflow level as well as the job level
+  (this repository's first selftest runs are the evidence). The check authenticates as the
+  caller's `SETTINGS_TOKEN` secret instead, a fine-grained PAT with that scope, stored once as an
+  organization secret. Until it exists, the job is red on its 403 with instructions.
 - Publishing for real needs the trusted publisher configured on crates.io for the crate and
   repository pair, which needs calef's crates.io account. Until then only `dry-run` rehearsals
   run.

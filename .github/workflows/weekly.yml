@@ -23,13 +23,15 @@ on:
         description: Run the settings-drift and stranger jobs (off for the template's selftest).
         type: boolean
         default: true
+    secrets:
+      SETTINGS_TOKEN:
+        description: A fine-grained PAT holding this repository's Administration read-only, for the
+          settings-drift reads. The GITHUB_TOKEN cannot hold that scope; an organization secret named
+          SETTINGS_TOKEN covers every crate repository at once.
+        required: false
 
 permissions:
   contents: read
-  # `administration` is not a job-level scope (GitHub refuses the value there), so the settings-drift
-  # job's reads of the environments and rulesets APIs are granted here, at the workflow level, and
-  # every other job simply does not exercise it.
-  administration: read
 
 concurrency:
   group: weekly-${{ github.workflow }}-${{ github.ref }}
@@ -247,6 +249,13 @@ jobs:
   # A setting changed by hand in the web interface is a red run, not a surprise. The comparison is
   # against the settings file at the pinned template commit, so the drift is always measured
   # against the version of the template the caller actually runs.
+  #
+  # The reads are repository-administration reads (rulesets, environments), and the GITHUB_TOKEN
+  # cannot hold that scope: GitHub's parser refuses `administration` in any `permissions` block.
+  # So the check authenticates as the SETTINGS_TOKEN secret instead, a fine-grained personal
+  # access token with this repository's Administration read-only, stored once as an organization
+  # secret so every crate repository inherits it. Until the secret exists the job is red on its
+  # 403 with instructions, which is the check working, not failing.
   settings-drift:
     name: settings drift
     runs-on: ubuntu-latest
@@ -263,7 +272,7 @@ jobs:
           persist-credentials: false
       - run: .crate-workflows/script/check-settings "${{ github.repository }}"
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.SETTINGS_TOKEN || github.token }}
       - name: budget
         if: always()
         run: python3 .crate-workflows/helpers/job_budget.py check "${{ github.job }}" "$JOB_STARTED_AT"

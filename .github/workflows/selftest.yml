@@ -16,9 +16,6 @@ on:
 
 permissions:
   contents: read
-  # For the weekly selftest's settings-drift call, which reads the environments and rulesets APIs.
-  # `administration` refuses the job-level permissions block, so this is a workflow-level grant.
-  administration: read
 
 concurrency:
   group: selftest-${{ github.ref }}
