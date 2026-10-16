@@ -103,11 +103,11 @@ jobs:
           # major yet", not a failure.
           cargo +stable semver-checks --manifest-path "$MANIFEST" --json > semver-report.json 2> semver.err || true
           set +e
-          python3 .crate-workflows/helpers/semver_major.py semver-report.json >> findings.txt 2>> semver.err
+          python3 .crate-workflows/helpers/semver_major.py semver-report.json > semver-found.txt 2>> semver.err
           rc=$?
           set -e
           case "$rc" in
-            0) echo "the semver rule fired" ;;
+            0) cat semver-found.txt >> findings.txt; echo "the semver rule fired" ;;
             1) echo "no major break against the last release" ;;
             *) cat semver.err >&2; echo "semver_major.py exited $rc; routing to a person"; exit 1 ;;
           esac
