@@ -11,8 +11,8 @@ github-actions ecosystem opens the bumps afterward; the lag check fails closed i
 
 | file | what it is |
 |---|---|
-| caller-workflows/ci.yml | calls check.yml on pull requests |
-| caller-workflows/proofs.yml | calls proofs.yml on pull requests |
+| caller-workflows/ci.yml | calls check.yml on pull requests and on merges to main |
+| caller-workflows/proofs.yml | calls proofs.yml on pull requests and on merges to main |
 | caller-workflows/weekly.yml | calls weekly.yml on a Monday cron and on dispatch |
 | caller-workflows/release.yml | calls release.yml on dispatch |
 | caller-workflows/label.yml | calls label.yml on pull request pushes |
