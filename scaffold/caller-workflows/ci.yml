@@ -13,4 +13,5 @@ jobs:
       security-events: write
     uses: nifeos/crate-workflows/.github/workflows/check.yml@PINS@
     with:
-      targets: '@TARGETS@'
+      # Bare-metal targets the crate builds for, space-separated; empty for a host-only crate.
+      targets: ''
