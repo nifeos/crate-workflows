@@ -1,0 +1,36 @@
+#!/bin/sh
+# shellcheck shell=sh
+#
+# script/sync-labels: make a repository's labels match settings/repository-settings.json.
+#
+#     script/sync-labels <owner/name>
+#
+# Creates a missing label and updates an existing one's color or description. Never deletes: a
+# label somebody added by hand is theirs to remove. The weekly settings-drift check fails on a
+# missing template label, so deletion drift shows up as a finding for a person, not as a silent
+# rewrite.
+
+set -eu
+
+repo="${1:?usage: script/sync-labels <owner/name>}"
+settings="$(dirname "$0")/../settings/repository-settings.json"
+
+labels="$(python3 - "$settings" <<'EOF'
+import json, sys
+for label in json.load(open(sys.argv[1]))['labels']:
+    print('|'.join(label[k] for k in ('name', 'color', 'description')))
+EOF
+)"
+
+printf '%s\n' "$labels" | while IFS='|' read -r name color description; do
+	if gh api "repos/$repo/labels/$name" >/dev/null 2>&1; then
+		gh api -X PATCH "repos/$repo/labels/$name" \
+			-f "new_name=$name" -f "color=$color" -f "description=$description" >/dev/null
+		echo "sync-labels: updated $name"
+	else
+		gh api "repos/$repo/labels" -f "name=$name" -f "color=$color" \
+			-f "description=$description" >/dev/null
+		echo "sync-labels: created $name"
+	fi
+done
+echo "sync-labels: the template's labels are in place on $repo"

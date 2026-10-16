@@ -1,0 +1,289 @@
+# The reusable weekly workflow: drift, MSRV, semver, Miri, mutation, fuzz, and the two checks that
+# need no pull request (settings drift, stranger cadence).
+
+# The caller's thin workflow carries the schedule (a weekly cron and workflow_dispatch); everything
+# here runs the same on a dispatch, so a person can trigger a pass at any time.
+
+name: weekly
+
+on:
+  workflow_call:
+    inputs:
+      manifest-path:
+        type: string
+        default: Cargo.toml
+      targets:
+        type: string
+        default: ''
+      fuzz:
+        description: Run cargo-fuzz (nightly, for crates that parse bytes).
+        type: boolean
+        default: false
+      caller-checks:
+        description: Run the settings-drift and stranger jobs (off for the template's selftest).
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+  administration: read
+
+concurrency:
+  group: weekly-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  MANIFEST: ${{ inputs.manifest-path }}
+  TARGETS: ${{ inputs.targets }}
+
+jobs:
+  lag:
+    name: lag (template release)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: clock
+        run: echo "JOB_STARTED_AT=$(date +%s)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: .crate-workflows
+          persist-credentials: false
+      - run: .crate-workflows/helpers/lag-check.sh
+        env:
+          JOB_WORKFLOW_SHA: ${{ job.workflow_sha }}
+          GH_TOKEN: ${{ github.token }}
+      - name: budget
+        if: always()
+        run: python3 .crate-workflows/helpers/job_budget.py check "${{ github.job }}" "$JOB_STARTED_AT"
+
+  # nife's toolchain-drift, minus the nightly pin: the crate builds on stable, so drift is "the
+  # newest stable or beta broke us", and red here is the signal a pin bump owes a fix for.
+  drift:
+    name: drift (newest stable and beta)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        channel: [stable, beta]
+    steps:
+      - name: clock
+        run: echo "JOB_STARTED_AT=$(date +%s)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: .crate-workflows
+          persist-credentials: false
+      - run: |
+          set -e
+          rustup toolchain install "${{ matrix.channel }}" --profile minimal --component clippy
+          for t in $TARGETS; do rustup +"${{ matrix.channel }}" target add "$t"; done
+      - run: |
+          set -e
+          cargo +"${{ matrix.channel }}" build --manifest-path "$MANIFEST"
+          cargo +"${{ matrix.channel }}" test --manifest-path "$MANIFEST"
+          cargo +"${{ matrix.channel }}" clippy --manifest-path "$MANIFEST" --all-targets -- -D warnings
+          for t in $TARGETS; do
+            cargo +"${{ matrix.channel }}" build --manifest-path "$MANIFEST" --target "$t"
+          done
+      - name: budget
+        if: always()
+        run: python3 .crate-workflows/helpers/job_budget.py check "${{ github.job }}" "$JOB_STARTED_AT"
+
+  msrv:
+    name: msrv (rust-version builds)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: clock
+        run: echo "JOB_STARTED_AT=$(date +%s)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: .crate-workflows
+          persist-credentials: false
+      - name: build and test at the stated MSRV
+        run: |
+          set -e
+          msrv=$(python3 .crate-workflows/helpers/read_rust_version.py "$MANIFEST")
+          if [ -z "$msrv" ]; then
+            echo "no rust-version in $MANIFEST; the standalone gate should have refused this"
+            exit 1
+          fi
+          rustup toolchain install "$msrv" --profile minimal
+          cargo +"$msrv" build --manifest-path "$MANIFEST"
+          cargo +"$msrv" test --manifest-path "$MANIFEST"
+      - name: budget
+        if: always()
+        run: python3 .crate-workflows/helpers/job_budget.py check "${{ github.job }}" "$JOB_STARTED_AT"
+
+  # The interface's stability is measured weekly, as a report: a deliberate break between releases
+  # waits for its release, so red here would be noise. The per-pull-request semver rule in label.yml
+  # is the one that holds a merge.
+  semver:
+    name: semver (report against the last release)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: clock
+        run: echo "JOB_STARTED_AT=$(date +%s)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: .crate-workflows
+          persist-credentials: false
+      - uses: taiki-e/install-action@ab6895351a88b908e96a4697860d4ffea5e57dbe # v2.87.27
+        with:
+          tool: cargo-semver-checks
+      - name: cargo-semver-checks against the last published version
+        run: |
+          set -e
+          cargo semver-checks --manifest-path "$MANIFEST" --json > semver-report.json 2> semver.err || true
+          {
+            echo "### semver against the last release"
+            '```'
+            python3 .crate-workflows/helpers/semver_major.py semver-report.json || true
+            head -5 semver.err
+            '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: budget
+        if: always()
+        run: python3 .crate-workflows/helpers/job_budget.py check "${{ github.job }}" "$JOB_STARTED_AT"
+
+  miri:
+    name: miri
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: clock
+        run: echo "JOB_STARTED_AT=$(date +%s)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: .crate-workflows
+          persist-credentials: false
+      - run: rustup toolchain install nightly --profile minimal --component miri
+      - run: cargo +nightly miri test --manifest-path "$MANIFEST"
+      - name: budget
+        if: always()
+        run: python3 .crate-workflows/helpers/job_budget.py check "${{ github.job }}" "$JOB_STARTED_AT"
+
+  mutation:
+    name: mutation
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: clock
+        run: echo "JOB_STARTED_AT=$(date +%s)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: .crate-workflows
+          persist-credentials: false
+      - uses: taiki-e/install-action@ab6895351a88b908e96a4697860d4ffea5e57dbe # v2.87.27
+        with:
+          tool: cargo-mutants@27.1.0
+      # A report with a tooth: a survivor fails the run unless the caller's
+      # .github/mutants-exempts lists it, one mutant per line with its reason.
+      - run: cargo mutants --manifest-path "$MANIFEST" --jobs 2 --timeout 300
+      - run: python3 .crate-workflows/helpers/mutants_gate.py mutants.out .github/mutants-exempts
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        if: always()
+        with:
+          name: mutants
+          path: mutants.out/
+      - name: budget
+        if: always()
+        run: python3 .crate-workflows/helpers/job_budget.py check "${{ github.job }}" "$JOB_STARTED_AT"
+
+  fuzz:
+    name: fuzz
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    if: ${{ inputs.fuzz }}
+    steps:
+      - name: clock
+        run: echo "JOB_STARTED_AT=$(date +%s)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: .crate-workflows
+          persist-credentials: false
+      - run: rustup toolchain install nightly --profile minimal
+      - run: cargo install --locked cargo-fuzz --version 0.13.2
+      - name: five minutes per target
+        run: |
+          set -e
+          cd "$(dirname "$MANIFEST")"
+          for t in $(cargo fuzz list); do
+            echo "==> cargo fuzz run $t"
+            cargo +nightly fuzz run "$t" -- -max_total_time=300
+          done
+      - name: budget
+        if: always()
+        run: python3 .crate-workflows/helpers/job_budget.py check "${{ github.job }}" "$JOB_STARTED_AT"
+
+  # A setting changed by hand in the web interface is a red run, not a surprise. The comparison is
+  # against the settings file at the pinned template commit, so the drift is always measured
+  # against the version of the template the caller actually runs.
+  settings-drift:
+    name: settings drift
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: ${{ inputs.caller-checks }}
+    steps:
+      - name: clock
+        run: echo "JOB_STARTED_AT=$(date +%s)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: .crate-workflows
+          persist-credentials: false
+      - run: .crate-workflows/script/check-settings "${{ github.repository }}"
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - name: budget
+        if: always()
+        run: python3 .crate-workflows/helpers/job_budget.py check "${{ github.job }}" "$JOB_STARTED_AT"
+
+  # The release's whole claim is that a stranger can build and prove the crate from its README
+  # alone. The run itself needs a person; this job fails when one is overdue, measured from the
+  # last recorded run in docs/stranger-test.md.
+  stranger:
+    name: stranger cadence
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: ${{ inputs.caller-checks }}
+    steps:
+      - name: clock
+        run: echo "JOB_STARTED_AT=$(date +%s)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: .crate-workflows
+          persist-credentials: false
+      - run: .crate-workflows/script/stranger-due docs/stranger-test.md
+      - name: budget
+        if: always()
+        run: python3 .crate-workflows/helpers/job_budget.py check "${{ github.job }}" "$JOB_STARTED_AT"

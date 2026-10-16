@@ -35,12 +35,11 @@ body_file="$(mktemp)"
 trap 'rm -f "$body_file"' EXIT
 
 cat >"$body_file" <<BODY
-\`needs-architect\` was added because this diff matched a rule in \`.crate-workflows/helpers/architect-label-rules.py\`. The two rules this repository keeps from nife's labeler:
+\`needs-architect\` was added because this diff matched a rule in \`.crate-workflows/helpers/architect-label-rules.py\`. The findings:
 
-- a dependency new to the crate's graph;
-- a breaking change \`cargo-semver-checks\` reports against the last published version.
+$(printf '%s\n' "$report" | sed 's/^/- /')
 
-What each finding means is in that file's docstring. A ruling is recorded with \`script/record-ruling $pr_number --text '<the ruling>'\`, which swaps the label for \`architect-ruled\`; removing \`needs-architect\` by hand does not stick, because the labeler re-fires on the next push while a rule still fires. "False positive, nothing like that moved" is a ruling like any other.
+The two rules this repository keeps from nife's labeler are a dependency new to the crate's graph, and a breaking change \`cargo-semver-checks\` reports against the last published version. What each finding means is in that file's docstring. A ruling is recorded with \`script/record-ruling $pr_number --text '<the ruling>'\`, which swaps the label for \`architect-ruled\`; removing \`needs-architect\` by hand does not stick, because the labeler re-fires on the next push while a rule still fires. "False positive, nothing like that moved" is a ruling like any other.
 
 <!-- $marker -->
 BODY

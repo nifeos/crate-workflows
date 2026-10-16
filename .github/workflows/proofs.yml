@@ -1,0 +1,109 @@
+# The reusable proofs workflow: Kani on every pull request, and every falsification patch replayed.
+
+# Fork 4's ruling, adapted: stock kani-github-action proves the crate; each falsification patch is
+# applied and must turn its harness red at its own assertion. A crate has few harnesses, so this
+# runs on every pull request rather than weekly.
+
+name: proofs
+
+on:
+  workflow_call:
+    inputs:
+      manifest-path:
+        type: string
+        default: Cargo.toml
+      toolchain:
+        type: string
+        default: stable
+      kani-args:
+        description: Extra arguments for cargo kani (features, --tests, ...).
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: proofs-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/heads/') }}
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  MANIFEST: ${{ inputs.manifest-path }}
+  TOOLCHAIN: ${{ inputs.toolchain }}
+
+jobs:
+  lag:
+    name: lag (template release)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: clock
+        run: echo "JOB_STARTED_AT=$(date +%s)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: .crate-workflows
+          persist-credentials: false
+      - run: .crate-workflows/helpers/lag-check.sh
+        env:
+          JOB_WORKFLOW_SHA: ${{ job.workflow_sha }}
+          GH_TOKEN: ${{ github.token }}
+      - name: budget
+        if: always()
+        run: python3 .crate-workflows/helpers/job_budget.py check "${{ github.job }}" "$JOB_STARTED_AT"
+
+  kani:
+    name: kani
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: clock
+        run: echo "JOB_STARTED_AT=$(date +%s)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: .crate-workflows
+          persist-credentials: false
+      # Stock Kani on every pull request (Fork 4). The action installs Kani itself; a crate has no
+      # riscv64 patch to carry, so there is nothing to pin and nothing to cache.
+      - uses: model-checking/kani-github-action@f838096619a707b0f6b2118cf435eaccfa33e51f # v1.1
+        with:
+          command: cargo-kani
+          args: --manifest-path ${{ inputs.manifest-path }} ${{ inputs.kani-args }}
+      - name: budget
+        if: always()
+        run: python3 .crate-workflows/helpers/job_budget.py check "${{ github.job }}" "$JOB_STARTED_AT"
+
+  falsify:
+    name: falsify
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: clock
+        run: echo "JOB_STARTED_AT=$(date +%s)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: .crate-workflows
+          persist-credentials: false
+      # The replay runs `cargo kani` itself, so it installs Kani the same way the action above does
+      # (8 to 20 seconds, mean 12; nife measured caching it as not worth a cache step).
+      - name: Install Kani
+        run: |
+          cargo install --locked kani-verifier
+          cargo kani setup
+      # Form first (every harness carries a patch or a reason), then truth (each patch turns exactly
+      # its own harness red). A survivor, a stale patch, or an unparseable verdict fails the job.
+      - run: python3 .crate-workflows/helpers/falsify.py --manifest-path "$MANIFEST"
+      - name: budget
+        if: always()
+        run: python3 .crate-workflows/helpers/job_budget.py check "${{ github.job }}" "$JOB_STARTED_AT"

@@ -1,0 +1,95 @@
+# This repository's own gate: script/lint, then a live call of every reusable workflow against
+# sample/, a fixture crate. The selftest is the proof that a change here still runs; a change that
+# only edits YAML and never sees a green selftest is not done.
+
+name: selftest
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    # Mondays 06:20 UTC: a canary pass of the whole weekly workflow against the fixture, so a
+    # tool that rots under the template finds out here and not in nine crate repositories.
+    - cron: '20 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: selftest-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/heads/') }}
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  lint:
+    name: lint (this repository)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: clock
+        run: echo "JOB_STARTED_AT=$(date +%s)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - run: script/lint
+      - name: budget
+        if: always()
+        run: python3 helpers/job_budget.py check "${{ github.job }}" "$JOB_STARTED_AT"
+
+  check:
+    name: selftest (check)
+    needs: lint
+    permissions:
+      contents: read
+      security-events: write
+    uses: ./.github/workflows/check.yml
+    with:
+      manifest-path: sample/Cargo.toml
+
+  proofs:
+    name: selftest (proofs)
+    needs: lint
+    permissions:
+      contents: read
+    uses: ./.github/workflows/proofs.yml
+    with:
+      manifest-path: sample/Cargo.toml
+
+  weekly:
+    name: selftest (weekly)
+    needs: lint
+    permissions:
+      contents: read
+      administration: read
+    uses: ./.github/workflows/weekly.yml
+    with:
+      manifest-path: sample/Cargo.toml
+      caller-checks: false
+
+  # The release workflow is not called here: sample/ carries publish = false, on purpose, because a
+  # fixture crate must never reach crates.io. Its gate and dry-run publish are exercised in a
+  # throwaway repository before a template release is cut (the roadmap block's exit).
+  release:
+    name: selftest (release gate refuses a red commit)
+    needs: lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      # Prove the refusal half of the release path on every change: the gate must be red on a
+      # commit whose checks have not run. The green half needs a published template release and a
+      # real caller, which is the throwaway repository's job.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - run: |
+          set -e
+          # This selftest run itself is the only run on this SHA, and it is not a green ci.yml run,
+          # so the gate must refuse.
+          if helpers/release-gate.sh "$GITHUB_REPOSITORY" "$GITHUB_SHA"; then
+            echo "release-gate passed on a commit with no green check run; the refusal is broken"
+            exit 1
+          fi
+          echo "==> the release gate refused an unchecked commit"

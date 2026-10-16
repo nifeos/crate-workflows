@@ -1,0 +1,145 @@
+#!/usr/bin/env python3
+"""Read a crate repository's live settings back and fail on any difference.
+
+    script/check-settings <owner/name> [--settings PATH]
+
+The weekly `settings-drift` job runs this against the pinned template's own settings file, so the
+comparison is always against the version of the template the caller actually runs. A setting
+changed by hand in the web interface is a red run, not a surprise; the run's output names the
+setting, the value the file rules, and the value the repository now has.
+
+What this reads: features, merging, metadata, security toggles, the Actions permission set, the
+`crates-io` environment's reviewers, both rulesets, and the label set. What it does not read:
+team membership and app installation permissions, which need organization scopes; those drift
+silently, and this is the BUGS entry that says so.
+"""
+
+import json
+import subprocess
+import sys
+from pathlib import Path
+
+SETTINGS = Path(__file__).resolve().parent.parent / 'settings' / 'repository-settings.json'
+
+
+def api(*args, method='GET', input_=None):
+    cmd = ['gh', 'api', '--method', method, *args]
+    run = subprocess.run(cmd, input=json.dumps(input_) if input_ is not None else None,
+                         capture_output=True, text=True)
+    if run.returncode != 0:
+        return None, run.stderr
+    try:
+        return json.loads(run.stdout), None
+    except json.JSONDecodeError:
+        return {}, None
+
+
+def main(argv):
+    args = argv[1:]
+    settings = SETTINGS
+    if '--settings' in args:
+        i = args.index('--settings')
+        settings = Path(args[i + 1])
+        args = args[:i] + args[i + 2:]
+    if len(args) != 1:
+        print(__doc__, file=sys.stderr)
+        return 2
+    repo = args[0]
+    s = json.loads(settings.read_text())
+    diffs = []
+
+    live, err = api(f'repos/{repo}')
+    if live is None:
+        print(f'check-settings: could not read {repo}: {err}', file=sys.stderr)
+        return 2
+    for key, want in {**s['features'], **s['merging']}.items():
+        if live.get(key) != want:
+            diffs.append(f'{key}: file says {want}, repository has {live.get(key)}')
+    if live.get('homepage') != s['metadata']['homepage'] and s['metadata']['homepage'] != 'https://docs.rs':
+        pass  # the homepage is crate-specific; apply-settings fills it from --crate
+
+    ssa = (live.get('security_and_analysis') or {})
+    for key, want in (('private_vulnerability_reporting', s['security']['private_vulnerability_reporting']),
+                      ('secret_scanning', s['security']['secret_scanning']),
+                      ('secret_scanning_push_protection', s['security']['secret_scanning_push_protection']),
+                      ('dependabot_alerts', s['security']['dependabot_alerts'])):
+        got = (ssa.get(key) or {}).get('enabled')
+        if got != want:
+            diffs.append(f'security/{key}: file says {want}, repository has {got}')
+
+    perms, err = api(f'repos/{repo}/actions/permissions')
+    if perms is None:
+        diffs.append(f'actions/permissions unreadable: {err}')
+    else:
+        if perms.get('enabled') != s['actions']['enabled'] or \
+                perms.get('allowed_actions') != s['actions']['allowed_actions']:
+            diffs.append(f"actions: file says {s['actions']['enabled']}/{s['actions']['allowed_actions']}, "
+                         f'repository has {perms.get("enabled")}/{perms.get("allowed_actions")}')
+    wf, err = api(f'repos/{repo}/actions/permissions/workflow')
+    if wf is None:
+        diffs.append(f'actions/workflow unreadable: {err}')
+    else:
+        if wf.get('default_workflow_permissions') != s['actions']['default_workflow_permissions']:
+            diffs.append(f"default_workflow_permissions: file says {s['actions']['default_workflow_permissions']}, "
+                         f"repository has {wf.get('default_workflow_permissions')}")
+
+    env, err = api(f'repos/{repo}/environments/{s["environment"]["name"]}')
+    if env is None:
+        diffs.append(f'environment {s["environment"]["name"]}: unreadable or absent ({err})')
+    else:
+        got = {r.get('reviewer', {}).get('login')
+               for r in (env.get('protection_rules') or {}).get('required_reviewers', [])}
+        want = set(s['environment']['reviewers'])
+        if got != want:
+            diffs.append(f'environment reviewers: file says {sorted(want)}, repository has {sorted(got)}')
+
+    live_rulesets, err = api(f'repos/{repo}/rulesets?per_page=100')
+    if live_rulesets is None:
+        diffs.append(f'rulesets unreadable: {err}')
+    else:
+        by_name = {r['name']: r for r in live_rulesets}
+        for rs in s['rulesets']:
+            got = by_name.get(rs['name'])
+            if got is None:
+                diffs.append(f'ruleset "{rs["name"]}": missing')
+                continue
+            if got.get('enforcement') != rs['enforcement']:
+                diffs.append(f'ruleset "{rs["name"]}": enforcement is {got.get("enforcement")}')
+            detail, err = api(f'repos/{repo}/rulesets/{got["id"]}')
+            if detail is None:
+                diffs.append(f'ruleset "{rs["name"]}": could not read the detail: {err}')
+                continue
+            rules = {r['type']: r.get('parameters') for r in detail.get('rules', [])}
+            for rtype, want_params in rs['rules'].items():
+                if rtype not in rules:
+                    diffs.append(f'ruleset "{rs["name"]}": rule {rtype} missing')
+                elif isinstance(want_params, dict) and rtype == 'required_status_checks':
+                    want_ctx = {c['context'] for c in want_params['required_status_checks']}
+                    got_ctx = {c['context'] for c in (rules.get(rtype) or {}).get('required_status_checks', [])}
+                    if want_ctx != got_ctx:
+                        diffs.append(f'ruleset "{rs["name"]}": required checks differ; '
+                                     f'missing {sorted(want_ctx - got_ctx)}, extra {sorted(got_ctx - want_ctx)}')
+                    strict = (rules.get(rtype) or {}).get('strict_required_status_checks_policy')
+                    if strict != want_params['strict_required_status_checks_policy']:
+                        diffs.append(f'ruleset "{rs["name"]}": strict (branches up to date) is {strict}')
+
+    labels, err = api(f'repos/{repo}/labels?per_page=100')
+    if labels is None:
+        diffs.append(f'labels unreadable: {err}')
+    else:
+        have = {l['name'] for l in labels}
+        for label in s['labels']:
+            if label['name'] not in have:
+                diffs.append(f'label {label["name"]}: missing')
+
+    if diffs:
+        print(f'check-settings: {len(diffs)} difference(s) between the template and {repo}:')
+        for d in diffs:
+            print(f'  - {d}')
+        return 1
+    print(f'==> check-settings: {repo} matches the template')
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main(sys.argv))
