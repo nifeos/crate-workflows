@@ -25,6 +25,10 @@ on:
         description: Per-file line coverage floor, in percent.
         type: number
         default: 85
+      allow-unpublished:
+        description: Let the crate carry publish = false (fixture crates only).
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -218,7 +222,10 @@ jobs:
         run: |
           set -e
           crate_dir=$(dirname "$MANIFEST")
-          python3 .crate-workflows/helpers/standalone.py --manifest-dir "$crate_dir"
+          # One file per argument is the point; shellcheck wants quoting everywhere otherwise.
+          # shellcheck disable=SC2086
+          flag=${{ inputs.allow-unpublished && '--allow-unpublished' || '' }}
+          python3 .crate-workflows/helpers/standalone.py --manifest-dir "$crate_dir" $flag
       - name: prose caps (README, CHANGELOG)
         run: |
           set -e

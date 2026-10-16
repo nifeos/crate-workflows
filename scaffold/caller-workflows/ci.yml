@@ -1,0 +1,14 @@
+name: check
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+permissions:
+  contents: read
+jobs:
+  ci:
+    permissions:
+      contents: read
+      security-events: write
+    uses: nifeos/crate-workflows/.github/workflows/check.yml@PINS@
+    with:
+      targets: '@TARGETS@'

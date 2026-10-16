@@ -24,9 +24,12 @@ publishing from a `nifeos` workflow. This repository is where all three land.
 
 Inputs every workflow takes (all optional unless named): `manifest-path` (default `Cargo.toml`),
 `targets` (space-separated bare-metal targets to build and lint for, default none), `toolchain`
-(default `stable`), `coverage-floor` (default 85). `proofs.yml` takes `kani-args`; `weekly.yml`
-takes `fuzz` (a boolean, default false, since cargo-fuzz needs nightly and only parsing crates
-want it); `release.yml` takes `version` (required, e.g. `0.1.0`) and `dry-run` (default true).
+(default `stable`), `coverage-floor` (default 85). `check.yml` takes `allow-unpublished` for
+fixture crates that carry `publish = false` on purpose; `proofs.yml` takes `kani-args`;
+`weekly.yml` takes `fuzz` (a boolean, default false, since cargo-fuzz needs nightly and only
+parsing crates want it) and `caller-checks` (the settings-drift and stranger jobs, off for this
+template's own selftest); `release.yml` takes `version` (required, e.g. `0.1.0`) and `dry-run`
+(default true).
 
 ## The lag check
 
@@ -73,7 +76,7 @@ no approval.
 | `script/crate-standalone` | the file, license, vocabulary and lint checks run in the repository itself | `check / standalone` |
 | file-length ratchet, 2,000 lines | same limit, no baseline file (a new repository starts under the cap) | `check / standalone` |
 | comment-block ratchet, 40 lines | same rule | `check / standalone` |
-| workspace lints | `unsafe_op_in_unsafe_fn` and `missing_docs` required in the crate's own `[lints]` | `check / standalone` |
+| workspace lints | `unsafe_op_in_unsafe_fn`, `missing_docs`, and `unexpected_cfgs` naming `cfg(kani)` required in the crate's own `[lints]` | `check / standalone` |
 | orphan Rust files | every `.rs` file sits in the module tree | `check / standalone` |
 | prose ratchet | README and CHANGELOG at nife's caps (3,000 words, median 20, longest 40) | `check / standalone` |
 | house style, typos | `typos` over the tree | `check / standalone` |

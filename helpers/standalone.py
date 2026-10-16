@@ -53,6 +53,34 @@ RUSTFMT_UNSTABLE = ('unstable_features', 'group_imports', 'imports_granularity')
 REQUIRED_LINTS = ('unsafe_op_in_unsafe_fn', 'missing_docs')
 
 
+def lint_findings(manifest):
+    """[(lint, why)] for the [lints] table a standalone crate must carry itself.
+
+    nife's workspace states these once; a standalone crate has no workspace, so the crate's own
+    `[lints]` is the one place they can live. `unexpected_cfgs` needs `cfg(kani)` in its check-cfg
+    list, because the model checker sets that cfg and cargo does not know it: without the line,
+    the ordinary clippy pass refuses every proof module with `-D warnings`.
+    """
+    found = []
+    lints = manifest.get('lints', {}) or {}
+    if lints.get('workspace'):
+        found.append(('lints.workspace = true inherits a workspace that is not here', ''))
+        return found
+    have = {}
+    for table in ('rust', 'clippy', 'all'):
+        for k, v in (lints.get(table, {}) or {}).items():
+            have.setdefault(k, str(v))
+    for lint in REQUIRED_LINTS:
+        if lint not in have:
+            found.append((f'[lints] does not set {lint}', ''))
+    got = have.get('unexpected_cfgs', '')
+    if 'kani' not in got:
+        found.append(('unexpected_cfgs', "[lints.rust] needs "
+                      'unexpected_cfgs = { level = "warn", check-cfg = [\'cfg(kani)\'] }, '
+                      'or -D warnings refuses every proof module'))
+    return found
+
+
 def _normpath(parts):
     out = []
     for p in parts:
@@ -101,14 +129,7 @@ def manifest_findings(manifest, allow_unpublished):
         found.append('no rust-version')
     if pkg.get('publish') is False and not allow_unpublished:
         found.append('publish = false, which no released crate carries')
-    if manifest.get('lints', {}).get('workspace'):
-        found.append('lints.workspace = true inherits a workspace that is not here')
-    have = set()
-    for table in ('rust', 'clippy', 'all'):
-        have |= set((manifest.get('lints', {}) or {}).get(table, {}) or {})
-    for lint in REQUIRED_LINTS:
-        if lint not in have:
-            found.append(f'[lints] does not set {lint}')
+    found += [why for why, _fix in lint_findings(manifest)]
     return found
 
 
@@ -184,6 +205,7 @@ license = "MIT OR Apache-2.0"
 [lints.rust]
 missing_docs = "deny"
 unsafe_op_in_unsafe_fn = "deny"
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(kani)'] }
 """
         (root / 'Cargo.toml').write_text(manifest)
         (root / 'src').mkdir()
