@@ -189,6 +189,8 @@ jobs:
           crate_dir=$(dirname "$MANIFEST")
           cd "$crate_dir"
           cargo +"$TOOLCHAIN" llvm-cov --no-report
+          # The report directory is llvm-cov's to fill, not to create.
+          mkdir -p target/llvm-cov
           cargo llvm-cov report --lcov --output-path target/llvm-cov/lcov.info
           cargo llvm-cov report --summary-only | tee -a "$GITHUB_STEP_SUMMARY"
       - run: .crate-workflows/helpers/coverage-floor.sh "${{ inputs.coverage-floor }}" "$(dirname "$MANIFEST")/target/llvm-cov/lcov.info" "$GITHUB_WORKSPACE/.github/coverage-exemptions"
