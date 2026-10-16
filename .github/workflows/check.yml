@@ -124,7 +124,9 @@ jobs:
       - name: clippy (--cfg kani)
         run: |
           set -e
-          shim=".crate-workflows/target/kani-lint-shim"
+          # Absolute: cargo resolves a relative --extern against the manifest's directory, and the
+          # shim is not the manifest's neighbor.
+          shim="$PWD/.crate-workflows/target/kani-lint-shim"
           mkdir -p "$shim"
           attrs=$(rustc --print file-names --crate-type proc-macro --crate-name kani_attributes \
               .crate-workflows/helpers/kani-lint-shim/kani_attributes.rs)
