@@ -71,7 +71,9 @@ litter="$(git ls-files -ci --exclude-standard)"
 echo "ok"
 
 echo "==> prose style"
-emdash="$(printf '\xe2\x80\x94')"
+# Octal, not hex: dash's printf does not interpret \xHH, and an ASCII "\xe2\x80\x94" would
+# match this very line, which is the failure the first CI run found.
+emdash="$(printf '\342\200\224')"
 if git grep -n -F "$emdash" -- '*.md' '*.yml' script helpers; then
 	fail "an em-dash is in the tree; use commas, periods, semicolons, or parentheses"
 fi
