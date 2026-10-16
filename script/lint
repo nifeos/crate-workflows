@@ -88,6 +88,10 @@ echo "==> markdown links resolve"
 "$py" helpers/check_links.py
 echo "ok"
 
+echo "==> prose caps (this repository's README and CHANGELOG)"
+"$py" helpers/prose_caps.py README.md CHANGELOG.md
+echo "ok"
+
 echo "==> actionlint (the workflow YAML's own linter)"
 if command -v actionlint >/dev/null 2>&1; then
 	# EXCEPTION, marked: actionlint 1.7.12's job-context model predates GitHub's

@@ -229,17 +229,21 @@ jobs:
       - name: prose caps (README, CHANGELOG)
         run: |
           set -e
+          # The crate's own prose, not the caller repository's root: a crate can live one level
+          # down (this template's sample does), and the template's README is nobody's crate.
+          crate_dir=$(dirname "$MANIFEST")
           # One file per argument is the point; shellcheck wants quoting everywhere otherwise.
           # shellcheck disable=SC2086
-          files=$(ls README* CHANGELOG.md 2>/dev/null || true)
+          files=$(ls "$crate_dir"/README* "$crate_dir"/CHANGELOG.md 2>/dev/null || true)
           # shellcheck disable=SC2086
           [ -z "$files" ] || python3 .crate-workflows/helpers/prose_caps.py $files
       - name: file and comment ratchets
         run: |
           set -e
+          crate_dir=$(dirname "$MANIFEST")
           # One file per argument is the point; shellcheck wants quoting everywhere otherwise.
           # shellcheck disable=SC2086
-          rs=$(git ls-files '*.rs')
+          rs=$(git ls-files -- "$crate_dir" | grep '[.]rs$' || true)
           # shellcheck disable=SC2086
           [ -z "$rs" ] || python3 .crate-workflows/helpers/file_length.py $rs
           # shellcheck disable=SC2086

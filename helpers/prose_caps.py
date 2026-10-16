@@ -6,8 +6,9 @@
 The limits are nife's writing standards (its §213 numbers): at most 3,000 words in a document, a
 median sentence of 20 words, a longest sentence of 40, and 4 bold spans per 1,000 words. Fenced
 code blocks are prose neither a reader nor a linter reads as sentences, so they come out first;
-table rows count, one row per sentence, because a wide table row is exactly the wall of text the
-longest-sentence cap exists to catch.
+table rows are data rather than sentences and are skipped too, because a wide mapping table is a
+grid a reader scans, not a paragraph a reader parses. Code spans keep their dots (a `cfg(kani)`
+never ends a sentence); everything else counts.
 
 A document over a cap fails, with its numbers, so the fix is a sentence-level decision and not a
 mood. Name: provisional, from milestone 887's lane.
@@ -21,14 +22,24 @@ DEFAULTS = {'words': 3000, 'median': 20, 'longest': 40, 'bold': 4}
 
 
 def prose(text):
-    """The document with fenced code blocks removed, as a list of sentences' word counts."""
+    """The document reduced to sentences' word counts.
+
+    Fenced code blocks and table rows come out first. A heading or a list marker ends a segment,
+    because "## Examples" is not the tail of the previous section's last sentence and a bullet is
+    not the tail of its neighbor; wrapped paragraph lines continue a sentence and stay joined.
+    """
     text = re.sub(r'```.*?```', '', text, flags=re.S)
     text = re.sub(r'~~~.*?~~~', '', text, flags=re.S)
+    text = '\n'.join(line for line in text.splitlines() if not line.lstrip().startswith('|'))
+    text = re.sub(r'^#{1,6}.*$', '.', text, flags=re.M)
+    text = re.sub(r'^(\s*)(?:[-*]|\d+[.)])\s+', r'\1. ', text, flags=re.M)
     text = re.sub(r'`[^`]*`', lambda m: m.group(0).replace('.', '').replace('!', '').replace('?', ''), text)
     counts = []
     for sentence in re.split(r'(?<=[.!?])\s+', text):
         words = sentence.split()
-        if words:
+        # A heading or list marker became a bare "."; a segment with no word characters in it is
+        # that punctuation, not prose.
+        if words and any(re.search(r'\w', w) for w in words):
             counts.append(len(words))
     return counts
 
@@ -75,7 +86,8 @@ def selftest():
         p.write_text('# A crate.\n\nShort sentences. Each one lands.\n\n```rust\nlet long = sentence; // not prose. Not counted.\n```\n')
         words, found = check(p, DEFAULTS)
         expect('clean', found, [])
-        expect('code fence not counted', words, 8)
+        # The heading is a segment boundary, not prose, so it adds no words.
+        expect('code fence and heading not counted', words, 5)
         p.write_text('One. ' * 3200 + '\n')
         _, found = check(p, DEFAULTS)
         expect('word cap', any('word' in f for f in found), True)

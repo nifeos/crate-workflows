@@ -25,10 +25,10 @@ publishing from a `nifeos` workflow. This repository is where all three land.
 Inputs every workflow takes (all optional unless named): `manifest-path` (default `Cargo.toml`),
 `targets` (space-separated bare-metal targets to build and lint for, default none), `toolchain`
 (default `stable`), `coverage-floor` (default 85). `check.yml` takes `allow-unpublished` for
-fixture crates that carry `publish = false` on purpose; `proofs.yml` takes `kani-args`;
+fixture crates that carry `publish = false` on purpose. `proofs.yml` takes `kani-args`.
 `weekly.yml` takes `fuzz` (a boolean, default false, since cargo-fuzz needs nightly and only
 parsing crates want it) and `caller-checks` (the settings-drift and stranger jobs, off for this
-template's own selftest); `release.yml` takes `version` (required, e.g. `0.1.0`) and `dry-run`
+template's own selftest). `release.yml` takes `version` (required, e.g. `0.1.0`) and `dry-run`
 (default true).
 
 ## The lag check
@@ -100,14 +100,14 @@ no approval.
 ## Repository configuration
 
 `settings/repository-settings.json` is the one description of what a crate repository is
-configured to be: features (issues on with forms, everything else off), merge behavior (merge
-commits, strict up-to-date branches, auto-merge, delete on merge), the two rulesets, the
-`crates-io` environment with a person as required reviewer, security features, Actions
-permissions, the team and app access, metadata, and the label set. `script/apply-settings` applies
-it to a repository with `gh api`; a setting the API refuses is reported and failed, never skipped
-silently. `script/check-settings` reads the live settings back and fails on any difference; the
-weekly `settings-drift` job runs it, so a setting changed by hand in the web interface is a red
-run, not a surprise.
+configured to be. It covers the features (issues on with forms, everything else off) and the merge
+behavior (merge commits, strict up-to-date branches, auto-merge, delete on merge). It covers the
+two rulesets, the `crates-io` environment with a person as required reviewer, and the security
+features. It covers the Actions permissions, the team and app access, the metadata, and the label
+set. `script/apply-settings` applies it to a repository with `gh api`; a setting the API refuses
+is reported and failed, never skipped silently. `script/check-settings` reads the live settings
+back and fails on any difference. The weekly `settings-drift` job runs it, so a setting changed by
+hand in the web interface is a red run, not a surprise.
 
 The architect rules a crate repository keeps: a dependency new to the crate's graph, and a
 breaking change cargo-semver-checks reports against the last published version. Everything else
@@ -116,41 +116,52 @@ tree) lives in nife and stays there.
 
 ## Required checks
 
-The ruleset on `main` requires, with branches up to date: `ci / fmt`, `ci / clippy`, `ci / tests`,
-`ci / coverage`, `ci / standalone`, `ci / supply-chain`, `proofs / kani`, `proofs / falsify`, and
-`hold / architect hold (needs-architect label)`. The names are the caller's job id, a slash, and
-the reusable workflow's job name; `scaffold/` fixes the caller job ids so the two ends cannot
-drift.
+The ruleset on `main` requires nine checks, with branches up to date: the six `check /` jobs (fmt,
+clippy, tests, coverage, standalone, supply-chain), the two `proofs /` jobs (kani, falsify), and
+the hold. The names are the caller's job id, a slash, and the reusable workflow's job name;
+`scaffold/` fixes the caller job ids so the two ends cannot drift.
+
+```
+ci / fmt, ci / clippy, ci / tests, ci / coverage, ci / standalone, ci / supply-chain,
+proofs / kani, proofs / falsify, hold / architect hold (needs-architect label)
+```
 
 ## Adopting it for a crate
 
-Copy `scaffold/` into a new crate repository, replace the pins in the six workflow files with the
-commit SHA of the release you are adopting (a tag's SHA, from `git rev-parse v1^{commit}` here),
-and run `script/apply-settings <owner/name>` once from a checkout, as somebody with repository
-administration rights. `.github/ci-job-budgets` is optional; without it every heavy job assumes
-20 minutes. `mutants-baseline.txt` is optional; without it one survivor fails `weekly / mutation`.
+Copy `scaffold/` into a new crate repository, and replace the pins in the six workflow files. The
+pin is the commit SHA of the release you are adopting: run `git rev-parse v1^{commit}` in a
+checkout of this repository. Then run `script/apply-settings <owner/name>` once, from a checkout,
+as somebody with repository administration rights. `.github/ci-job-budgets` is optional; without
+it every heavy job assumes 20 minutes. `mutants-baseline.txt` is optional; without it one survivor
+fails `weekly / mutation`.
 
 ## EXAMPLES
 
 Adopt the template for a crate called `example_thing`:
 
-    gh repo create nifeos/example_thing --public --clone
-    cd example_thing
-    cp -R ../crate-workflows/scaffold/. .
-    sed -i 's/@PINS@/<release SHA>/g' .github/workflows/*.yml
-    # put the crate under src/, its proofs under src/ with #[kani::proof],
-    # its falsification patches under falsifications/
-    git add -A && git commit -m "adopt the shared crate workflows"
-    gh workflow run release.yml -f version=0.1.0 -f dry-run=true   # rehearse
-    gh workflow run release.yml -f version=0.1.0 -f dry-run=false  # publish, after approval
+```sh
+gh repo create nifeos/example_thing --public --clone
+cd example_thing
+cp -R ../crate-workflows/scaffold/. .
+sed -i 's/@PINS@/<release SHA>/g' .github/workflows/*.yml
+# put the crate under src/, its proofs under src/ with #[kani::proof],
+# its falsification patches under falsifications/
+git add -A && git commit -m "adopt the shared crate workflows"
+gh workflow run release.yml -f version=0.1.0 -f dry-run=true   # rehearse
+gh workflow run release.yml -f version=0.1.0 -f dry-run=false  # publish, after approval
+```
 
 Run the settings drift check by hand:
 
-    script/check-settings nifeos/example_thing
+```sh
+script/check-settings nifeos/example_thing
+```
 
 Record an architect ruling on a pull request:
 
-    script/record-ruling 12 --text "The new dependency is fine: it is no_std and proven."
+```sh
+script/record-ruling 12 --text "The new dependency is fine: it is no_std and proven."
+```
 
 ## BUGS
 

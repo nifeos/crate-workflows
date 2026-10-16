@@ -7,10 +7,9 @@ call that sits behind the newest release.
 ## Unreleased
 
 - First version, from milestone 887 (crate repositories share one CI template). Four reusable
-  workflows (`check`, `proofs`, `weekly`, `release`), the architect label and hold workflows, one
-  settings file with an apply script and a drift check, the lag check in every reusable workflow's
-  first job, and `sample/`, the fixture crate the selftest runs everything against.
-
+  workflows (`check`, `proofs`, `weekly`, `release`), plus the architect label and hold workflows.
+  One settings file, with an apply script and a drift check. The lag check sits in every reusable
+  workflow's first job. `sample/` is the fixture crate the selftest runs everything against.
 ## BUGS
 
 - Nothing here is on crates.io yet, so no release row exists. The first release line lands with
