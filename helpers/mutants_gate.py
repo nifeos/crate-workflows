@@ -21,32 +21,21 @@ from pathlib import Path
 
 
 def survivors(out_dir):
-    """[(file, line, description)] for every mutant the tests did not catch."""
-    path = Path(out_dir) / 'out.json'
-    data = json.loads(path.read_text())
-    if isinstance(data, dict):
-        data = data.get('results', [])
+    """[(file, line, name)] for every mutant the tests did not catch.
+
+    cargo-mutants (27.x) writes `outcomes.json`: one entry per run, `summary` naming the verdict,
+    `scenario.Mutant` carrying the mutant's file, span and name. A mutant the tests did not catch
+    is summary `MissedMutant`.
+    """
+    data = json.loads((Path(out_dir) / 'outcomes.json').read_text())
     out = []
-    for entry in data:
-        if not isinstance(entry, dict):
+    for entry in data.get('outcomes', []):
+        if entry.get('summary') != 'MissedMutant':
             continue
-        missed = _missed(entry)
-        if missed:
-            out.append((entry.get('file', '?'), entry.get('line', '?'),
-                        entry.get('description', '')))
+        mutant = (entry.get('scenario') or {}).get('Mutant') or {}
+        line = ((mutant.get('span') or {}).get('start') or {}).get('line', '?')
+        out.append((mutant.get('file', '?'), line, mutant.get('name', '')))
     return out
-
-
-def _missed(entry):
-    summary = entry.get('summary') or {}
-    if isinstance(summary, dict) and summary.get('Missed'):
-        return True
-    results = entry.get('results')
-    if isinstance(results, dict):
-        return any(isinstance(r, dict) and r.get('class') == 'Missed' for r in results.values())
-    if isinstance(results, list):
-        return any(isinstance(r, dict) and r.get('class') == 'Missed' for r in results)
-    return False
 
 
 def parse_exempts(text):
@@ -112,15 +101,21 @@ def selftest():
     with tempfile.TemporaryDirectory() as tmp:
         out = Path(tmp) / 'mutants.out'
         out.mkdir()
-        (out / 'out.json').write_text(json.dumps([
-            {'file': 'src/lib.rs', 'line': 4, 'description': 'replace + with -',
-             'summary': {'Caught': 2, 'Missed': 1}},
-            {'file': 'src/lib.rs', 'line': 9, 'description': 'replace == with !=',
-             'results': {'t': {'class': 'Caught'}}},
-        ]))
-        expect('one survivor', survivors(out), [('src/lib.rs', 4, 'replace + with -')])
-        lines, problems = parse_exempts('# c\n\nsrc/lib.rs:4 # equivalent arithmetic\nbad line\n')
-        expect('exempt parsed', list(lines), ['src/lib.rs:4'])
+        (out / 'outcomes.json').write_text(json.dumps({'outcomes': [
+            {'scenario': 'Baseline', 'summary': 'Success'},
+            {'scenario': {'Mutant': {'name': 'src/lib.rs:4:5: replace x with 0',
+                                     'file': 'src/lib.rs',
+                                     'span': {'start': {'line': 4, 'column': 5}}}},
+             'summary': 'CaughtMutant'},
+            {'scenario': {'Mutant': {'name': 'src/lib.rs:9:12: replace > with >=',
+                                     'file': 'src/lib.rs',
+                                     'span': {'start': {'line': 9, 'column': 12}}}},
+             'summary': 'MissedMutant'},
+        ]}))
+        expect('one survivor', survivors(out),
+               [('src/lib.rs', 9, 'src/lib.rs:9:12: replace > with >=')])
+        lines, problems = parse_exempts('# c\n\nsrc/lib.rs:9 # equivalent arithmetic\nbad line\n')
+        expect('exempt parsed', list(lines), ['src/lib.rs:9'])
         expect('bad line refused', len(problems), 1)
     print('mutants_gate selftest: %s' % ('ok' if ok else 'FAILED'))
     return 0 if ok else 1

@@ -44,6 +44,28 @@ ATTR = '#[kani::proof]'
 CONVENTIONAL = re.compile(r'^falsifications/[\w.]+\.patch$')
 
 
+def git_apply(root, patch_rel, mode):
+    """git apply a crate-relative patch.
+
+    `git apply` run inside a subdirectory SILENTLY IGNORES patches whose paths resolve outside
+    that subdirectory (exit 0, "0 files changed"), so a patch for `src/lib.rs` applied from a
+    crate that is not the repository root would do nothing and call it success. The apply goes
+    through the repository root with `--directory=<crate prefix>` instead, which is also why the
+    form check's `--check` cannot lie the same way.
+    """
+    prefix = subprocess.run(['git', 'rev-parse', '--show-prefix'], cwd=root,
+                            capture_output=True, text=True).stdout.strip()
+    args = ['git']
+    if prefix:
+        args += ['-C', subprocess.run(['git', 'rev-parse', '--show-toplevel'], cwd=root,
+                                      capture_output=True, text=True).stdout.strip()]
+        args += ['apply', f'--directory={prefix.rstrip("/")}']
+    else:
+        args += ['apply']
+    args += ([mode] if mode else []) + ['-p1', str(patch_rel) if not prefix else str(Path(root) / patch_rel)]
+    return subprocess.run(args, capture_output=True, text=True)
+
+
 def records(root):
     """[(file, line, fn, state, path, reason)] for every Kani harness under root."""
     out = []
@@ -129,8 +151,7 @@ def check(root, recs):
             continue
         if not text.startswith(('diff --git', '///', '/*', '#')) and not re.match(r'^\s*///', text):
             pass  # prose above the first hunk is checked by applying, not by guessing formats
-        r = subprocess.run(['git', 'apply', '--check', '-p1', str(p.relative_to(root))],
-                           cwd=root, capture_output=True, text=True)
+        r = git_apply(root, Path(path), '--check')
         if r.returncode != 0:
             print(f'falsify: {where}: patch {path} no longer applies: {r.stderr.strip()}',
                   file=sys.stderr)
@@ -148,9 +169,7 @@ def replay(root, recs, limit):
     for f, line, name, state, path, _rest in recs:
         if state != 'replayable' or not path:
             continue
-        p = root / path
-        apply_in = subprocess.run(['git', 'apply', '-p1', str(p.relative_to(root))],
-                                  cwd=root, capture_output=True, text=True)
+        apply_in = git_apply(root, Path(path), '')
         if apply_in.returncode != 0:
             print(f'falsify: {f.relative_to(root)}:{line}: patch {path} would not apply: '
                   f'{apply_in.stderr.strip()}', file=sys.stderr)
@@ -182,8 +201,7 @@ def replay(root, recs, limit):
                   file=sys.stderr)
             bad = True
         finally:
-            subprocess.run(['git', 'apply', '-R', '-p1', str(p.relative_to(root))],
-                           cwd=root, capture_output=True, text=True)
+            git_apply(root, Path(path), '-R')
     return bad
 
 
