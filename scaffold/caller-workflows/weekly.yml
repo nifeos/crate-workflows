@@ -3,6 +3,8 @@ on:
   schedule:
     - cron: '30 6 * * 1'
   workflow_dispatch:
+# `administration` refuses the job-level permissions block (GitHub validates only a subset of
+# scopes there), so the settings-drift job's reads are granted here, at the workflow level.
 permissions:
   contents: read
   administration: read

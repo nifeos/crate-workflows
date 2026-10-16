@@ -26,6 +26,9 @@ on:
 
 permissions:
   contents: read
+  # `administration` is not a job-level scope (GitHub refuses the value there), so the settings-drift
+  # job's reads of the environments and rulesets APIs are granted here, at the workflow level, and
+  # every other job simply does not exercise it.
   administration: read
 
 concurrency:
