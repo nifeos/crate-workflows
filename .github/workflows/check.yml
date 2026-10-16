@@ -193,12 +193,15 @@ jobs:
           mkdir -p target/llvm-cov
           cargo llvm-cov report --lcov --output-path target/llvm-cov/lcov.info
           cargo llvm-cov report --summary-only | tee -a "$GITHUB_STEP_SUMMARY"
-      - run: .crate-workflows/helpers/coverage-floor.sh "${{ inputs.coverage-floor }}" "$(dirname "$MANIFEST")/target/llvm-cov/lcov.info" "$GITHUB_WORKSPACE/.github/coverage-exemptions"
+          # Exported, not expressed: GitHub's expression language has no dirname, and a path built
+          # by concatenating the manifest path points through the manifest file itself.
+          echo "COVERAGE_DIR=$(pwd)/target/llvm-cov" >> "$GITHUB_ENV"
+      - run: .crate-workflows/helpers/coverage-floor.sh "${{ inputs.coverage-floor }}" "$COVERAGE_DIR/lcov.info" "$GITHUB_WORKSPACE/.github/coverage-exemptions"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
         with:
           name: coverage
-          path: ${{ inputs.manifest-path != 'Cargo.toml' && format('{0}/target/llvm-cov/', inputs.manifest-path) || 'target/llvm-cov/' }}
+          path: ${{ env.COVERAGE_DIR }}
       - name: budget
         if: always()
         run: python3 .crate-workflows/helpers/job_budget.py check "${{ github.job }}" "$JOB_STARTED_AT"
