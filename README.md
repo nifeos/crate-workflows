@@ -187,6 +187,8 @@ script/record-ruling 12 --text "The new dependency is fine: it is no_std and pro
 - The org-level Actions allowlist (SHA-pinned only, verified creators, `kani-github-action`
   named) is organization state, not repository state; `script/apply-settings` attempts it and
   reports the refusal when the token lacks the scope.
-- Tag rules: the ruleset restricts tag update and deletion for everyone; creation is restricted
-  with the GitHub Actions integration as bypass so only `release.yml` can make one. If the API
-  refuses the bypass entry on a repository, creation stays open until a person closes it.
+- Tag rules: the repository rulesets API refuses ref_name conditions on push-target rulesets
+  ("Target ref_name is not supported for push rulesets", measured live on the throwaway
+  repository), so `apply-settings` reports the tags ruleset as refused and the release workflow's
+  own gate is what keeps a stray tag from mattering. The durable fix is an organization-level
+  push ruleset scoped by repository and ref, which needs an org-scoped token.

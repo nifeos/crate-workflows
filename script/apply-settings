@@ -20,8 +20,12 @@ SETTINGS = Path(__file__).resolve().parent.parent / 'settings' / 'repository-set
 
 
 def gh(*args, input_=None):
-    """(rc, stdout, stderr) for one `gh api` call."""
+    """(rc, stdout, stderr) for one `gh api` call. A body goes with --input -; without it, gh
+    silently drops stdin and the API answers with 422s about null data (found live, on the
+    throwaway repository, where every JSON-bodied step was refused at once)."""
     cmd = ['gh', 'api', *args]
+    if input_ is not None:
+        cmd[2:2] = ['--input', '-']
     run = subprocess.run(cmd, input=input_, capture_output=True, text=True)
     return run.returncode, run.stdout, run.stderr
 
@@ -31,7 +35,7 @@ def call(step, *args, method='POST', json_body=None, input_=None):
     ('repos/o/r',); the method is gh's --method, defaulting to POST, the API's write default."""
     if json_body is not None:
         input_ = json.dumps(json_body)
-    rc, out, err = gh('--method', method, *args, input=input_)
+    rc, out, err = gh('--method', method, *args, input_=input_)
     if rc != 0:
         last = err.strip().splitlines()[-1] if err.strip() else f'exit {rc}'
         print(f'apply-settings: REFUSED at {step}: {last}', file=sys.stderr)

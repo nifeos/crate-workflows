@@ -124,6 +124,7 @@
           "exclude": []
         }
       },
+      "_readme": "The repository rulesets API refuses ref_name conditions on push-target rulesets (measured live: 'Target ref_name is not supported for push rulesets'), so apply-settings reports this ruleset as refused. Tag protection is then one of: an organization-level push ruleset scoped by repository_name and ref_name (needs an org-scoped token), or tag creation staying open on the repository, which the release workflow's own refusal (gate before tag) keeps from mattering much.",
       "bypass_actors": [
         { "actor_id": 15368, "actor_type": "Integration", "bypass_mode": "always" }
       ],
