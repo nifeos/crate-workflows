@@ -187,6 +187,11 @@ script/record-ruling 12 --text "The new dependency is fine: it is no_std and pro
 - The org-level Actions allowlist (SHA-pinned only, verified creators, `kani-github-action`
   named) is organization state, not repository state; `script/apply-settings` attempts it and
   reports the refusal when the token lacks the scope.
+- The fork pull request approval policy ("require approval for all outside contributors") is
+  organization state too, and nothing here can set or read it: the org Actions endpoints answer
+  403 to a non-admin token and the fork-policy path answers Not Found (measured 2026-10-16). Set
+  it once in the org's Actions settings. A public repository's default is approval for
+  first-time outside contributors only.
 - Tag rules: the repository rulesets API refuses ref_name conditions on push-target rulesets
   ("Target ref_name is not supported for push rulesets", measured live on the throwaway
   repository), so `apply-settings` reports the tags ruleset as refused and the release workflow's

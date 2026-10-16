@@ -69,13 +69,20 @@ def main(argv):
         pass  # the homepage is crate-specific; apply-settings fills it from --crate
 
     ssa = (live.get('security_and_analysis') or {})
-    for key, want in (('private_vulnerability_reporting', s['security']['private_vulnerability_reporting']),
-                      ('secret_scanning', s['security']['secret_scanning']),
-                      ('secret_scanning_push_protection', s['security']['secret_scanning_push_protection']),
-                      ('dependabot_alerts', s['security']['dependabot_alerts'])):
-        got = (ssa.get(key) or {}).get('enabled')
-        if got != want:
-            diffs.append(f'security/{key}: file says {want}, repository has {got}')
+    if not ssa:
+        diffs.append('security/security_and_analysis: the API returns no block for this token, so '
+                     'the four toggles are unverifiable by read here; they were verified at '
+                     'apply time, and an organization token would make this row readable')
+    else:
+        for key, want in (('secret_scanning', s['security']['secret_scanning']),
+                          ('secret_scanning_push_protection', s['security']['secret_scanning_push_protection'])):
+            status = (ssa.get(key) or {}).get('status')
+            got = {'enabled': True, 'disabled': False, None: None}.get(status, status)
+            if got != want:
+                diffs.append(f'security/{key}: file says {want}, repository has {got}')
+        # private_vulnerability_reporting and dependabot_alerts are absent from the read on a
+        # public repository (measured): the first is not offered there, the second is always on.
+        # Unverifiable by read is not drift, so they are skipped rather than flagged.
 
     perms, err = api(f'repos/{repo}/actions/permissions')
     if perms is None:
@@ -97,8 +104,12 @@ def main(argv):
     if env is None:
         diffs.append(rulesets_unreadable(repo, f'environment {s["environment"]["name"]}: {err}'))
     else:
-        got = {r.get('reviewer', {}).get('login')
-               for r in (env.get('protection_rules') or {}).get('required_reviewers', [])}
+        # protection_rules is a list of rule objects; the reviewers ride the one of type
+        # required_reviewers (measured live on the exit-test repository).
+        got = set()
+        for rule in env.get('protection_rules') or []:
+            if rule.get('type') == 'required_reviewers':
+                got |= {r.get('reviewer', {}).get('login') for r in rule.get('reviewers', [])}
         want = set(s['environment']['reviewers'])
         if got != want:
             diffs.append(f'environment reviewers: file says {sorted(want)}, repository has {sorted(got)}')
