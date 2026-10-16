@@ -182,15 +182,19 @@ jobs:
       # still carries its numbers.
       - run: |
           set -e
-          cargo +"$TOOLCHAIN" llvm-cov --manifest-path "$MANIFEST" --no-report
+          # From the crate's directory: cargo-llvm-cov's own plumbing (cargo locate-project) runs
+          # against the working directory, and a crate one level down has no manifest at the root.
+          crate_dir=$(dirname "$MANIFEST")
+          cd "$crate_dir"
+          cargo +"$TOOLCHAIN" llvm-cov --no-report
           cargo llvm-cov report --lcov --output-path target/llvm-cov/lcov.info
           cargo llvm-cov report --summary-only | tee -a "$GITHUB_STEP_SUMMARY"
-      - run: .crate-workflows/helpers/coverage-floor.sh "${{ inputs.coverage-floor }}" target/llvm-cov/lcov.info .github/coverage-exemptions
+      - run: .crate-workflows/helpers/coverage-floor.sh "${{ inputs.coverage-floor }}" "$(dirname "$MANIFEST")/target/llvm-cov/lcov.info" "$(dirname "$MANIFEST")/../.github/coverage-exemptions"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
         with:
           name: coverage
-          path: target/llvm-cov/
+          path: ${{ inputs.manifest-path != 'Cargo.toml' && format('{0}/target/llvm-cov/', inputs.manifest-path) || 'target/llvm-cov/' }}
       - name: budget
         if: always()
         run: python3 .crate-workflows/helpers/job_budget.py check "${{ github.job }}" "$JOB_STARTED_AT"

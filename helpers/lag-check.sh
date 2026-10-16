@@ -25,6 +25,14 @@ set -eu
 repo="${TEMPLATE_REPO:-nifeos/crate-workflows}"
 pin="${JOB_WORKFLOW_SHA:-}"
 
+# The template's own selftest calls these workflows in their own repository; such a call is the
+# current source by construction, and there is no release for the check to compare against until
+# the first one is cut. The check exists for cross-repository pins, so it stands down here.
+if [ "${GITHUB_REPOSITORY:-}" = "$repo" ]; then
+	echo "lag: same-repository call; the pin is this commit by construction."
+	exit 0
+fi
+
 if [ -z "$pin" ]; then
 	echo "lag: job.workflow_sha is empty, so this call's template version is unknown." >&2
 	echo "lag: failing closed: a call whose version cannot be read may be any age." >&2

@@ -158,10 +158,10 @@ jobs:
           cargo semver-checks --manifest-path "$MANIFEST" --json > semver-report.json 2> semver.err || true
           {
             echo "### semver against the last release"
-            '```'
+            echo '```'
             python3 .crate-workflows/helpers/semver_major.py semver-report.json || true
             head -5 semver.err
-            '```'
+            echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
       - name: budget
         if: always()
@@ -206,7 +206,7 @@ jobs:
           tool: cargo-mutants@27.1.0
       # A report with a tooth: a survivor fails the run unless the caller's
       # .github/mutants-exempts lists it, one mutant per line with its reason.
-      - run: cargo mutants --manifest-path "$MANIFEST" --jobs 2 --timeout 300
+      - run: cd "$(dirname "$MANIFEST")" && cargo mutants --jobs 2 --timeout 300
       - run: python3 .crate-workflows/helpers/mutants_gate.py "$(dirname "$MANIFEST")/mutants.out" .github/mutants-exempts
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
