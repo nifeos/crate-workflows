@@ -1,0 +1,135 @@
+#!/bin/sh
+#
+# Record an architect's ruling on a pull request or issue, and take it out of the architect's queue,
+# in one step. Ported from nife's script/record-ruling, with the default repository changed and the
+# drain references dropped: a crate repository has no merge drain, and the hold check here is what
+# keeps the pull request red until the swap lands.
+#
+#     script/record-ruling 12 --text 'The new dependency is fine: no_std, and proven.'
+#     script/record-ruling 12 --link https://github.com/nifeos/example/pull/12#issuecomment-1
+#     script/record-ruling 12 --partial --text 'Fork 1: "Yes."'
+#
+# # What it does
+#
+# Posts the ruling as a comment carrying `## Ruling (calef, <UTC time>)`, then removes
+# `needs-architect` and adds `architect-ruled`, plus `held-by-lane` when the ruling sends work back.
+# `--partial` records a ruling on some of the asks and changes no label. The swap is verified by
+# re-reading the labels; until it took, the hold check keeps the pull request red, which is the
+# mechanism, not a bug.
+
+set -eu
+
+usage() {
+	cat >&2 <<'EOF'
+usage: script/record-ruling <number> (--text <ruling> | --file <path> | --link <url>)
+                            [--held-by-lane] [--partial] [--lane <name>] [--repo <owner/repo>]
+                            [--dry-run]
+
+  <number>          the pull request or issue the ruling answers
+  --text <ruling>   the ruling, in the architect's words where there are any (markdown)
+  --file <path>     the same, read from a file
+  --link <url>      the ruling is recorded elsewhere; link it
+  --held-by-lane    the ruling sends work back: also add held-by-lane
+  --partial         rules on some of the asks only: post it, change no label, leave the question open
+  --lane <name>     who is relaying, for the comment's first line (default: $CRATE_LANE, else
+                    "maintainer session")
+  --repo <o/r>      default: $GITHUB_REPOSITORY, else required
+  --dry-run         print the comment and the label change, post nothing
+EOF
+	exit 2
+}
+
+[ $# -ge 1 ] || usage
+num="$1"
+shift
+case "$num" in '' | *[!0-9]*) usage ;; esac
+
+text="" link="" held="" partial="" dry=""
+lane="${CRATE_LANE:-maintainer session}"
+repo="${GITHUB_REPOSITORY:-}"
+while [ $# -gt 0 ]; do
+	case "$1" in
+	--text) [ $# -ge 2 ] || usage; text="$2"; shift 2 ;;
+	--file) [ $# -ge 2 ] || usage; text="$(cat "$2")"; shift 2 ;;
+	--link) [ $# -ge 2 ] || usage; link="$2"; shift 2 ;;
+	--held-by-lane) held=1; shift ;;
+	--partial) partial=1; shift ;;
+	--lane) [ $# -ge 2 ] || usage; lane="$2"; shift 2 ;;
+	--repo) [ $# -ge 2 ] || usage; repo="$2"; shift 2 ;;
+	--dry-run) dry=1; shift ;;
+	*) usage ;;
+	esac
+done
+if [ -z "$repo" ]; then
+	echo "record-ruling: name the repository (--repo owner/name, or run inside the repository)." >&2
+	usage
+fi
+if [ -z "$text" ] && [ -z "$link" ]; then
+	echo "record-ruling: give the ruling (--text or --file) or where it is recorded (--link)." >&2
+	usage
+fi
+if [ -n "$partial" ] && [ -n "$held" ]; then
+	echo "record-ruling: --partial changes no label, so it cannot add held-by-lane." >&2
+	exit 2
+fi
+
+kind="$(gh api "repos/$repo/issues/$num" --jq 'if .pull_request then "pr" else "issue" end')" || {
+	echo "record-ruling: could not read #$num in $repo." >&2
+	exit 1
+}
+
+when="$(date -u '+%Y-%m-%d %H:%M')"
+if [ -n "$partial" ]; then
+	heading="## Partial ruling (calef, $when UTC)"
+	marker="<!-- architect-ruling partial -->"
+	tail="Some asks remain open; \`needs-architect\` stays on."
+else
+	heading="## Ruling (calef, $when UTC)"
+	marker="<!-- architect-ruling -->"
+	if [ -n "$held" ]; then
+		tail="Sent back: the lane owes a change, so this carries \`held-by-lane\` and \`architect-ruled\`."
+	else
+		tail="Every open ask above is answered, so this carries \`architect-ruled\`."
+	fi
+fi
+body="**Lane:** $lane, relaying an architect ruling, written by an agent; calef's account is the author GitHub shows.
+
+$heading
+"
+[ -n "$text" ] && body="$body
+$text
+"
+[ -n "$link" ] && body="$body
+Recorded at $link.
+"
+body="$body
+$tail
+
+$marker"
+
+if [ -n "$dry" ]; then
+	printf 'record-ruling: (dry run) would comment on %s #%s:\n\n%s\n\n' "$kind" "$num" "$body"
+	[ -z "$partial" ] && echo "record-ruling: (dry run) would remove needs-architect and add architect-ruled${held:+ and held-by-lane}"
+	exit 0
+fi
+
+printf '%s\n' "$body" | gh "$kind" comment "$num" --repo "$repo" --body-file - >/dev/null
+echo "record-ruling: ruling posted on #$num"
+[ -n "$partial" ] && exit 0
+
+# One edit, so the queue never shows the item half-swapped. Remove only what is present: gh refuses
+# to remove a label the item does not carry.
+labels="$(gh api "repos/$repo/issues/$num" --jq '.labels[].name')" || labels=""
+set -- --add-label architect-ruled
+[ -n "$held" ] && set -- "$@" --add-label held-by-lane
+printf '%s\n' "$labels" | grep -qx needs-architect && set -- "$@" --remove-label needs-architect
+gh "$kind" edit "$num" --repo "$repo" "$@" >/dev/null || true
+
+after="$(gh api "repos/$repo/issues/$num" --jq '.labels[].name')" || after=""
+if printf '%s\n' "$after" | grep -qx needs-architect || ! printf '%s\n' "$after" | grep -qx architect-ruled ||
+	{ [ -n "$held" ] && ! printf '%s\n' "$after" | grep -qx held-by-lane; }; then
+	echo "record-ruling: the ruling is posted, but the labels on #$num did not swap (now: $(printf '%s' "$after" | tr '\n' ' '))." >&2
+	echo "record-ruling: fix them by hand; until then the hold check keeps #$num red." >&2
+	exit 1
+fi
+echo "record-ruling: #$num now carries architect-ruled${held:+ and held-by-lane}, and not needs-architect"

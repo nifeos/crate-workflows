@@ -1,0 +1,115 @@
+#!/bin/sh
+#
+# script/lint: this repository's own gates. Runs offline (selftests, greps, shell checks) and is
+# called by the selftest workflow's lint job, which installs actionlint first when it is missing.
+#
+# What each section is for:
+# - shell checks: every script here runs inside a caller's CI; a shell bug is nine repositories'
+#   red at once.
+# - selftests: the python helpers carry their own; a change to a gate without a test of the gate is
+#   not done.
+# - SHA pinning: the same grep nife runs. A floating `uses:` is a supply-chain hole in every caller
+#   at once.
+# - workflow shape: reusable workflows declare permissions; the lag check is the first job where a
+#   stale pin should fail (helpers/workflow_shape.py); the budget lint holds the clock steps
+#   (helpers/job_budget.py lint).
+# - prose: em-dashes and the banned words nife's style refuses; a template that teaches by example
+#   keeps the style.
+# - actionlint: the one check this script runs only when the binary exists. Its absence is printed
+#   loudly: the workflow files' YAML is otherwise unlinted until CI, which is an exception, marked
+#   here rather than hidden.
+
+set -eu
+
+cd "$(dirname "$0")/.."
+
+fail() {
+	echo "lint: $1" >&2
+	exit 1
+}
+
+echo "==> shell checks"
+scripts="script/lint script/record-ruling script/stranger-due script/sync-labels helpers/*.sh"
+shellcheck --severity=warning $scripts
+for f in $scripts; do
+	case "$(head -1 "$f")" in
+	'#!/bin/sh') sh -n "$f" ;;
+	esac
+done
+echo "ok"
+
+echo "==> python selftests"
+py="$(command -v python3)"
+if ! "$py" -c 'import tomllib' 2>/dev/null; then
+	fail "python3 lacks tomllib (3.11+); the helpers parse manifests"
+fi
+# The helpers that carry their own tests, named here so a helper without a selftest is a visible
+# gap in this list rather than an invisible gap in a grep.
+for f in standalone prose_caps orphan_modules check_links falsify architect-label-rules \
+	mutants_gate job_budget workflow_shape; do
+	"$py" "helpers/$f.py" --selftest
+done
+"$py" script/apply-settings --help >/dev/null && echo "apply-settings --help ok"
+echo "ok"
+
+echo "==> actions are pinned to a commit SHA"
+unpinned="$(git grep -nE '^[[:space:]]*(-[[:space:]]+)?uses:[[:space:]]' -- .github |
+	grep -vE 'uses:[[:space:]]+\./' |
+	grep -vE 'uses:[[:space:]]+[^@[:space:]]+@[0-9a-f]{40}([[:space:]]|$)' || true)"
+[ -z "$unpinned" ] || fail "an action is not pinned to a full SHA:
+$unpinned"
+echo "ok"
+
+echo "==> workflow shape and budgets"
+"$py" helpers/workflow_shape.py
+"$py" helpers/job_budget.py lint
+echo "ok"
+
+echo "==> tracked-but-ignored files"
+litter="$(git ls-files -ci --exclude-standard)"
+[ -z "$litter" ] || fail "tracked but ignored: $litter"
+echo "ok"
+
+echo "==> prose style"
+# Octal, not hex: dash's printf does not interpret \xHH, and an ASCII "\xe2\x80\x94" would
+# match this very line, which is the failure the first CI run found.
+emdash="$(printf '\342\200\224')"
+if git grep -n -F "$emdash" -- '*.md' '*.yml' script helpers; then
+	fail "an em-dash is in the tree; use commas, periods, semicolons, or parentheses"
+fi
+if git grep -niE 'delve|comprehensive|landscape|moreover|furthermore|notably|it.s worth noting|straightforward' -- '*.md'; then
+	fail "a banned word is in the tree"
+fi
+[ -f README.md ] || fail "no README"
+[ -f CHANGELOG.md ] || fail "no CHANGELOG"
+echo "ok"
+
+echo "==> markdown links resolve"
+"$py" helpers/check_links.py
+echo "ok"
+
+echo "==> prose caps (this repository's README and CHANGELOG)"
+"$py" helpers/prose_caps.py README.md CHANGELOG.md
+echo "ok"
+
+echo "==> actionlint (the workflow YAML's own linter)"
+if command -v actionlint >/dev/null 2>&1; then
+	# EXCEPTION, marked: actionlint 1.7.12's job-context model predates GitHub's
+	# job.workflow_sha / job.workflow_repository, which the contexts reference documents and which
+	# the lag check and helper checkout depend on. The two -ignore patterns name exactly those
+	# properties and nothing else; the selftest's own runs are the proof the properties resolve on
+	# github.com. A newer actionlint that knows them makes the ignores dead and harmless.
+	# EXCEPTION, marked: actionlint 1.7.12 also does not know the "administration" permission
+	# scope, which GitHub documents and the settings-drift job needs to read rulesets back. The
+	# ignore names that scope only; the selftest's settings-drift run is the proof it works.
+	actionlint \
+		-ignore 'property "workflow_sha" is not defined' \
+		-ignore 'property "workflow_repository" is not defined' \
+		-ignore 'unknown permission scope "administration"'
+	echo "ok"
+else
+	echo "EXCEPTION: actionlint is not installed, so the workflow YAML is unlinted here and only" >&2
+	echo "checked when CI runs it. This is marked rather than hidden; install actionlint locally." >&2
+fi
+
+echo "==> lint: ok"

@@ -1,0 +1,8 @@
+# Build output and tool droppings. Nothing here is source.
+/target
+sample/target
+mutants.out
+sample/mutants.out
+semver-report.json
+semver.err
+findings.txt

@@ -1,0 +1,137 @@
+{
+  "_readme": "The one description of what a crate repository is configured to be. script/apply-settings applies it with gh api and refuses a setting the API rejects, never silently skips it. script/check-settings reads the live settings back and fails on any difference, so a setting changed by hand in the web interface is a red run. Names here are provisional until calef's naming pass.",
+
+  "metadata": {
+    "description": "A standalone nifeos crate: proven with Kani, released through the shared workflows",
+    "homepage": "https://docs.rs",
+    "topics": ["rust", "no-std", "formal-verification", "kani"]
+  },
+
+  "features": {
+    "has_issues": true,
+    "has_wiki": false,
+    "has_projects": false,
+    "has_discussions": false
+  },
+
+  "merging": {
+    "allow_merge_commit": true,
+    "allow_squash_merge": false,
+    "allow_rebase_merge": false,
+    "delete_branch_on_merge": true,
+    "allow_auto_merge": true,
+    "allow_update_branch": true
+  },
+
+  "security": {
+    "private_vulnerability_reporting": true,
+    "secret_scanning": true,
+    "secret_scanning_push_protection": true,
+    "dependabot_alerts": true,
+    "dependabot_security_updates": true
+  },
+
+  "actions": {
+    "enabled": true,
+    "allowed_actions": "selected",
+    "github_owned_allowed": true,
+    "verified_allowed": true,
+    "patterns_allowed": ["model-checking/kani-github-action"],
+    "default_workflow_permissions": "read",
+    "can_approve_pull_request_reviews": false
+  },
+
+  "environment": {
+    "name": "crates-io",
+    "wait_timer": 0,
+    "reviewers": ["calef"]
+  },
+
+  "team": {
+    "org": "nifeos",
+    "slug": "crates-io",
+    "permission": "maintain"
+  },
+
+  "app": {
+    "slug": "nife-smelter",
+    "permission": "write"
+  },
+
+  "labels": [
+    {
+      "name": "needs-architect",
+      "color": "b60205",
+      "description": "An open question for the architect; the hold check keeps this red until a ruling lands."
+    },
+    {
+      "name": "architect-ruled",
+      "color": "0e8a16",
+      "description": "The architect ruled; the hold check releases and the labeler stands down."
+    },
+    {
+      "name": "held-by-lane",
+      "color": "d93f0b",
+      "description": "Ruled, and the lane still owes a change; holds even beside architect-ruled."
+    }
+  ],
+
+  "rulesets": [
+    {
+      "name": "main: pull requests and the shared checks",
+      "target": "branch",
+      "enforcement": "active",
+      "conditions": {
+        "ref_name": {
+          "include": ["~DEFAULT_BRANCH"],
+          "exclude": []
+        }
+      },
+      "bypass_actors": [],
+      "rules": {
+        "deletion": true,
+        "non_fast_forward": true,
+        "pull_request": {
+          "required_approving_review_count": 0,
+          "dismiss_stale_reviews_on_push": false,
+          "require_code_owner_review": false,
+          "require_last_push_approval": false,
+          "required_review_thread_resolution": true
+        },
+        "required_status_checks": {
+          "strict_required_status_checks_policy": true,
+          "required_status_checks": [
+            { "context": "ci / fmt" },
+            { "context": "ci / clippy" },
+            { "context": "ci / tests" },
+            { "context": "ci / coverage" },
+            { "context": "ci / standalone" },
+            { "context": "ci / supply-chain" },
+            { "context": "proofs / kani" },
+            { "context": "proofs / falsify" },
+            { "context": "hold / architect hold (needs-architect label)" }
+          ]
+        }
+      }
+    },
+    {
+      "name": "tags: only the release workflow makes one",
+      "target": "push",
+      "enforcement": "active",
+      "conditions": {
+        "ref_name": {
+          "include": ["refs/tags/v*"],
+          "exclude": []
+        }
+      },
+      "bypass_actors": [
+        { "actor_id": 15368, "actor_type": "Integration", "bypass_mode": "always" }
+      ],
+      "rules": {
+        "creation": true,
+        "update": true,
+        "deletion": true
+      }
+    }
+  ]
+}

@@ -1,0 +1,156 @@
+#!/usr/bin/env python3
+"""Apply settings/repository-settings.json to a crate repository, with gh api.
+
+    script/apply-settings <owner/name> [--crate NAME] [--topic extra-topic] [--dry-run]
+
+`--crate` fills the metadata (description's first word and the docs.rs homepage); `--topic` appends
+the crate's domain topic. Every step reports what it did and what the API refused. A refusal is a
+finding, never a silent skip: some settings (organization teams, app installation permissions, the
+org Actions allowlist) need scopes a repository-scoped token does not carry, and the honest output
+is the list of what a person still owes. Exit 1 when anything was refused.
+"""
+
+import argparse
+import json
+import subprocess
+import sys
+from pathlib import Path
+
+SETTINGS = Path(__file__).resolve().parent.parent / 'settings' / 'repository-settings.json'
+
+
+def gh(*args, input_=None):
+    """(rc, stdout, stderr) for one `gh api` call."""
+    cmd = ['gh', 'api', *args]
+    run = subprocess.run(cmd, input=input_, capture_output=True, text=True)
+    return run.returncode, run.stdout, run.stderr
+
+
+def call(step, *args, method='POST', json_body=None, input_=None):
+    """Run one gh api call; print and remember refusals. args are gh api path arguments, e.g.
+    ('repos/o/r',); the method is gh's --method, defaulting to POST, the API's write default."""
+    if json_body is not None:
+        input_ = json.dumps(json_body)
+    rc, out, err = gh('--method', method, *args, input=input_)
+    if rc != 0:
+        last = err.strip().splitlines()[-1] if err.strip() else f'exit {rc}'
+        print(f'apply-settings: REFUSED at {step}: {last}', file=sys.stderr)
+        return None
+    print(f'apply-settings: {step}: ok')
+    return out
+
+
+def main(argv):
+    ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    ap.add_argument('repo')
+    ap.add_argument('--crate')
+    ap.add_argument('--topic', action='append', default=[])
+    ap.add_argument('--dry-run', action='store_true')
+    ap.add_argument('--settings', default=str(SETTINGS))
+    args = ap.parse_args(argv[1:])
+    s = json.loads(open(args.settings).read())
+    refusals = []
+
+    def step(label, *api, **kw):
+        if args.dry_run:
+            print(f'apply-settings: (dry run) {label}: {" ".join(str(a) for a in api)}')
+            return '{}'
+        out = call(label, *api, **kw)
+        if out is None:
+            refusals.append(label)
+            return '{}'
+        return out or '{}'
+
+    repo = args.repo
+    crate = args.crate or repo.split('/')[-1]
+    body = dict(s['metadata'])
+    body['description'] = body['description'].replace('A standalone nifeos crate', f'{crate}: a standalone nifeos crate')
+    body['homepage'] = f'https://docs.rs/{crate}'
+    body.update(s['features'])
+    body.update(s['merging'])
+    step('features, merging and metadata', f'repos/{repo}', method='PATCH', json_body=body)
+
+    sec = {'security_and_analysis': {
+        'private_vulnerability_reporting': {'enabled': s['security']['private_vulnerability_reporting']},
+        'secret_scanning': {'enabled': s['security']['secret_scanning']},
+        'secret_scanning_push_protection': {'enabled': s['security']['secret_scanning_push_protection']},
+        'dependabot_alerts': {'enabled': s['security']['dependabot_alerts']},
+    }}
+    step('security features', f'repos/{repo}', method='PATCH', json_body=sec)
+    step('dependabot security updates', f'repos/{repo}/automated-security-fixes', method='PUT')
+
+    a = s['actions']
+    step('actions enabled, selected actions', f'repos/{repo}/actions/permissions',
+         method='PUT', json_body={'enabled': a['enabled'], 'allowed_actions': a['allowed_actions']})
+    step('actions allowlist', f'repos/{repo}/actions/permissions/selected-actions',
+         method='PUT', json_body={'github_owned_allowed': a['github_owned_allowed'],
+                                  'verified_allowed': a['verified_allowed'],
+                                  'patterns_allowed': a['patterns_allowed']})
+    step('default token read-only', f'repos/{repo}/actions/permissions/workflow',
+         method='PUT', json_body={'default_workflow_permissions': a['default_workflow_permissions'],
+                                  'can_approve_pull_request_reviews': a['can_approve_pull_request_reviews']})
+
+    env = s['environment']
+    reviewers = []
+    for login in env['reviewers']:
+        out = call(f'environment reviewer id ({login})', f'users/{login}', method='GET')
+        if out:
+            reviewers.append({'type': 'User', 'id': json.loads(out).get('id')})
+    step(f'environment {env["name"]} (a person approves every publish)',
+         f'repos/{repo}/environments/{env["name"]}', method='PUT',
+         json_body={'wait_timer': env['wait_timer'], 'reviewers': reviewers})
+
+    team = s['team']
+    step(f'team {team["slug"]} (organization API; needs an org-scoped token)',
+         f'orgs/{team["org"]}/teams', json_body={'org': team['org'], 'slug': team['slug'],
+                                                 'name': team['slug']})
+    step(f'team {team["slug"]} maintains {repo}',
+         f'orgs/{team["org"]}/teams/{team["slug"]}/repos/{repo}',
+         method='PUT', json_body={'permission': team['permission']})
+    app = s['app']
+    step(f'app {app["slug"]} gets {app["permission"]} (installation settings; the API refuses a '
+         f'repository token)', f'repos/{repo}/installation', method='PUT',
+         json_body={'permission': app['permission']})
+
+    existing = set()
+    if not args.dry_run:
+        out = call('read existing labels', f'repos/{repo}/labels?per_page=100', method='GET')
+        if out:
+            existing = {l['name'] for l in json.loads(out)}
+    for label in s['labels']:
+        if label['name'] in existing:
+            step(f'label {label["name"]}', f'repos/{repo}/labels/{label["name"]}',
+                 method='PATCH', json_body=label)
+        else:
+            step(f'label {label["name"]}', f'repos/{repo}/labels', method='POST', json_body=label)
+
+    for rs in s['rulesets']:
+        payload = {'name': rs['name'], 'target': rs['target'], 'enforcement': rs['enforcement'],
+                   'conditions': rs['conditions'], 'bypass_actors': rs['bypass_actors'],
+                   'rules': [{'type': t, 'parameters': v} for t, v in rs['rules'].items()]}
+        # The rules API wants {"type": ..., "parameters": ...}; parameters are null for flag rules.
+        payload['rules'] = [{'type': t, 'parameters': v if isinstance(v, dict) else {}} for t, v in rs['rules'].items()]
+        made = step(f'ruleset "{rs["name"]}"', f'repos/{repo}/rulesets', method='POST',
+                    json_body=payload)
+        if made and made != '{}':
+            try:
+                rs_id = json.loads(made).get('id')
+                if rs_id:
+                    print(f'apply-settings: ruleset "{rs["name"]}" is id {rs_id}')
+            except json.JSONDecodeError:
+                pass
+
+    topics = list(s['metadata']['topics']) + list(args.topic)
+    step('topics', f'repos/{repo}/topics', method='PUT', json_body={'names': topics})
+
+    if refusals:
+        print(f'\napply-settings: {len(refusals)} setting(s) refused; a person owes these:')
+        for r in refusals:
+            print(f'  - {r}')
+        return 1
+    print('apply-settings: every setting applied')
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main(sys.argv))

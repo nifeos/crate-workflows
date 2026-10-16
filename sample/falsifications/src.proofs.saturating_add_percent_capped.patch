@@ -1,0 +1,13 @@
+diff --git a/src/lib.rs b/src/lib.rs
+index de68769..4561547 100644
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -13,7 +13,7 @@
+ /// ```
+ pub fn saturating_add_percent(a: u8, b: u8) -> u8 {
+     let sum = a.saturating_add(b);
+-    if sum > 100 { 100 } else { sum }
++    if sum > 200 { 200 } else { sum }
+ }
+ 
+ #[cfg(kani)]

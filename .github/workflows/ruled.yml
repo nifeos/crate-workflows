@@ -1,0 +1,61 @@
+# The ruled workflow: when `architect-ruled` lands on a pull request, remove `needs-architect` (a
+# ruling is the thing it waits for) and rerun the failed hold runs on the head, so the newest
+# result is the one GitHub counts. Ported from nife, whose #1766 left an armed pull request out of
+# the queue for two hours because an older red run kept counting.
+
+name: ruled clears hold
+
+on:
+  workflow_call: {}
+
+permissions:
+  pull-requests: write
+  actions: write
+
+concurrency:
+  group: ruled-${{ github.event.pull_request.number }}
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  clear:
+    name: clear needs-architect
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: github.event.action == 'labeled' && github.event.label.name == 'architect-ruled'
+    steps:
+      - name: remove needs-architect (re-reading live labels)
+        run: |
+          set -e
+          pr="${{ github.event.pull_request.number }}"
+          labels="$(gh api "repos/$GITHUB_REPOSITORY/issues/$pr" --jq '.labels[].name')"
+          if printf '%s\n' "$labels" | grep -qx needs-architect; then
+            gh api "repos/$GITHUB_REPOSITORY/issues/$pr/labels/needs-architect" -X DELETE
+            echo "needs-architect removed; architect-ruled stands in for it"
+          else
+            echo "needs-architect is not on the pull request; nothing to remove"
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+  rerun:
+    name: rerun failed holds
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: >-
+      (github.event.action == 'labeled' && github.event.label.name == 'architect-ruled') ||
+      (github.event.action == 'unlabeled' &&
+        (github.event.label.name == 'needs-architect' || github.event.label.name == 'held-by-lane'))
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: .crate-workflows
+          persist-credentials: false
+      - run: .crate-workflows/helpers/hold-rerun.sh \
+              "${{ github.event.pull_request.number }}" "$GITHUB_REPOSITORY"
+        env:
+          GH_TOKEN: ${{ github.token }}

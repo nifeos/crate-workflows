@@ -1,0 +1,45 @@
+# The reusable hold workflow: the required check that stays red while `needs-architect` (or
+# `held-by-lane`) is on the pull request, and turns green on `architect-ruled`.
+
+# calef ruled to keep the hold on the crates ("We should keep the needs-architect hold on the
+# crates"): a semver-breaking API change, or a new dependency, waits for him, and a hold nobody can
+# trigger holds nothing, so the label workflow is what puts the label on.
+
+name: architect hold
+
+on:
+  workflow_call: {}
+
+permissions:
+  pull-requests: read
+
+jobs:
+  hold:
+    name: architect hold (needs-architect label)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: read the labels and decide
+        run: |
+          set -e
+          pr="${{ github.event.pull_request.number }}"
+          if [ -z "$pr" ]; then
+            echo "no pull request context; a hold without a pull request holds nothing"
+            exit 0
+          fi
+          labels="$(gh api "repos/$GITHUB_REPOSITORY/issues/$pr" --jq '.labels[].name')"
+          if printf '%s\n' "$labels" | grep -qx held-by-lane; then
+            echo "held-by-lane is on: sent back to its lane, and it must not merge until the lane removes it"
+            exit 1
+          fi
+          if printf '%s\n' "$labels" | grep -qx architect-ruled; then
+            echo "architect-ruled is on: a ruling is the thing needs-architect waits for"
+            exit 0
+          fi
+          if printf '%s\n' "$labels" | grep -qx needs-architect; then
+            echo "needs-architect is on: an architect's ruling is owed (script/record-ruling $pr)"
+            exit 1
+          fi
+          echo "no hold label is on"
+        env:
+          GH_TOKEN: ${{ github.token }}

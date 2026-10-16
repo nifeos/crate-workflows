@@ -1,0 +1,16 @@
+[package]
+name = "crate-workflows-sample"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+license = "MIT OR Apache-2.0"
+publish = false            # a fixture, never released; the selftest passes allow-unpublished
+
+[lints.rust]
+missing_docs = "deny"
+unsafe_op_in_unsafe_fn = "deny"
+# The model checker sets cfg(kani) and cargo does not know it; without this line, -D warnings
+# refuses every proof module in the ordinary lint pass.
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(kani)'] }
+
+[dependencies]

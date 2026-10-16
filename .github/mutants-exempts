@@ -1,0 +1,5 @@
+# Exemptions for the fixture crate's mutation run, one survivor per line with its reason. A line
+# without a reason is refused, and a line naming a survivor that no longer exists is refused too.
+src/lib.rs:16 # >= is equivalent: sum == 100 returns 100 under both operators
+src/proofs.rs:12 # the proof module is cfg(kani); a cargo test run never compiles it
+src/proofs.rs:13 # the proof module is cfg(kani); a cargo test run never compiles it

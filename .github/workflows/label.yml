@@ -1,0 +1,129 @@
+# The reusable label workflow: the architect rules a crate repository keeps.
+
+# Two rules, both from nife's labeler, reduced to what a standalone crate carries:
+#   1. a dependency new to the crate's graph (helpers/architect-label-rules.py);
+#   2. a breaking change cargo-semver-checks reports against the last published version.
+# The labeler only ever adds `needs-architect`; a recorded ruling swaps it, through
+# script/record-ruling or the ruled workflow. The hold check (hold.yml) is the required gate that
+# keeps the pull request red until then.
+
+# Each rule step re-resolves the merge base itself, because steps do not share shell state. The
+# base is the base branch's real current tip through origin, never the payload's cached sha
+# (nife's #1416 was flagged for a dependency a DIFFERENT pull request had added to main; the
+# cached sha pointed one merge behind it).
+
+name: architect label
+
+on:
+  workflow_call:
+    inputs:
+      manifest-path:
+        type: string
+        default: Cargo.toml
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: architect-label-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  MANIFEST: ${{ inputs.manifest-path }}
+  PR: ${{ github.event.pull_request.number }}
+
+jobs:
+  label:
+    name: label
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: clock
+        run: echo "JOB_STARTED_AT=$(date +%s)" >> "$GITHUB_ENV"
+      # Full history and no blobs: the dependency rule reads base manifests out of git.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+          filter: blob:none
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: .crate-workflows
+          persist-credentials: false
+      - name: skip while a ruling stands
+        run: |
+          set -e
+          labels="$(gh api "repos/$GITHUB_REPOSITORY/issues/$PR" --jq '.labels[].name')"
+          if printf '%s\n' "$labels" | grep -qx architect-ruled || printf '%s\n' "$labels" | grep -qx held-by-lane; then
+            echo "A ruling label is on; the labeler stands down."
+            echo "SKIP=1" >> "$GITHUB_ENV"
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - name: rule 1, a dependency new to the graph
+        if: env.SKIP != '1'
+        run: |
+          set -e
+          base=$(.crate-workflows/helpers/scope-merge-base.sh \
+              "${{ github.event.pull_request.base.ref }}" \
+              "${{ github.event.pull_request.base.sha }}") || {
+            echo "could not resolve a merge base; routing to a person"; exit 1
+          }
+          set +e
+          git diff --unified=1000000 "$base" HEAD |
+            python3 .crate-workflows/helpers/architect-label-rules.py --base-rev "$base" > findings.txt
+          rc=$?
+          set -e
+          case "$rc" in
+            0) echo "the dependency rule fired" ;;
+            1) : > findings.txt; echo "no new dependency" ;;
+            *) echo "architect-label-rules.py exited $rc; routing to a person"; exit 1 ;;
+          esac
+      - name: rule 2, a semver break against the last release
+        if: env.SKIP != '1'
+        run: |
+          set -e
+          base=$(.crate-workflows/helpers/scope-merge-base.sh \
+              "${{ github.event.pull_request.base.ref }}" \
+              "${{ github.event.pull_request.base.sha }}")
+          if ! git diff --name-only "$base" HEAD | grep -qE '\.(rs|toml)$'; then
+            echo "no Rust or manifest change; the semver rule does not run"
+            exit 0
+          fi
+          rustup toolchain install stable --profile minimal
+          cargo +stable semver-checks --version >/dev/null 2>&1 || cargo install --locked cargo-semver-checks
+          # The tool exits non-zero when it finds a major break; the report is the input, and
+          # semver_major.py decides. A crate never published has no baseline, which is "nothing
+          # major yet", not a failure.
+          cargo +stable semver-checks --manifest-path "$MANIFEST" --json > semver-report.json 2> semver.err || true
+          set +e
+          python3 .crate-workflows/helpers/semver_major.py semver-report.json >> findings.txt 2>> semver.err
+          rc=$?
+          set -e
+          case "$rc" in
+            0) echo "the semver rule fired" ;;
+            1) echo "no major break against the last release" ;;
+            *) cat semver.err >&2; echo "semver_major.py exited $rc; routing to a person"; exit 1 ;;
+          esac
+      - name: hold the pull request when a rule fired
+        if: env.SKIP != '1'
+        run: |
+          set -e
+          if [ -s findings.txt ]; then
+            cat findings.txt
+            gh api "repos/$GITHUB_REPOSITORY/issues/$PR" -f 'labels[]=needs-architect' >/dev/null
+            .crate-workflows/helpers/label-comment.sh "$PR" "$GITHUB_REPOSITORY" "$(cat findings.txt)"
+          else
+            echo "no rule fired"
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - name: budget
+        if: always()
+        run: python3 .crate-workflows/helpers/job_budget.py check "${{ github.job }}" "$JOB_STARTED_AT"

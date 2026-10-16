@@ -1,0 +1,345 @@
+# The reusable check workflow: what runs on every pull request to a crate repository.
+
+# Every third-party action is pinned to a full commit SHA (the comment carries the tag), the same
+# rule nife's supply-chain gate enforces on its own workflows. A caller adopting a release pins
+# THESE files, and Dependabot bumps the pins from the outside.
+
+name: check
+
+on:
+  workflow_call:
+    inputs:
+      manifest-path:
+        description: Path to the crate's Cargo.toml, for a repository holding more than one.
+        type: string
+        default: Cargo.toml
+      targets:
+        description: Space-separated bare-metal targets to lint and build for, besides the host.
+        type: string
+        default: ''
+      toolchain:
+        description: The toolchain the pull request gates on; drift is weekly's business.
+        type: string
+        default: stable
+      coverage-floor:
+        description: Per-file line coverage floor, in percent.
+        type: number
+        default: 85
+      allow-unpublished:
+        description: Let the crate carry publish = false (fixture crates only).
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: check-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/heads/') }}
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  MANIFEST: ${{ inputs.manifest-path }}
+  TOOLCHAIN: ${{ inputs.toolchain }}
+  TARGETS: ${{ inputs.targets }}
+
+jobs:
+  # The first job of every reusable workflow: a call behind the newest release is red before
+  # anything else runs. No checkout of the caller here; the check is four gh api calls.
+  lag:
+    name: lag (template release)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: clock
+        run: echo "JOB_STARTED_AT=$(date +%s)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: .crate-workflows
+          persist-credentials: false
+      - run: .crate-workflows/helpers/lag-check.sh
+        env:
+          JOB_WORKFLOW_SHA: ${{ job.workflow_sha }}
+          GH_TOKEN: ${{ github.token }}
+      - name: budget
+        if: always()
+        run: python3 .crate-workflows/helpers/job_budget.py check "${{ github.job }}" "$JOB_STARTED_AT"
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+  fmt:
+    name: fmt
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: clock
+        run: echo "JOB_STARTED_AT=$(date +%s)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: .crate-workflows
+          persist-credentials: false
+      - run: rustup toolchain install "$TOOLCHAIN" --profile minimal --component rustfmt
+      - run: cargo +"$TOOLCHAIN" fmt --all --manifest-path "$MANIFEST" -- --check
+      - name: budget
+        if: always()
+        run: python3 .crate-workflows/helpers/job_budget.py check "${{ github.job }}" "$JOB_STARTED_AT"
+
+  clippy:
+    name: clippy
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: clock
+        run: echo "JOB_STARTED_AT=$(date +%s)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: .crate-workflows
+          persist-credentials: false
+      - run: |
+          rustup toolchain install "$TOOLCHAIN" --profile minimal --component clippy
+          for t in $TARGETS; do rustup +"$TOOLCHAIN" target add "$t"; done
+      # The host, then each bare-metal target the crate names.
+      - run: |
+          set -e
+          cargo +"$TOOLCHAIN" clippy --manifest-path "$MANIFEST" --all-targets -- -D warnings
+          for t in $TARGETS; do
+            echo "==> clippy: $t"
+            cargo +"$TOOLCHAIN" clippy --manifest-path "$MANIFEST" --target "$t" --all-targets -- -D warnings
+          done
+      # The proof harnesses, which only `--cfg kani` compiles. The shim is enough of Kani's API for
+      # clippy to type-check them; a clean pass here is not a proof, and proofs.yml is the thing
+      # that proves. Taken from nife, whose measured reason (13 undocumented unsafe sites that no
+      # other gate saw) is written in helpers/kani-lint-shim/kani.rs.
+      - name: clippy (--cfg kani)
+        run: |
+          set -e
+          # Absolute: cargo resolves a relative --extern against the manifest's directory, and the
+          # shim is not the manifest's neighbor.
+          shim="$PWD/.crate-workflows/target/kani-lint-shim"
+          mkdir -p "$shim"
+          attrs=$(rustc --print file-names --crate-type proc-macro --crate-name kani_attributes \
+              .crate-workflows/helpers/kani-lint-shim/kani_attributes.rs)
+          rustc --edition 2024 --crate-type proc-macro --crate-name kani_attributes \
+              .crate-workflows/helpers/kani-lint-shim/kani_attributes.rs --out-dir "$shim"
+          rustc --edition 2024 --crate-type lib --crate-name kani \
+              .crate-workflows/helpers/kani-lint-shim/kani.rs \
+              --extern kani_attributes="$shim/$attrs" --out-dir "$shim"
+          cargo +"$TOOLCHAIN" clippy --manifest-path "$MANIFEST" --all-targets -- \
+              --cfg kani --extern "kani=$shim/libkani.rlib" -L "$shim" -D warnings
+      - name: budget
+        if: always()
+        run: python3 .crate-workflows/helpers/job_budget.py check "${{ github.job }}" "$JOB_STARTED_AT"
+
+  tests:
+    name: tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: clock
+        run: echo "JOB_STARTED_AT=$(date +%s)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: .crate-workflows
+          persist-credentials: false
+      - run: rustup toolchain install "$TOOLCHAIN" --profile minimal
+      - run: cargo +"$TOOLCHAIN" test --manifest-path "$MANIFEST"
+      - name: budget
+        if: always()
+        run: python3 .crate-workflows/helpers/job_budget.py check "${{ github.job }}" "$JOB_STARTED_AT"
+
+  coverage:
+    name: coverage
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: clock
+        run: echo "JOB_STARTED_AT=$(date +%s)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: .crate-workflows
+          persist-credentials: false
+      - uses: taiki-e/install-action@ab6895351a88b908e96a4697860d4ffea5e57dbe # v2.87.27
+        with:
+          tool: cargo-llvm-cov
+      - run: rustup toolchain install "$TOOLCHAIN" --profile minimal --component llvm-tools
+      # The floor is per file, not an average: a clean average hides one untested file behind nine
+      # tested ones. The report goes to the step summary and the artifact either way, so a red run
+      # still carries its numbers.
+      - run: |
+          set -e
+          # From the crate's directory: cargo-llvm-cov's own plumbing (cargo locate-project) runs
+          # against the working directory, and a crate one level down has no manifest at the root.
+          crate_dir=$(dirname "$MANIFEST")
+          cd "$crate_dir"
+          cargo +"$TOOLCHAIN" llvm-cov --no-report
+          # The report directory is llvm-cov's to fill, not to create.
+          mkdir -p target/llvm-cov
+          cargo llvm-cov report --lcov --output-path target/llvm-cov/lcov.info
+          cargo llvm-cov report --summary-only | tee -a "$GITHUB_STEP_SUMMARY"
+          # Exported, not expressed: GitHub's expression language has no dirname, and a path built
+          # by concatenating the manifest path points through the manifest file itself.
+          echo "COVERAGE_DIR=$(pwd)/target/llvm-cov" >> "$GITHUB_ENV"
+      - run: .crate-workflows/helpers/coverage-floor.sh "${{ inputs.coverage-floor }}" "$COVERAGE_DIR/lcov.info" "$GITHUB_WORKSPACE/.github/coverage-exemptions"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        if: always()
+        with:
+          name: coverage
+          path: ${{ env.COVERAGE_DIR }}
+      - name: budget
+        if: always()
+        run: python3 .crate-workflows/helpers/job_budget.py check "${{ github.job }}" "$JOB_STARTED_AT"
+
+  # A published crate's docs, files, vocabulary and source shape. This is nife's
+  # script/crate-standalone turned inward: the checks run in the crate's own repository, so nife's
+  # vocabulary cannot creep back in.
+  standalone:
+    name: standalone
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: clock
+        run: echo "JOB_STARTED_AT=$(date +%s)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: .crate-workflows
+          persist-credentials: false
+      - run: rustup toolchain install "$TOOLCHAIN" --profile minimal
+      - name: rustdoc (broken links are errors)
+        run: |
+          set -e
+          export RUSTDOCFLAGS="-D rustdoc::broken_intra_doc_links -D rustdoc::invalid_html_tags"
+          cargo +"$TOOLCHAIN" doc --manifest-path "$MANIFEST" --no-deps
+      - name: standalone (files, manifest, vocabulary, rustfmt channel, README headings)
+        run: |
+          set -e
+          crate_dir=$(dirname "$MANIFEST")
+          # One file per argument is the point; shellcheck wants quoting everywhere otherwise.
+          # shellcheck disable=SC2086
+          flag=${{ inputs.allow-unpublished && '--allow-unpublished' || '' }}
+          python3 .crate-workflows/helpers/standalone.py --manifest-dir "$crate_dir" $flag
+      - name: prose caps (README, CHANGELOG)
+        run: |
+          set -e
+          # The crate's own prose, not the caller repository's root: a crate can live one level
+          # down (this template's sample does), and the template's README is nobody's crate.
+          crate_dir=$(dirname "$MANIFEST")
+          # One file per argument is the point; shellcheck wants quoting everywhere otherwise.
+          # shellcheck disable=SC2086
+          files=$(ls "$crate_dir"/README* "$crate_dir"/CHANGELOG.md 2>/dev/null || true)
+          # shellcheck disable=SC2086
+          [ -z "$files" ] || python3 .crate-workflows/helpers/prose_caps.py $files
+      - name: file and comment ratchets
+        run: |
+          set -e
+          crate_dir=$(dirname "$MANIFEST")
+          # One file per argument is the point; shellcheck wants quoting everywhere otherwise.
+          # shellcheck disable=SC2086
+          rs=$(git ls-files -- "$crate_dir" | grep '[.]rs$' || true)
+          # shellcheck disable=SC2086
+          [ -z "$rs" ] || python3 .crate-workflows/helpers/file_length.py $rs
+          # shellcheck disable=SC2086
+          [ -z "$rs" ] || python3 .crate-workflows/helpers/comment_blocks.py $rs
+      - name: orphan modules
+        run: python3 .crate-workflows/helpers/orphan_modules.py "$(dirname "$MANIFEST")"
+      - name: markdown links resolve
+        run: |
+          # shellcheck disable=SC2046  # one file per argument is the point
+          python3 .crate-workflows/helpers/check_links.py $(git ls-files '*.md')
+      - name: shellcheck and sh -n
+        run: |
+          set -e
+          for f in $(git ls-files '*.sh'); do
+            shellcheck --severity=warning "$f"
+            if head -1 "$f" | grep -q '#!/bin/sh'; then sh -n "$f"; fi
+          done
+      - name: tracked-but-ignored files
+        run: |
+          litter=$(git ls-files -ci --exclude-standard)
+          [ -z "$litter" ] || { echo "tracked but ignored: $litter"; exit 1; }
+      - name: budget
+        if: always()
+        run: python3 .crate-workflows/helpers/job_budget.py check "${{ github.job }}" "$JOB_STARTED_AT"
+
+  supply-chain:
+    name: supply-chain
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: clock
+        run: echo "JOB_STARTED_AT=$(date +%s)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          # Full history: the empty-diff check below reads the merge ref's two parents.
+          fetch-depth: 0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: .crate-workflows
+          persist-credentials: false
+      # The caller's own workflow files: a `uses:` must carry a full 40-hex SHA. Local `./` actions
+      # are in this tree and exempt. Dependabot bumps the SHA and the comment together.
+      - name: actions pinned to a SHA
+        run: |
+          set -e
+          unpinned="$(git grep -nE '^[[:space:]]*(-[[:space:]]+)?uses:[[:space:]]' -- .github \
+              | grep -vE 'uses:[[:space:]]+\./' \
+              | grep -vE 'uses:[[:space:]]+[^@[:space:]]+@[0-9a-f]{40}([[:space:]]|$)' || true)"
+          [ -z "$unpinned" ] || { echo "$unpinned"; exit 1; }
+      - uses: taiki-e/install-action@ab6895351a88b908e96a4697860d4ffea5e57dbe # v2.87.27
+        with:
+          tool: cargo-deny@0.20.2
+      # nife's policy without its exceptions: no rayon skip, no advisory ignore, no vendored tree.
+      - name: cargo-deny
+        run: cargo deny --manifest-path "$MANIFEST" --config deny.toml --all-features check advisories bans licenses sources
+      - name: cargo-machete (unused dependencies)
+        run: |
+          set -e
+          cargo install --locked cargo-machete
+          cargo machete
+      # A merge that changes no file is refused, same as nife: the PR's own merge ref is fetched and
+      # its two parents' trees compared. On a push event there is nothing to check.
+      - name: empty diff
+        if: github.event_name == 'pull_request'
+        run: |
+          set -e
+          git fetch --no-tags origin "refs/pull/${{ github.event.pull_request.number }}/merge"
+          merge=$(git rev-parse FETCH_HEAD)
+          first=$(git rev-parse "$merge^1")
+          if [ "$(git rev-parse "$merge^{tree}")" = "$(git rev-parse "$first^{tree}")" ]; then
+            echo "the merge changes no file"; exit 1
+          fi
+      - name: CodeQL (Rust, build-mode none)
+        uses: github/codeql-action/init@24c54180a607b1449ed407dd24f251e4e9147c8d # v4
+        with:
+          languages: rust
+          build-mode: none
+      # The analyze action uploads its own SARIF; nife's split-job retry exists for its four-language
+      # matrix, and one language in one job does not need it.
+      - uses: github/codeql-action/analyze@24c54180a607b1449ed407dd24f251e4e9147c8d # v4
+      - name: budget
+        if: always()
+        run: python3 .crate-workflows/helpers/job_budget.py check "${{ github.job }}" "$JOB_STARTED_AT"
