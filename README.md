@@ -64,7 +64,7 @@ no approval.
 | fuzz (cargo-fuzz) | nightly, weekly, only when the caller asks | `weekly / fuzz` |
 | Miri, weekly | `cargo +nightly miri test` | `weekly / miri` |
 | mutation, weekly | cargo-mutants; new survivors fail against `mutants-baseline.txt` | `weekly / mutation` |
-| `script/verify` (Kani) | `model-checking/kani-github-action` on every pull request | `proofs / kani` |
+| `script/verify` (Kani) | `cargo kani` at the version in `.kani-version`, on every pull request | `proofs / kani` |
 | falsification sweep | every patch applied with `-p1` must turn its harness red at its own assertion; the form check (every harness carries a patch or a reason) runs beside it | `proofs / falsify` |
 | kani-reach | dropped: a dispatch-only measurement of nife's reach | |
 | loom interleavings | dropped: none of the first crates uses loom | |
@@ -163,6 +163,20 @@ Record an architect ruling on a pull request:
 script/record-ruling 12 --text "The new dependency is fine: it is no_std and proven."
 ```
 
+## Release secrets
+
+`release / tag` creates the tag as the nife-smelter app, because the tags ruleset refuses every
+other actor. Two organization secrets, visible to every crate repository, feed it:
+
+| secret | holds |
+|---|---|
+| `NIFE_SMELTER_APP_ID` | the nife-smelter app's ID |
+| `NIFE_SMELTER_PRIVATE_KEY` | a private key generated for the app (the whole PEM) |
+
+The caller passes both (`scaffold/caller-workflows/release.yml` does). If either is missing the
+job fails naming it; it never falls back to `github.token`. The app must also be installed on the
+repository, with contents write.
+
 ## Testing a release
 
 The canary repository `nifeos/crate-workflows-test` adopts every release before anything depends
@@ -192,31 +206,28 @@ red, by design. The canary is also the configured repository `apply-settings` an
   (this repository's first selftest runs are the evidence). The check authenticates as the
   caller's `SETTINGS_TOKEN` secret instead, a fine-grained PAT with that scope, stored once as an
   organization secret. Until it exists, the job is red on its 403 with instructions.
-- Full-name resolution of a reusable workflow whose graph uses a third-party action fails,
-  measured 2026-10-16. `check.yml` and `proofs.yml` could not be called by any caller shape, by
-  any event, at any SHA, including this repository calling itself by name. `hold.yml` and
-  `label.yml` resolved from the same callers at the same commits. The same two refused files ran
-  green through `./` calls in the same minute (canary run 38998555269; this repository's pull
-  request 3). Declared inputs, the workflow_call context, the caller's allowlist and the pinned
-  commit were each exonerated by probe. The canary's adoption of v4 is the unblock test; the
-  ritual resumes there when GitHub heals.
 - Publishing for real needs the trusted publisher configured on crates.io for the crate and
   repository pair, which needs calef's crates.io account. Until then only `dry-run` rehearsals
   run.
-- The org-level Actions allowlist (SHA-pinned only, verified creators, and every third-party
-  action the template itself uses named: `kani-github-action`, `taiki-e/install-action`) is
-  organization state, not repository state; `script/apply-settings` attempts it and
-  reports the refusal when the token lacks the scope.
-- With `allowed_actions: selected`, a reusable workflow whose steps use a non-allowlisted action
-  fails at resolution, not at a step: the caller records a startup failure with empty
-  `referenced_workflows`, and the settings file must therefore name the template's own third-party
-  actions. Measured on the canary when `taiki-e/install-action` was missing from the patterns.
+- The repository's Actions allowlist is `patterns_allowed` in the settings file, and each pattern
+  needs the `@*` suffix: `taiki-e/install-action` alone matches no reference. Every caller
+  workflow using a third-party action then ends in `startup_failure` with empty `referenced_workflows`
+  (measured on the canary; the same patterns with `@*` run). The file must name every third-party
+  action the template itself uses: `taiki-e/install-action`. `check-settings` compares the list
+  exactly.
+- Kani is installed with `cargo install --locked kani-verifier` at the version in `.kani-version`.
+  The version is read from the template's own pinned checkout, so a crate inherits it through its
+  pin. The `model-checking/kani-github-action` is not used: it calls `dtolnay/rust-toolchain@stable` and
+  `actions/checkout@v3` unpinned, which a repository requiring SHA pinning refuses.
 - The fork pull request approval policy is organization state, and nothing here can set or read
   it. The org Actions endpoints answer 403 to a non-admin token; the fork-policy path answers
   Not Found (measured 2026-10-16). Set it once in the org's Actions settings. A public
   repository's default is approval for first-time outside contributors only.
-- Tag rules: the repository rulesets API refuses ref_name conditions on push-target rulesets. The
-  measured error is "Target ref_name is not supported for push rulesets", live on the canary
-  repository. `apply-settings` therefore reports the tags ruleset as refused, and the release
-  workflow's own gate is what keeps a stray tag from mattering. The durable fix is an
-  organization-level push ruleset scoped by repository and ref, which needs an org-scoped token.
+- Tag rules: the tags ruleset is a tag-target ruleset (`refs/tags/v*`: creation, update,
+  deletion), because a push-target ruleset refuses ref_name conditions ("Target ref_name is not
+  supported for push rulesets"). Its only bypass actor is the nife-smelter app, which the release
+  workflow's `tag` job authenticates as. The GitHub Actions integration is refused as a bypass
+  actor ("must be part of the ruleset source or owner organization"), so `github.token` cannot
+  tag. The app is accepted as a bypass actor only once it is installed on the repository. Measured
+  on the canary 2026-10-17: a repository-level tag ruleset is accepted, a hand-made `v*` tag is
+  refused (422), and a tag that does not match `v*` is allowed.

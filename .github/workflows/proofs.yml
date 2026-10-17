@@ -1,6 +1,6 @@
 # The reusable proofs workflow: Kani on every pull request, and every falsification patch replayed.
 
-# Fork 4's ruling, adapted: stock kani-github-action proves the crate; each falsification patch is
+# Fork 4's ruling, adapted: stock Kani proves the crate; each falsification patch is
 # applied and must turn its harness red at its own assertion. A crate has few harnesses, so this
 # runs on every pull request rather than weekly.
 
@@ -71,12 +71,18 @@ jobs:
           ref: ${{ job.workflow_sha }}
           path: .crate-workflows
           persist-credentials: false
-      # Stock Kani on every pull request (Fork 4). The action installs Kani itself; a crate has no
-      # riscv64 patch to carry, so there is nothing to pin and nothing to cache.
-      - uses: model-checking/kani-github-action@f838096619a707b0f6b2118cf435eaccfa33e51f # v1.1
-        with:
-          command: cargo-kani
-          args: --manifest-path ${{ inputs.manifest-path }} ${{ inputs.kani-args }}
+      # Stock Kani on every pull request (Fork 4), at the version the template's own `.kani-version`
+      # names, read from the pinned template checkout so a crate inherits it through its pin. The
+      # install runs from the runner's temp directory so it uses the runner's default toolchain,
+      # not a crate-pinned one; `cargo kani` itself runs in the crate and honors its
+      # rust-toolchain.toml. The marketplace action is not used: it calls unpinned actions inside.
+      - name: Install Kani
+        run: |
+          cd "$RUNNER_TEMP"
+          cargo install --locked kani-verifier --version "$(cat "$GITHUB_WORKSPACE/.crate-workflows/.kani-version")"
+          cargo kani setup
+      - name: prove
+        run: cargo kani --manifest-path "$MANIFEST" ${{ inputs.kani-args }}
       - name: budget
         if: always()
         run: python3 .crate-workflows/helpers/job_budget.py check "${{ github.job }}" "$JOB_STARTED_AT"
@@ -95,11 +101,12 @@ jobs:
           ref: ${{ job.workflow_sha }}
           path: .crate-workflows
           persist-credentials: false
-      # The replay runs `cargo kani` itself, so it installs Kani the same way the action above does
-      # (8 to 20 seconds, mean 12; nife measured caching it as not worth a cache step).
+      # The replay runs `cargo kani` itself, so it installs the same pinned Kani as the job above
+      # (nife measured caching the install as not worth a cache step).
       - name: Install Kani
         run: |
-          cargo install --locked kani-verifier
+          cd "$RUNNER_TEMP"
+          cargo install --locked kani-verifier --version "$(cat "$GITHUB_WORKSPACE/.crate-workflows/.kani-version")"
           cargo kani setup
       # Form first (every harness carries a patch or a reason), then truth (each patch turns exactly
       # its own harness red). A survivor, a stale patch, or an unparseable verdict fails the job.
