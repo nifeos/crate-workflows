@@ -51,6 +51,14 @@ already exists. `publish` runs last, in the `crates-io` environment (a person ap
 through trusted publishing. `dry-run` defaults to true, so a rehearsal publishes nothing and needs
 no approval.
 
+crates.io binds a trusted publisher only to a crate that already exists, so a crate's first publish
+uses a token instead. `helpers/publish_mode.py` picks the door by whether the crate is on crates.io:
+absent means the `crates-io` environment secret `CRATES_IO_FIRST_PUBLISH_TOKEN`. Its name is
+provisional. The maintainer creates it as a `publish-new` token limited to the crate name, with a
+short expiry. Present means trusted publishing only, even if the secret is still set. A failed lookup or a
+missing secret is a red job; nothing falls back. The first publish passes the same gate and the
+same environment approval as every later one, and a dry run reports which door it would use.
+
 ## What each nife gate became
 
 | nife gate | here | where |
