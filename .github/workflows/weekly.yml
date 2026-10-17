@@ -26,8 +26,9 @@ on:
     secrets:
       SETTINGS_TOKEN:
         description: A fine-grained PAT holding this repository's Administration read-only, for the
-          settings-drift reads. The GITHUB_TOKEN cannot hold that scope; an organization secret named
-          SETTINGS_TOKEN covers every crate repository at once.
+          settings-drift reads, plus Contents read and write (GitHub returns the merge settings only to a
+          caller with push access). The GITHUB_TOKEN cannot hold the first scope; an organization
+          secret named SETTINGS_TOKEN covers every crate repository at once.
         required: false
 
 permissions:

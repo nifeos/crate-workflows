@@ -8,8 +8,7 @@ comparison is always against the version of the template the caller actually run
 changed by hand in the web interface is a red run, not a surprise; the run's output names the
 setting, the value the file rules, and the value the repository now has.
 
-What this reads: features, merging, metadata, security toggles, the Actions permission set and allowlist (patterns compared
-exactly), the `crates-io` environment's reviewers, both rulesets (target, conditions, bypass actors, and every
+What this reads: features, merging, metadata, security toggles, the Actions permission set and allowlist (patterns compared exactly), the `crates-io` environment's reviewers, both rulesets (target, conditions, bypass actors, and every
 rule with its parameters), and the label set. What it does not read: team membership and app
 installation permissions, which need organization scopes; those drift silently, and this is the BUGS
 entry that says so.
@@ -98,6 +97,29 @@ def forbidden(err):
     return bool(err) and any(m in err for m in ('403', 'Forbidden', 'Resource not accessible'))
 
 
+MERGING_SCOPE = (
+    'GitHub omits the merge settings (allow_merge_commit, allow_squash_merge, allow_rebase_merge, '
+    'delete_branch_on_merge, allow_auto_merge, allow_update_branch) from the repository read unless '
+    'the caller has push access; no read-only endpoint carries them. SETTINGS_TOKEN needs Contents '
+    'read and write on this repository besides Administration read-only (a write-capable token is '
+    'the price of reading these); this is not a statement that the settings are right or wrong')
+
+
+def repo_read_diffs(repo, live, wanted):
+    """Compare the repository read's booleans with the file. A key the response does not carry, or
+    carries as null, is unreadable, a finding that names the scope, never a comparison against None."""
+    out = []
+    missing = [k for k in wanted if live.get(k) is None]
+    for key, want in wanted.items():
+        if key in missing:
+            continue
+        if live[key] != want:
+            out.append(f'{key}: file says {want}, repository has {live[key]}')
+    if missing:
+        out.append(f'{repo}: {", ".join(missing)} unreadable. {MERGING_SCOPE}')
+    return out
+
+
 def security_unreadable(key, repo, err):
     if forbidden(err):
         return (f'security/{key} unreadable on {repo}: the token lacks repository Administration '
@@ -165,6 +187,19 @@ def selftest():
             print('FAIL 403 finding does not name the scope')
     finally:
         globals()['api'] = real
+    wanted = {'allow_merge_commit': True, 'allow_squash_merge': False}
+    for name, live, n in (('both read right', wanted, 0),
+                          ('one wrong', {'allow_merge_commit': True, 'allow_squash_merge': True}, 1),
+                          ('fields omitted is one finding', {}, 1),
+                          ('null is unreadable, not a mismatch', {'allow_merge_commit': None, 'allow_squash_merge': None}, 1)):
+        found = repo_read_diffs('o/r', live, wanted)
+        if len(found) != n:
+            ok = False
+            print(f'FAIL {name}: expected {n} finding(s), got {found}')
+    omitted = repo_read_diffs('o/r', {}, wanted)
+    if not omitted or 'Contents' not in omitted[0] or 'None' in omitted[0]:
+        ok = False
+        print(f'FAIL omitted-field finding does not name the scope: {omitted}')
     print('check-settings selftest: %s' % ('ok' if ok else 'FAILED'))
     return 0 if ok else 1
 
@@ -189,9 +224,7 @@ def main(argv):
     if live is None:
         print(f'check-settings: could not read {repo}: {err}', file=sys.stderr)
         return 2
-    for key, want in {**s['features'], **s['merging']}.items():
-        if live.get(key) != want:
-            diffs.append(f'{key}: file says {want}, repository has {live.get(key)}')
+    diffs.extend(repo_read_diffs(repo, live, {**s['features'], **s['merging']}))
     if live.get('homepage') != s['metadata']['homepage'] and s['metadata']['homepage'] != 'https://docs.rs':
         pass  # the homepage is crate-specific; apply-settings fills it from --crate
 
