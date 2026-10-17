@@ -167,8 +167,9 @@ script/record-ruling 12 --text "The new dependency is fine: it is no_std and pro
 
 The canary repository `nifeos/crate-workflows-test` adopts every release before anything depends
 on one. The ritual after cutting a tag: open a pull request there that moves every caller's pin
-to the new release's commit, expect the nine required checks green, and merge it. A release the
-canary cannot adopt is not cut, and a canary pin behind the newest release is the lag check's
+to the new release's commit, expect the nine required checks green, and merge it. A release is
+not depended on until the canary has adopted it, and a canary pin behind the newest release is
+the lag check's
 red, by design. The canary is also the configured repository `apply-settings` and
 `check-settings` run against, so the drift check always has a real repository to read. Until
 `nife-smelter` holds write there, a person opens the adoption pull request by hand.
@@ -191,6 +192,14 @@ red, by design. The canary is also the configured repository `apply-settings` an
   (this repository's first selftest runs are the evidence). The check authenticates as the
   caller's `SETTINGS_TOKEN` secret instead, a fine-grained PAT with that scope, stored once as an
   organization secret. Until it exists, the job is red on its 403 with instructions.
+- Full-name resolution of a reusable workflow whose graph uses a third-party action fails,
+  measured 2026-10-16. `check.yml` and `proofs.yml` could not be called by any caller shape, by
+  any event, at any SHA, including this repository calling itself by name. `hold.yml` and
+  `label.yml` resolved from the same callers at the same commits. The same two refused files ran
+  green through `./` calls in the same minute (canary run 38998555269; this repository's pull
+  request 3). Declared inputs, the workflow_call context, the caller's allowlist and the pinned
+  commit were each exonerated by probe. The canary's adoption of v4 is the unblock test; the
+  ritual resumes there when GitHub heals.
 - Publishing for real needs the trusted publisher configured on crates.io for the crate and
   repository pair, which needs calef's crates.io account. Until then only `dry-run` rehearsals
   run.
