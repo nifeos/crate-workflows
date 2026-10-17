@@ -194,9 +194,14 @@ red, by design. The canary is also the configured repository `apply-settings` an
 - Publishing for real needs the trusted publisher configured on crates.io for the crate and
   repository pair, which needs calef's crates.io account. Until then only `dry-run` rehearsals
   run.
-- The org-level Actions allowlist (SHA-pinned only, verified creators, `kani-github-action`
-  named) is organization state, not repository state; `script/apply-settings` attempts it and
+- The org-level Actions allowlist (SHA-pinned only, verified creators, and every third-party
+  action the template itself uses named: `kani-github-action`, `taiki-e/install-action`) is
+  organization state, not repository state; `script/apply-settings` attempts it and
   reports the refusal when the token lacks the scope.
+- With `allowed_actions: selected`, a reusable workflow whose steps use a non-allowlisted action
+  fails at resolution, not at a step: the caller records a startup failure with empty
+  `referenced_workflows`, and the settings file must therefore name the template's own third-party
+  actions. Measured on the canary when `taiki-e/install-action` was missing from the patterns.
 - The fork pull request approval policy is organization state, and nothing here can set or read
   it. The org Actions endpoints answer 403 to a non-admin token; the fork-policy path answers
   Not Found (measured 2026-10-16). Set it once in the org's Actions settings. A public
