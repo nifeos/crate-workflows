@@ -163,12 +163,22 @@ Record an architect ruling on a pull request:
 script/record-ruling 12 --text "The new dependency is fine: it is no_std and proven."
 ```
 
+## Testing a release
+
+The canary repository `nifeos/crate-workflows-test` adopts every release before anything depends
+on one. The ritual after cutting a tag: open a pull request there that moves every caller's pin
+to the new release's commit, expect the nine required checks green, and merge it. A release the
+canary cannot adopt is not cut, and a canary pin behind the newest release is the lag check's
+red, by design. The canary is also the configured repository `apply-settings` and
+`check-settings` run against, so the drift check always has a real repository to read. Until
+`nife-smelter` holds write there, a person opens the adoption pull request by hand.
+
 ## BUGS
 
 - Names are provisional: this repository's name, the workflow names, the team slug (`crates-io`)
   and the release cadence all wait for calef's naming pass.
 - The required-check names above describe what GitHub shows for cross-repository reusable workflow
-  calls. The throwaway test repository's runs are the evidence; if GitHub names the checks
+  calls. The canary repository's runs are the evidence; if GitHub names the checks
   differently, this section and the ruleset in the settings file are both wrong until they match.
 - The coverage floor here is 85, matching nife's current floor. The roadmap block still says 80
   because it predates the raise.
@@ -192,7 +202,7 @@ script/record-ruling 12 --text "The new dependency is fine: it is no_std and pro
   Not Found (measured 2026-10-16). Set it once in the org's Actions settings. A public
   repository's default is approval for first-time outside contributors only.
 - Tag rules: the repository rulesets API refuses ref_name conditions on push-target rulesets. The
-  measured error is "Target ref_name is not supported for push rulesets", live on the throwaway
+  measured error is "Target ref_name is not supported for push rulesets", live on the canary
   repository. `apply-settings` therefore reports the tags ruleset as refused, and the release
   workflow's own gate is what keeps a stray tag from mattering. The durable fix is an
   organization-level push ruleset scoped by repository and ref, which needs an org-scoped token.
