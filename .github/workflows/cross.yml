@@ -3,6 +3,6 @@ on:
   pull_request:
 jobs:
   x:
-    uses: nifeos/crate-workflows/.github/workflows/check.yml@91eb0a9d068dbaf6d63175c7fb0e7ec59fce9dc4
+    uses: nifeos/crate-workflows/.github/workflows/run-checks.yml@42be5bb14d4d7d83a07a580168615cd42d480142
     with:
       targets: ''
