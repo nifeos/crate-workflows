@@ -1,6 +1,6 @@
 name: cross probe
 on:
-  workflow_dispatch:
+  pull_request:
 jobs:
   x:
     uses: nifeos/crate-workflows/.github/workflows/check.yml@91eb0a9d068dbaf6d63175c7fb0e7ec59fce9dc4
