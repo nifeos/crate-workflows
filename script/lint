@@ -49,6 +49,7 @@ for f in standalone prose_caps orphan_modules check_links falsify architect-labe
 	mutants_gate job_budget workflow_shape kani_bump; do
 	"$py" "helpers/$f.py" --selftest
 done
+"$py" script/check-settings --selftest
 "$py" script/apply-settings --help >/dev/null && echo "apply-settings --help ok"
 echo "ok"
 
