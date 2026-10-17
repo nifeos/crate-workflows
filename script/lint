@@ -103,7 +103,12 @@ if command -v actionlint >/dev/null 2>&1; then
 	# EXCEPTION, marked: actionlint 1.7.12 also does not know the "administration" permission
 	# scope, which GitHub documents and the settings-drift job needs to read rulesets back. The
 	# ignore names that scope only; the selftest's settings-drift run is the proof it works.
+	# EXCEPTION, marked: CRATES_IO_FIRST_PUBLISH_TOKEN is an environment secret of the caller's
+	# crates-io environment, read by release.yml's publish job (which names that environment). It
+	# cannot be a declared workflow_call secret: a caller job has no environment to pass it from.
+	# The ignore names that one secret only.
 	actionlint \
+		-ignore 'property "crates_io_first_publish_token" is not defined' \
 		-ignore 'property "workflow_sha" is not defined' \
 		-ignore 'property "workflow_repository" is not defined' \
 		-ignore 'unknown permission scope "administration"'
