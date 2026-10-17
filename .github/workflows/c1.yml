@@ -1,0 +1,8 @@
+name: c1
+on:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  probe:
+    uses: nifeos/crate-workflows/.github/workflows/hold-x1.yml@91eb0a9d068dbaf6d63175c7fb0e7ec59fce9dc4
