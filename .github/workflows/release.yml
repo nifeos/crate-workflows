@@ -22,6 +22,14 @@ on:
       dry-run:
         type: boolean
         default: true
+    secrets:
+      NIFE_SMELTER_APP_ID:
+        description: The nife-smelter app's ID, an organization secret. `tag` mints an installation
+          token from it and the private key, because the tags ruleset refuses github.token.
+        required: false
+      NIFE_SMELTER_PRIVATE_KEY:
+        description: The nife-smelter app's private key (the whole PEM), an organization secret.
+        required: false
 
 permissions:
   contents: read
@@ -72,7 +80,7 @@ jobs:
     needs: gate
     if: ${{ !inputs.dry-run }}
     permissions:
-      contents: write
+      contents: read
     steps:
       - name: clock
         run: echo "JOB_STARTED_AT=$(date +%s)" >> "$GITHUB_ENV"
@@ -82,6 +90,30 @@ jobs:
           ref: ${{ job.workflow_sha }}
           path: .crate-workflows
           persist-credentials: false
+      # The tags ruleset lets only the nife-smelter app create a v* tag, and github.token is not
+      # permitted as a bypass actor. There is no fallback to github.token: a missing secret is a red
+      # job that names what to create, because a fallback would fail later with a bare 422.
+      - name: the app credentials exist
+        run: |
+          missing=""
+          [ -n "$APP_ID" ] || missing="$missing NIFE_SMELTER_APP_ID"
+          [ -n "$APP_KEY" ] || missing="$missing NIFE_SMELTER_PRIVATE_KEY"
+          if [ -n "$missing" ]; then
+            echo "missing secret(s):$missing"
+            echo "Create them as organization secrets (nife-smelter's app ID and private key), visible"
+            echo "to this repository, and pass them from the caller's release job."
+            exit 1
+          fi
+        env:
+          APP_ID: ${{ secrets.NIFE_SMELTER_APP_ID }}
+          APP_KEY: ${{ secrets.NIFE_SMELTER_PRIVATE_KEY }}
+      - name: mint a nife-smelter installation token
+        id: app
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ secrets.NIFE_SMELTER_APP_ID }}
+          private-key: ${{ secrets.NIFE_SMELTER_PRIVATE_KEY }}
+          permission-contents: write
       - name: create the tag (refusing one that exists)
         run: |
           set -e
@@ -93,7 +125,7 @@ jobs:
           gh api "repos/$GITHUB_REPOSITORY/git/refs" -f "ref=$ref" -f "sha=$GITHUB_SHA"
           echo "created $ref at $GITHUB_SHA"
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ steps.app.outputs.token }}
       - name: budget
         if: always()
         run: python3 .crate-workflows/helpers/job_budget.py check "${{ github.job }}" "$JOB_STARTED_AT"

@@ -9,9 +9,10 @@ changed by hand in the web interface is a red run, not a surprise; the run's out
 setting, the value the file rules, and the value the repository now has.
 
 What this reads: features, merging, metadata, security toggles, the Actions permission set, the
-`crates-io` environment's reviewers, both rulesets, and the label set. What it does not read:
-team membership and app installation permissions, which need organization scopes; those drift
-silently, and this is the BUGS entry that says so.
+`crates-io` environment's reviewers, both rulesets (target, conditions, bypass actors, and every
+rule with its parameters), and the label set. What it does not read: team membership and app
+installation permissions, which need organization scopes; those drift silently, and this is the BUGS
+entry that says so.
 """
 
 import json
@@ -42,6 +43,55 @@ def rulesets_unreadable(repo, err):
                 'Set a SETTINGS_TOKEN secret holding a fine-grained PAT with that scope; an '
                 'organization secret covers every crate repository at once.')
     return f'rulesets unreadable: {err}'
+
+
+def subset_diffs(path, want, got):
+    """Every key the file names must read back equal; keys only the live side has are the API's
+    defaults and are not drift. Lists compare as given."""
+    if isinstance(want, dict):
+        if not isinstance(got, dict):
+            return [f'{path}: file says {want}, repository has {got}']
+        out = []
+        for key, value in want.items():
+            out += subset_diffs(f'{path}.{key}', value, got.get(key))
+        return out
+    return [] if want == got else [f'{path}: file says {want}, repository has {got}']
+
+
+def ruleset_diffs(rs, detail):
+    """What differs between one ruleset in the file and its live detail: target, conditions, the
+    bypass actors (as a set), and the rules (names and parameters, both directions)."""
+    name = f'ruleset "{rs["name"]}"'
+    out = []
+    if detail.get('target') != rs['target']:
+        out.append(f'{name}: target is {detail.get("target")}, file says {rs["target"]}')
+    out += subset_diffs(f'{name}: conditions', rs['conditions'], detail.get('conditions') or {})
+
+    def actors(items):
+        return {(a.get('actor_id'), a.get('actor_type'), a.get('bypass_mode')) for a in items or []}
+    want_actors, got_actors = actors(rs['bypass_actors']), actors(detail.get('bypass_actors'))
+    if want_actors != got_actors:
+        out.append(f'{name}: bypass actors differ; missing {sorted(want_actors - got_actors, key=str)}, '
+                   f'extra {sorted(got_actors - want_actors, key=str)}')
+
+    rules = {r['type']: r.get('parameters') or {} for r in detail.get('rules', [])}
+    for rtype in sorted(set(rs['rules']) - set(rules)):
+        out.append(f'{name}: rule {rtype} missing')
+    for rtype in sorted(set(rules) - set(rs['rules'])):
+        out.append(f'{name}: rule {rtype} is on but not in the file')
+    for rtype, want_params in rs['rules'].items():
+        if rtype not in rules or not isinstance(want_params, dict):
+            continue
+        got_params = rules[rtype]
+        if rtype == 'required_status_checks':
+            want_ctx = {c['context'] for c in want_params['required_status_checks']}
+            got_ctx = {c['context'] for c in got_params.get('required_status_checks', [])}
+            if want_ctx != got_ctx:
+                out.append(f'{name}: required checks differ; '
+                           f'missing {sorted(want_ctx - got_ctx)}, extra {sorted(got_ctx - want_ctx)}')
+            want_params = {k: v for k, v in want_params.items() if k != 'required_status_checks'}
+        out += subset_diffs(f'{name}: rule {rtype}', want_params, got_params)
+    return out
 
 
 def main(argv):
@@ -130,19 +180,7 @@ def main(argv):
             if detail is None:
                 diffs.append(f'ruleset "{rs["name"]}": could not read the detail: {err}')
                 continue
-            rules = {r['type']: r.get('parameters') for r in detail.get('rules', [])}
-            for rtype, want_params in rs['rules'].items():
-                if rtype not in rules:
-                    diffs.append(f'ruleset "{rs["name"]}": rule {rtype} missing')
-                elif isinstance(want_params, dict) and rtype == 'required_status_checks':
-                    want_ctx = {c['context'] for c in want_params['required_status_checks']}
-                    got_ctx = {c['context'] for c in (rules.get(rtype) or {}).get('required_status_checks', [])}
-                    if want_ctx != got_ctx:
-                        diffs.append(f'ruleset "{rs["name"]}": required checks differ; '
-                                     f'missing {sorted(want_ctx - got_ctx)}, extra {sorted(got_ctx - want_ctx)}')
-                    strict = (rules.get(rtype) or {}).get('strict_required_status_checks_policy')
-                    if strict != want_params['strict_required_status_checks_policy']:
-                        diffs.append(f'ruleset "{rs["name"]}": strict (branches up to date) is {strict}')
+            diffs.extend(ruleset_diffs(rs, detail))
 
     labels, err = api(f'repos/{repo}/labels?per_page=100')
     if labels is None:

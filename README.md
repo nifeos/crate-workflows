@@ -163,6 +163,20 @@ Record an architect ruling on a pull request:
 script/record-ruling 12 --text "The new dependency is fine: it is no_std and proven."
 ```
 
+## Release secrets
+
+`release / tag` creates the tag as the nife-smelter app, because the tags ruleset refuses every
+other actor. Two organization secrets, visible to every crate repository, feed it:
+
+| secret | holds |
+|---|---|
+| `NIFE_SMELTER_APP_ID` | the nife-smelter app's ID |
+| `NIFE_SMELTER_PRIVATE_KEY` | a private key generated for the app (the whole PEM) |
+
+The caller passes both (`scaffold/caller-workflows/release.yml` does). If either is missing the
+job fails naming it; it never falls back to `github.token`. The app must also be installed on the
+repository, with contents write.
+
 ## Testing a release
 
 The canary repository `nifeos/crate-workflows-test` adopts every release before anything depends
@@ -215,8 +229,11 @@ red, by design. The canary is also the configured repository `apply-settings` an
   it. The org Actions endpoints answer 403 to a non-admin token; the fork-policy path answers
   Not Found (measured 2026-10-16). Set it once in the org's Actions settings. A public
   repository's default is approval for first-time outside contributors only.
-- Tag rules: the repository rulesets API refuses ref_name conditions on push-target rulesets. The
-  measured error is "Target ref_name is not supported for push rulesets", live on the canary
-  repository. `apply-settings` therefore reports the tags ruleset as refused, and the release
-  workflow's own gate is what keeps a stray tag from mattering. The durable fix is an
-  organization-level push ruleset scoped by repository and ref, which needs an org-scoped token.
+- Tag rules: the tags ruleset is a tag-target ruleset (`refs/tags/v*`: creation, update,
+  deletion), because a push-target ruleset refuses ref_name conditions ("Target ref_name is not
+  supported for push rulesets"). Its only bypass actor is the nife-smelter app, which the release
+  workflow's `tag` job authenticates as. The GitHub Actions integration is refused as a bypass
+  actor ("must be part of the ruleset source or owner organization"), so `github.token` cannot
+  tag. The app is accepted as a bypass actor only once it is installed on the repository. Measured
+  on the canary 2026-10-17: a repository-level tag ruleset is accepted, a hand-made `v*` tag is
+  refused (422), and a tag that does not match `v*` is allowed.

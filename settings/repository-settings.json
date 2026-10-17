@@ -117,7 +117,7 @@
     },
     {
       "name": "tags: only the release workflow makes one",
-      "target": "push",
+      "target": "tag",
       "enforcement": "active",
       "conditions": {
         "ref_name": {
@@ -125,9 +125,9 @@
           "exclude": []
         }
       },
-      "_readme": "The repository rulesets API refuses ref_name conditions on push-target rulesets (measured live: 'Target ref_name is not supported for push rulesets'), so apply-settings reports this ruleset as refused. Tag protection is then one of: an organization-level push ruleset scoped by repository_name and ref_name (needs an org-scoped token), or tag creation staying open on the repository, which the release workflow's own refusal (gate before tag) keeps from mattering much.",
+      "_readme": "A repository-level tag ruleset is accepted (measured 2026-10-17 on the canary); a push-target ruleset refuses ref_name conditions. The only bypass actor is the nife-smelter app (actor_id 5053502), which the release workflow's tag job authenticates as. The GitHub Actions integration (15368) is refused as a bypass actor ('must be part of the ruleset source or owner organization'), so github.token cannot tag. The app is accepted once it is installed on the repository. A hand-made v* tag is refused with a 422; a tag that does not match v* is allowed.",
       "bypass_actors": [
-        { "actor_id": 15368, "actor_type": "Integration", "bypass_mode": "always" }
+        { "actor_id": 5053502, "actor_type": "Integration", "bypass_mode": "always" }
       ],
       "rules": {
         "creation": true,
