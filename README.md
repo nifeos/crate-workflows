@@ -64,7 +64,7 @@ no approval.
 | fuzz (cargo-fuzz) | nightly, weekly, only when the caller asks | `weekly / fuzz` |
 | Miri, weekly | `cargo +nightly miri test` | `weekly / miri` |
 | mutation, weekly | cargo-mutants; new survivors fail against `mutants-baseline.txt` | `weekly / mutation` |
-| `script/verify` (Kani) | `model-checking/kani-github-action` on every pull request | `proofs / kani` |
+| `script/verify` (Kani) | `cargo kani` at the version in `.kani-version`, on every pull request | `proofs / kani` |
 | falsification sweep | every patch applied with `-p1` must turn its harness red at its own assertion; the form check (every harness carries a patch or a reason) runs beside it | `proofs / falsify` |
 | kani-reach | dropped: a dispatch-only measurement of nife's reach | |
 | loom interleavings | dropped: none of the first crates uses loom | |
@@ -213,11 +213,12 @@ red, by design. The canary is also the configured repository `apply-settings` an
   needs the `@*` suffix: `taiki-e/install-action` alone matches no reference. Every caller
   workflow using a third-party action then ends in `startup_failure` with empty `referenced_workflows`
   (measured on the canary; the same patterns with `@*` run). The file must name every third-party
-  action the template itself uses: `taiki-e/install-action` and `model-checking/kani-github-action`.
-  `check-settings` compares the list exactly.
-- `model-checking/kani-github-action` uses `dtolnay/rust-toolchain@stable` and `actions/checkout@v3`
-  internally, neither pinned to a SHA. Where a repository requires SHA pinning, `proofs / kani`
-  fails at startup; where `dtolnay/rust-toolchain` is not allowlisted it is refused as well.
+  action the template itself uses: `taiki-e/install-action`. `check-settings` compares the list
+  exactly.
+- Kani is installed with `cargo install --locked kani-verifier` at the version in `.kani-version`.
+  The version is read from the template's own pinned checkout, so a crate inherits it through its
+  pin. The `model-checking/kani-github-action` is not used: it calls `dtolnay/rust-toolchain@stable` and
+  `actions/checkout@v3` unpinned, which a repository requiring SHA pinning refuses.
 - The fork pull request approval policy is organization state, and nothing here can set or read
   it. The org Actions endpoints answer 403 to a non-admin token; the fork-policy path answers
   Not Found (measured 2026-10-16). Set it once in the org's Actions settings. A public
