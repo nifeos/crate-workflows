@@ -216,7 +216,10 @@ red, by design. The canary is also the configured repository `apply-settings` an
   `administration` in any `permissions` block, at the workflow level as well as the job level
   (this repository's first selftest runs are the evidence). The check authenticates as the
   caller's `SETTINGS_TOKEN` secret instead, a fine-grained PAT with that scope, stored once as an
-  organization secret. Until it exists, the job is red on its 403 with instructions.
+  organization secret. Until it exists, the job is red on its 403 with instructions. The merge
+  settings (`allow_merge_commit` and the other five) are returned only to a caller with push
+  access, so the PAT also needs Contents read and write; without it each one is an "unreadable"
+  finding naming that scope, not a mismatch.
 - Publishing for real needs the trusted publisher configured on crates.io for the crate and
   repository pair, which needs calef's crates.io account. Until then only `dry-run` rehearsals
   run.
