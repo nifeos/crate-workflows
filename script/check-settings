@@ -94,8 +94,85 @@ def ruleset_diffs(rs, detail):
     return out
 
 
+def forbidden(err):
+    return bool(err) and any(m in err for m in ('403', 'Forbidden', 'Resource not accessible'))
+
+
+def security_unreadable(key, repo, err):
+    if forbidden(err):
+        return (f'security/{key} unreadable on {repo}: the token lacks repository Administration '
+                'read-only (SETTINGS_TOKEN needs it); this is not a statement that the setting is on or off')
+    return f'security/{key} unreadable on {repo}: {err}'
+
+
+def security_endpoint_diffs(repo, s):
+    """Private vulnerability reporting and Dependabot alerts are not in the repository read's
+    security_and_analysis block, so each has its own endpoint: `private-vulnerability-reporting`
+    answers {"enabled": bool}; `vulnerability-alerts` answers 204 when on and 404 when off. A 403 is
+    a missing scope, never an answer: it is a finding that names the scope."""
+    out = []
+    pvr, err = api(f'repos/{repo}/private-vulnerability-reporting')
+    if pvr is None:
+        out.append(security_unreadable('private_vulnerability_reporting', repo, err))
+    elif pvr.get('enabled') != s['security']['private_vulnerability_reporting']:
+        out.append(f"security/private_vulnerability_reporting: file says "
+                   f"{s['security']['private_vulnerability_reporting']}, repository has {pvr.get('enabled')}")
+    alerts, err = api(f'repos/{repo}/vulnerability-alerts')
+    if alerts is None and '404' in (err or '') and not forbidden(err):
+        got = False
+    elif alerts is None:
+        got = None
+        out.append(security_unreadable('dependabot_alerts', repo, err))
+    else:
+        got = True
+    if got is not None and got != s['security']['dependabot_alerts']:
+        out.append(f"security/dependabot_alerts: file says {s['security']['dependabot_alerts']}, "
+                   f'repository has {got}')
+    return out
+
+
+def selftest():
+    """Both toggles in both directions through a fake api layer, plus the 403 and other-error paths."""
+    global api
+    real = api
+    want = {'security': {'private_vulnerability_reporting': True, 'dependabot_alerts': True}}
+    fail_403 = (None, 'gh: Resource not accessible by personal access token (HTTP 403)')
+    off_404 = (None, 'gh: Not Found (HTTP 404)')
+    on = ({'enabled': True}, None)
+    empty = ({}, None)
+
+    def run(pvr, alerts):
+        globals()['api'] = lambda path, **_: pvr if path.endswith('/private-vulnerability-reporting') else alerts
+        return security_endpoint_diffs('o/r', want)
+    cases = [
+        ('both on', on, empty, 0),
+        ('pvr off', ({'enabled': False}, None), empty, 1),
+        ('alerts off (404)', on, off_404, 1),
+        ('both off', ({'enabled': False}, None), off_404, 2),
+        ('pvr 403', fail_403, empty, 1),
+        ('alerts 403 is not off', on, fail_403, 1),
+        ('alerts 500 is not off', on, (None, 'HTTP 500'), 1),
+    ]
+    ok = True
+    try:
+        for name, pvr, alerts, n in cases:
+            found = run(pvr, alerts)
+            if len(found) != n:
+                ok = False
+                print(f'FAIL {name}: expected {n} finding(s), got {found}')
+        if not any('Administration' in d for d in run(fail_403, empty)):
+            ok = False
+            print('FAIL 403 finding does not name the scope')
+    finally:
+        globals()['api'] = real
+    print('check-settings selftest: %s' % ('ok' if ok else 'FAILED'))
+    return 0 if ok else 1
+
+
 def main(argv):
     args = argv[1:]
+    if args == ['--selftest']:
+        return selftest()
     settings = SETTINGS
     if '--settings' in args:
         i = args.index('--settings')
@@ -130,9 +207,8 @@ def main(argv):
             got = {'enabled': True, 'disabled': False, None: None}.get(status, status)
             if got != want:
                 diffs.append(f'security/{key}: file says {want}, repository has {got}')
-        # private_vulnerability_reporting and dependabot_alerts are absent from the read on a
-        # public repository (measured): the first is not offered there, the second is always on.
-        # Unverifiable by read is not drift, so they are skipped rather than flagged.
+
+    diffs.extend(security_endpoint_diffs(repo, s))
 
     perms, err = api(f'repos/{repo}/actions/permissions')
     if perms is None:
