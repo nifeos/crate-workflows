@@ -1,4 +1,4 @@
-# Every path is owned by the crates-io team (name provisional, for calef's naming pass). The
+# Every path is owned by the crate-maintainers team. The
 # apply script creates the team; until it exists this file names a ghost, and review assignment
 # for it is a no-op rather than an error.
-* @nifeos/crates-io
+* @nifeos/crate-maintainers

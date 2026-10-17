@@ -99,7 +99,7 @@ same environment approval as every later one, and a dry run reports which door i
 | `Co-Authored-By` commit hook | documented in the scaffold's `.githooks`; a crate repository copies nife's hook file | scaffold |
 | empty diff | a merge that changes no file is refused | `check / supply-chain` |
 | architect label | the dependency rule, plus a semver rule (cargo-semver-checks against the last release) | `label / label` |
-| architect hold | red while `needs-architect` or `held-by-lane` is on, green on `architect-ruled`; a required check | `hold / architect hold (needs-architect label)` |
+| architect hold | red while `needs-architect` or `held-by-lane` is on, green on `architect-ruled`; a required check | `hold / architect hold` |
 | `script/record-ruling` | a ruling swaps `needs-architect` for `architect-ruled` | `script/record-ruling` |
 | naming checks, name provenance, citations, roadmap, branch names, merge drain | dropped: nife's own process. A TODO in a crate cites an issue there | |
 | audit and stranger cadence | a stranger builds and proves the crate from its README alone; the job fails when the recorded run is overdue | `weekly / stranger` |
@@ -141,8 +141,8 @@ the hold. The names are the caller's job id, a slash, and the reusable workflow'
 `scaffold/` fixes the caller job ids so the two ends cannot drift.
 
 ```
-ci / fmt, ci / clippy, ci / tests, ci / coverage, ci / standalone, ci / supply-chain,
-proofs / kani, proofs / falsify, hold / architect hold (needs-architect label)
+check / fmt, check / clippy, check / tests, check / coverage, check / standalone, check / supply-chain,
+proofs / kani, proofs / falsify, hold / architect hold
 ```
 
 ## Adopting it for a crate
@@ -209,8 +209,8 @@ red, by design. The canary is also the configured repository `apply-settings` an
 
 ## BUGS
 
-- Names are provisional: this repository's name, the workflow names, the team slug (`crates-io`)
-  and the release cadence all wait for calef's naming pass.
+- Names are provisional: this repository's name, the workflow names, and the release cadence
+  wait for calef's naming pass; the team slug is ruled (`crate-maintainers`).
 - The required-check names above describe what GitHub shows for cross-repository reusable workflow
   calls. The canary repository's runs are the evidence; if GitHub names the checks
   differently, this section and the ruleset in the settings file are both wrong until they match.

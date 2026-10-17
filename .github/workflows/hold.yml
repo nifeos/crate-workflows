@@ -15,7 +15,7 @@ permissions:
 
 jobs:
   hold:
-    name: architect hold (needs-architect label)
+    name: architect hold
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

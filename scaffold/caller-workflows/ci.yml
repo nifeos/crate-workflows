@@ -10,7 +10,7 @@ on:
 permissions:
   contents: read
 jobs:
-  ci:
+  check:
     permissions:
       contents: read
       security-events: write

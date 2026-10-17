@@ -24,7 +24,7 @@ github-actions ecosystem opens the bumps afterward; the lag check fails closed i
 | .github/dependabot.yml | cargo and github-actions ecosystems, both weekly |
 | .github/pull_request_template.md | the disclosure line first, then what changed |
 | .github/ISSUE_TEMPLATE/ | bug report and feature request forms, blank issues off |
-| CODEOWNERS | the crates-io team owns every path (team name provisional) |
+| CODEOWNERS | the crate-maintainers team owns every path |
 | caller `weekly.yml` | forwards the `SETTINGS_TOKEN` secret to the template's weekly workflow |
 | CONTRIBUTING.md | disclosure of agent-written work, and how outside contributions are reviewed |
 | SECURITY.md | what a security report means here, and private reporting |
@@ -35,7 +35,7 @@ github-actions ecosystem opens the bumps afterward; the lag check fails closed i
 | .githooks/commit-msg | the Co-Authored-By trailer, required of every agent's commit |
 | docs/stranger-test.md | the stranger cadence record; the first run is overdue until it exists |
 
-The caller workflow files fix the job ids (`ci`, `proofs`, `weekly`, `release`, `label`, `hold`),
+The caller workflow files fix the job ids (`check`, `proofs`, `weekly`, `release`, `label`, `hold`),
 which is what makes the required-check names in the settings file stable: GitHub shows a called
-reusable workflow's jobs as `<caller job id> / <job name>`, so `ci / fmt` and friends resolve
+reusable workflow's jobs as `<caller job id> / <job name>`, so `check / fmt` and friends resolve
 exactly when the caller ids are these.

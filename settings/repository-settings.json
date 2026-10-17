@@ -52,7 +52,7 @@
 
   "team": {
     "org": "nifeos",
-    "slug": "crates-io",
+    "slug": "crate-maintainers",
     "permission": "maintain"
   },
 
@@ -104,15 +104,15 @@
         "required_status_checks": {
           "strict_required_status_checks_policy": true,
           "required_status_checks": [
-            { "context": "ci / fmt" },
-            { "context": "ci / clippy" },
-            { "context": "ci / tests" },
-            { "context": "ci / coverage" },
-            { "context": "ci / standalone" },
-            { "context": "ci / supply-chain" },
+            { "context": "check / fmt" },
+            { "context": "check / clippy" },
+            { "context": "check / tests" },
+            { "context": "check / coverage" },
+            { "context": "check / standalone" },
+            { "context": "check / supply-chain" },
             { "context": "proofs / kani" },
             { "context": "proofs / falsify" },
-            { "context": "hold / architect hold (needs-architect label)" }
+            { "context": "hold / architect hold" }
           ]
         }
       }
