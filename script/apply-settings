@@ -91,7 +91,11 @@ def main(argv):
 
     a = s['actions']
     step('actions enabled, selected actions', f'repos/{repo}/actions/permissions',
-         method='PUT', json_body={'enabled': a['enabled'], 'allowed_actions': a['allowed_actions']})
+         method='PUT', json_body={'enabled': a['enabled'], 'allowed_actions': a['allowed_actions'],
+                    'sha_pinning_required': a['sha_pinning_required']})
+    step('fork pull request approval policy',
+         f'repos/{repo}/actions/permissions/fork-pr-contributor-approval',
+         method='PUT', json_body={'approval_policy': a['approval_policy']})
     step('actions allowlist', f'repos/{repo}/actions/permissions/selected-actions',
          method='PUT', json_body={'github_owned_allowed': a['github_owned_allowed'],
                                   'verified_allowed': a['verified_allowed'],
