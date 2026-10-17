@@ -32,12 +32,12 @@
   },
 
   "actions": {
-    "_readme": "Every third-party action the template itself uses is named in patterns_allowed, or the caller's allowlist refuses the whole reusable workflow at resolution: startup_failure with empty referenced_workflows, measured on the canary, where taiki-e/install-action (used by check and weekly) was missing and took the two workflows down with it.",
+    "_readme": "Every third-party action the template itself uses is named in patterns_allowed, with an @* version suffix. A pattern without @ matches no reference: every caller workflow that uses a third-party action ends in startup_failure with empty referenced_workflows (measured on the canary with the bare names), and the same patterns with @* run. The template's own actions are taiki-e/install-action (check, weekly) and model-checking/kani-github-action (proofs).",
     "enabled": true,
     "allowed_actions": "selected",
     "github_owned_allowed": true,
     "verified_allowed": true,
-    "patterns_allowed": ["model-checking/kani-github-action", "taiki-e/install-action"],
+    "patterns_allowed": ["model-checking/kani-github-action@*", "taiki-e/install-action@*"],
     "default_workflow_permissions": "read",
     "can_approve_pull_request_reviews": false
   },

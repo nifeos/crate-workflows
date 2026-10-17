@@ -8,8 +8,8 @@ comparison is always against the version of the template the caller actually run
 changed by hand in the web interface is a red run, not a surprise; the run's output names the
 setting, the value the file rules, and the value the repository now has.
 
-What this reads: features, merging, metadata, security toggles, the Actions permission set, the
-`crates-io` environment's reviewers, both rulesets (target, conditions, bypass actors, and every
+What this reads: features, merging, metadata, security toggles, the Actions permission set and allowlist (patterns compared
+exactly), the `crates-io` environment's reviewers, both rulesets (target, conditions, bypass actors, and every
 rule with its parameters), and the label set. What it does not read: team membership and app
 installation permissions, which need organization scopes; those drift silently, and this is the BUGS
 entry that says so.
@@ -149,6 +149,18 @@ def main(argv):
         if wf.get('default_workflow_permissions') != s['actions']['default_workflow_permissions']:
             diffs.append(f"default_workflow_permissions: file says {s['actions']['default_workflow_permissions']}, "
                          f"repository has {wf.get('default_workflow_permissions')}")
+
+    sel, err = api(f'repos/{repo}/actions/permissions/selected-actions')
+    if sel is None:
+        diffs.append(f'actions allowlist unreadable: {err}')
+    else:
+        for key in ('github_owned_allowed', 'verified_allowed'):
+            if sel.get(key) != s['actions'][key]:
+                diffs.append(f"actions {key}: file says {s['actions'][key]}, repository has {sel.get(key)}")
+        want_p, got_p = set(s['actions']['patterns_allowed']), set(sel.get('patterns_allowed') or [])
+        if want_p != got_p:
+            diffs.append(f'actions patterns_allowed differ; missing {sorted(want_p - got_p)}, '
+                         f'extra {sorted(got_p - want_p)}')
 
     env, err = api(f'repos/{repo}/environments/{s["environment"]["name"]}')
     if env is None:

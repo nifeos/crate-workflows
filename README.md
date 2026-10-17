@@ -206,25 +206,18 @@ red, by design. The canary is also the configured repository `apply-settings` an
   (this repository's first selftest runs are the evidence). The check authenticates as the
   caller's `SETTINGS_TOKEN` secret instead, a fine-grained PAT with that scope, stored once as an
   organization secret. Until it exists, the job is red on its 403 with instructions.
-- Full-name resolution of a reusable workflow whose graph uses a third-party action fails,
-  measured 2026-10-16. `check.yml` and `proofs.yml` could not be called by any caller shape, by
-  any event, at any SHA, including this repository calling itself by name. `hold.yml` and
-  `label.yml` resolved from the same callers at the same commits. The same two refused files ran
-  green through `./` calls in the same minute (canary run 38998555269; this repository's pull
-  request 3). Declared inputs, the workflow_call context, the caller's allowlist and the pinned
-  commit were each exonerated by probe. The canary's adoption of v4 is the unblock test; the
-  ritual resumes there when GitHub heals.
 - Publishing for real needs the trusted publisher configured on crates.io for the crate and
   repository pair, which needs calef's crates.io account. Until then only `dry-run` rehearsals
   run.
-- The org-level Actions allowlist (SHA-pinned only, verified creators, and every third-party
-  action the template itself uses named: `kani-github-action`, `taiki-e/install-action`) is
-  organization state, not repository state; `script/apply-settings` attempts it and
-  reports the refusal when the token lacks the scope.
-- With `allowed_actions: selected`, a reusable workflow whose steps use a non-allowlisted action
-  fails at resolution, not at a step: the caller records a startup failure with empty
-  `referenced_workflows`, and the settings file must therefore name the template's own third-party
-  actions. Measured on the canary when `taiki-e/install-action` was missing from the patterns.
+- The repository's Actions allowlist is `patterns_allowed` in the settings file, and each pattern
+  needs the `@*` suffix: `taiki-e/install-action` alone matches no reference. Every caller
+  workflow using a third-party action then ends in `startup_failure` with empty `referenced_workflows`
+  (measured on the canary; the same patterns with `@*` run). The file must name every third-party
+  action the template itself uses: `taiki-e/install-action` and `model-checking/kani-github-action`.
+  `check-settings` compares the list exactly.
+- `model-checking/kani-github-action` uses `dtolnay/rust-toolchain@stable` and `actions/checkout@v3`
+  internally, neither pinned to a SHA. Where a repository requires SHA pinning, `proofs / kani`
+  fails at startup; where `dtolnay/rust-toolchain` is not allowlisted it is refused as well.
 - The fork pull request approval policy is organization state, and nothing here can set or read
   it. The org Actions endpoints answer 403 to a non-admin token; the fork-policy path answers
   Not Found (measured 2026-10-16). Set it once in the org's Actions settings. A public
