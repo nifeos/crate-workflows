@@ -97,6 +97,17 @@ no approval.
 | audit and stranger cadence | a stranger builds and proves the crate from its README alone; the job fails when the recorded run is overdue | `weekly / stranger` |
 | kernel and image gates | dropped: a library crate has none | |
 
+## How Kani moves
+
+`.kani-version` holds the one exact kani-verifier version that `proofs.yml` installs. Every
+Wednesday `.github/workflows/kani-bump.yml` compares it with the newest release on crates.io and,
+when that is newer, opens or updates a single pull request that changes only that file. This
+repository's own `selftest (proofs)` run is the verification, and the default is to merge. A crate
+repository receives the new Kani when it next bumps its pin of this template (Dependabot, weekly),
+so the lag is the bump merge plus a template release plus that weekly pin bump. The job authenticates
+as nife-smelter (`NIFE_SMELTER_APP_ID`, `NIFE_SMELTER_PRIVATE_KEY`, with contents and pull requests
+write here) and fails naming the secret when one is missing.
+
 ## Repository configuration
 
 `settings/repository-settings.json` is the one description of what a crate repository is
