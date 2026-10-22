@@ -1,0 +1,126 @@
+# The canary's release ritual, opened by machine: after each template release, one pull request on
+# nifeos/crate-workflows-test moves every caller to the release's commit, copied from that
+# release's scaffold/caller-workflows with the pin filled in, so the canary runs exactly what a
+# crate would adopt. A person still reads the nine required checks and merges; nothing here merges.
+#
+# Provisional name, for calef's naming pass, like the rest of this repository.
+
+name: canary adopt
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'the release tag to adopt, e.g. v6'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: canary-adopt
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  adopt:
+    name: open the canary's adoption pull request
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    env:
+      TAG: ${{ github.event.release.tag_name || inputs.tag }}
+      CANARY: crate-workflows-test
+    steps:
+      # A pull request opened with github.token triggers no workflows, and github.token cannot
+      # write to another repository at all. The nife-smelter app's token does both; it needs
+      # workflows write on the canary because every changed file is under .github/workflows.
+      # There is no fallback: a missing secret is a red job that names what to create.
+      - name: the app credentials exist
+        run: |
+          missing=""
+          [ -n "$APP_ID" ] || missing="$missing NIFE_SMELTER_APP_ID"
+          [ -n "$APP_KEY" ] || missing="$missing NIFE_SMELTER_PRIVATE_KEY"
+          if [ -n "$missing" ]; then
+            echo "missing secret(s):$missing"
+            echo "Create them as organization secrets (nife-smelter's app ID and private key), visible"
+            echo "to this repository. The app needs contents, pull requests and workflows write on $CANARY."
+            exit 1
+          fi
+        env:
+          APP_ID: ${{ secrets.NIFE_SMELTER_APP_ID }}
+          APP_KEY: ${{ secrets.NIFE_SMELTER_PRIVATE_KEY }}
+      - name: mint a nife-smelter installation token for the canary
+        id: app
+        uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        with:
+          app-id: ${{ secrets.NIFE_SMELTER_APP_ID }}
+          private-key: ${{ secrets.NIFE_SMELTER_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ env.CANARY }}
+          permission-contents: write
+          permission-pull-requests: write
+          permission-workflows: write
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ env.TAG }}
+          path: template
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: ${{ github.repository_owner }}/${{ env.CANARY }}
+          token: ${{ steps.app.outputs.token }}
+          path: canary
+      - name: copy the release's callers with the pin filled in
+        id: copy
+        run: |
+          set -e
+          sha="$(git -C template rev-parse "$TAG^{commit}")"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          for f in template/scaffold/caller-workflows/*.yml; do
+            sed "s/@PINS@/@$sha/" "$f" > "canary/.github/workflows/$(basename "$f")"
+          done
+          if git -C canary diff --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "$CANARY's callers already match $TAG ($sha); nothing to open."
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            git -C canary diff --stat
+          fi
+      # One branch per release, force-pushed in place, so a re-run updates its pull request
+      # instead of opening another.
+      - name: open or update the pull request
+        if: steps.copy.outputs.changed == 'true'
+        working-directory: canary
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          SHA: ${{ steps.copy.outputs.sha }}
+          RELEASE_URL: ${{ github.server_url }}/${{ github.repository }}/releases/tag/${{ env.TAG }}
+        run: |
+          set -e
+          branch="adopt-$TAG"
+          title="Adopt release $TAG (the canary ritual)"
+          body="$(printf '%s\n' \
+            "Automated by \`nifeos/crate-workflows/.github/workflows/canary-adopt.yml\`. Every caller moves to $TAG (\`${GITHUB_REPOSITORY}@$SHA\`), copied from that release's \`scaffold/caller-workflows\` with the pin filled in." \
+            "" \
+            "Release notes: $RELEASE_URL" \
+            "" \
+            "Merge when the nine required checks are green. A release whose notes rename a required check also needs \`script/apply-settings\` from that release before this can merge.")"
+          git config user.name 'nife-smelter[bot]'
+          git config user.email 'nife-smelter[bot]@users.noreply.github.com'
+          git switch -C "$branch"
+          git add .github/workflows
+          git commit -m "$title"
+          git push --force origin "$branch"
+          if existing="$(gh pr list --head "$branch" --state open --json number --jq '.[0].number')" && [ -n "$existing" ]; then
+            gh pr edit "$existing" --title "$title" --body "$body"
+            echo "updated pull request $existing"
+          else
+            gh pr create --head "$branch" --base main --title "$title" --body "$body"
+          fi
