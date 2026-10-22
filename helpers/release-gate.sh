@@ -33,7 +33,7 @@ for workflow in ci.yml proofs.yml; do
 		echo "release-gate: $workflow is green on $sha"
 	else
 		echo "release-gate: no completed, green run of $workflow on $sha." >&2
-		echo "release-gate: let the pull-request checks finish and merge first; then dispatch the release." >&2
+		echo "release-gate: merge first and let the push run on main finish; then dispatch the release. A pull request run does not count: it is recorded at the pull request head, not at this commit." >&2
 		exit 1
 	fi
 done
