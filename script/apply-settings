@@ -144,9 +144,11 @@ def main(argv):
     for rs in s['rulesets']:
         payload = {'name': rs['name'], 'target': rs['target'], 'enforcement': rs['enforcement'],
                    'conditions': rs['conditions'], 'bypass_actors': rs['bypass_actors'],
-                   'rules': [{'type': t, 'parameters': v} for t, v in rs['rules'].items()]}
-        # The rules API wants {"type": ..., "parameters": ...}; parameters are null for flag rules.
-        payload['rules'] = [{'type': t, 'parameters': v if isinstance(v, dict) else {}} for t, v in rs['rules'].items()]
+                   # A flag rule goes without parameters. An empty object is not the same: the
+                   # tag ruleset's `update` rule has its own parameter schema, and GitHub answers
+                   # {} with a 422 (measured on the canary, 2026-10-22).
+                   'rules': [{'type': t, 'parameters': v} if isinstance(v, dict) else {'type': t}
+                             for t, v in rs['rules'].items()]}
         made = None
         live_rulesets = call(f'rulesets of {repo}: read', f'repos/{repo}/rulesets?per_page=100', method='GET')
         existing_id = None
@@ -154,7 +156,6 @@ def main(argv):
             for r in json.loads(live_rulesets):
                 if r.get('name') == rs['name']:
                     existing_id = r['id']
-        payload['rules'] = [{'type': t, 'parameters': v if isinstance(v, dict) else {}} for t, v in rs['rules'].items()]
         if existing_id:
             step(f'ruleset "{rs["name"]}" (update)', f'repos/{repo}/rulesets/{existing_id}',
                  method='PUT', json_body=payload)
