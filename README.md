@@ -202,10 +202,16 @@ The canary repository `nifeos/crate-workflows-test` adopts every release before 
 on one. The ritual after cutting a tag: open a pull request there that moves every caller's pin
 to the new release's commit, expect the nine required checks green, and merge it. A release is
 not depended on until the canary has adopted it, and a canary pin behind the newest release is
-the lag check's
-red, by design. The canary is also the configured repository `apply-settings` and
-`check-settings` run against, so the drift check always has a real repository to read. Until
-`nife-smelter` holds write there, a person opens the adoption pull request by hand.
+the lag check's red, by design. The canary is also the configured repository `apply-settings` and
+`check-settings` run against, so the drift check always has a real repository to read.
+
+`.github/workflows/canary-adopt.yml` opens that pull request when a release is published (or on a
+dispatch naming a tag). It copies the release's `scaffold/caller-workflows` into the canary with
+the pin filled in, on the branch `adopt-<tag>`, and a re-run updates the same pull request. It
+authenticates as nife-smelter (`NIFE_SMELTER_APP_ID`, `NIFE_SMELTER_PRIVATE_KEY`), which needs
+contents, pull requests and workflows write on the canary, and fails naming a missing secret. It
+never merges: a person reads the checks, and a release that renames a required check also needs
+`apply-settings` run from it first.
 
 ## BUGS
 
