@@ -2,11 +2,11 @@ name: check
 on:
   pull_request:
     types: [opened, reopened, synchronize, ready_for_review]
-  # No push trigger: a push-triggered cross-repository reusable call start-fails on GitHub with
-  # an empty error (crate-workflows-test runs 38914536439 and 38914537601, against the same file
-  # that is green on pull_request). It is not needed: a pull request's runs are recorded at the
-  # merge commit's SHA, which is exactly the commit a release dispatches at, and that is what the
-  # release gate reads.
+  # The push on main is what the release gate reads. A pull request's runs are recorded at the
+  # pull request's head SHA, never at the merge commit a release dispatches at, so without this
+  # trigger no release can pass the gate.
+  push:
+    branches: [main]
 permissions:
   contents: read
 jobs:
