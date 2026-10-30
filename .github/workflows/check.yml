@@ -175,7 +175,7 @@ jobs:
           ref: ${{ job.workflow_sha }}
           path: .crate-workflows
           persist-credentials: false
-      - uses: taiki-e/install-action@8cca0918f8471c33515202b73f56ab27f2bed283 # v2.87.29
+      - uses: taiki-e/install-action@5488ac5a951645ce95062214902ac4b6bc1a1037 # v2.87.32
         with:
           tool: cargo-llvm-cov
       - run: rustup toolchain install "$TOOLCHAIN" --profile minimal --component llvm-tools
@@ -309,7 +309,7 @@ jobs:
               | grep -vE 'uses:[[:space:]]+\./' \
               | grep -vE 'uses:[[:space:]]+[^@[:space:]]+@[0-9a-f]{40}([[:space:]]|$)' || true)"
           [ -z "$unpinned" ] || { echo "$unpinned"; exit 1; }
-      - uses: taiki-e/install-action@8cca0918f8471c33515202b73f56ab27f2bed283 # v2.87.29
+      - uses: taiki-e/install-action@5488ac5a951645ce95062214902ac4b6bc1a1037 # v2.87.32
         with:
           tool: cargo-deny@0.20.2
       # nife's policy without its exceptions: no rayon skip, no advisory ignore, no vendored tree.
@@ -333,13 +333,13 @@ jobs:
             echo "the merge changes no file"; exit 1
           fi
       - name: CodeQL (Rust, build-mode none)
-        uses: github/codeql-action/init@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4
+        uses: github/codeql-action/init@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4
         with:
           languages: rust
           build-mode: none
       # The analyze action uploads its own SARIF; nife's split-job retry exists for its four-language
       # matrix, and one language in one job does not need it.
-      - uses: github/codeql-action/analyze@6f2ac81f5cd81fe351a197ba0b00d91d03cd2aee # v4
+      - uses: github/codeql-action/analyze@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4
       - name: budget
         if: always()
         run: python3 .crate-workflows/helpers/job_budget.py check "${{ github.job }}" "$JOB_STARTED_AT"
