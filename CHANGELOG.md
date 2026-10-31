@@ -10,6 +10,10 @@ call that sits behind the newest release.
   workflows (`check`, `proofs`, `weekly`, `release`), plus the architect label and hold workflows.
   One settings file, with an apply script and a drift check. The lag check sits in every reusable
   workflow's first job. `sample/` is the fixture crate the selftest runs everything against.
+- `check` lints each bare-metal target with `--lib --bins`, not `--all-targets`: the `test` crate
+  does not exist on those targets, so a crate with unit tests could never pass. The host run keeps
+  `--all-targets`, so tests are still linted once.
+
 ## BUGS
 
 - Nothing here is on crates.io yet, so no release row exists. The first release line lands with
