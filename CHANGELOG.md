@@ -13,6 +13,9 @@ call that sits behind the newest release.
 - `check` lints each bare-metal target with `--lib --bins`, not `--all-targets`: the `test` crate
   does not exist on those targets, so a crate with unit tests could never pass. The host run keeps
   `--all-targets`, so tests are still linted once.
+- The Disclosure section of CONTRIBUTING.md, in the repository and in `scaffold/`, now says a person
+  outside the project may use any tools they like and need not say which. The first-line rule for
+  agent-written pull requests is unchanged. Ruled 2026-10-31 (UTC).
 
 ## BUGS
 
