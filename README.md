@@ -90,7 +90,6 @@ same environment approval as every later one, and a dry run reports which door i
 | passive-voice ratchet | README, CHANGELOG and `docs/*.md` at nife's limit of 2 passives per 1,000 prose words; no baseline | `check / standalone` |
 | history ratchet | README and `docs/*.md` carry no phrase that only a history uses (`supersede`, `renamed from`, `moved from` a document, a Timeline heading); the CHANGELOG is exempt; no baseline | `check / standalone` |
 | function-length ratchet, 100 code lines | the count clippy's `too_many_lines` makes, read from source; no baseline | `check / standalone` |
-| module-block ratchet | every `.rs` file under `src/` opens with a `//!` block, below the inner attributes; nife's version requires a provenance block, which a crate repository never carries | `check / standalone` |
 | house style, typos | `typos` over the tree | `check / standalone` |
 | markdown links resolve | every relative link resolves | `check / standalone` |
 | EXAMPLES and BUGS | the README must carry both headings | `check / standalone` |

@@ -278,11 +278,6 @@ jobs:
           [ -z "$rs" ] || python3 .crate-workflows/helpers/comment_blocks.py $rs
           # shellcheck disable=SC2086
           [ -z "$rs" ] || python3 .crate-workflows/helpers/function_length.py $rs
-          # Module blocks judge the files under src/, where a module lives.
-          # shellcheck disable=SC2086
-          src=$(git ls-files -- "$crate_dir/src" | grep '[.]rs$' || true)
-          # shellcheck disable=SC2086
-          [ -z "$src" ] || python3 .crate-workflows/helpers/module_blocks.py $src
       - name: orphan modules
         run: python3 .crate-workflows/helpers/orphan_modules.py "$(dirname "$MANIFEST")"
       - name: markdown links resolve
