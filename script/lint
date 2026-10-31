@@ -45,7 +45,7 @@ if ! "$py" -c 'import tomllib' 2>/dev/null; then
 fi
 # The helpers that carry their own tests, named here so a helper without a selftest is a visible
 # gap in this list rather than an invisible gap in a grep.
-for f in standalone prose_caps orphan_modules check_links falsify architect-label-rules \
+for f in standalone prose_caps passive_voice history_phrases function_length orphan_modules check_links falsify architect-label-rules \
 	mutants_gate job_budget workflow_shape kani_bump publish_mode; do
 	"$py" "helpers/$f.py" --selftest
 done

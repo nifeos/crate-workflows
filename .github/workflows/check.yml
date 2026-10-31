@@ -250,6 +250,21 @@ jobs:
           files=$(ls "$crate_dir"/README* "$crate_dir"/CHANGELOG.md 2>/dev/null || true)
           # shellcheck disable=SC2086
           [ -z "$files" ] || python3 .crate-workflows/helpers/prose_caps.py $files
+      - name: passive voice and history phrases (README, CHANGELOG, docs)
+        run: |
+          set -e
+          crate_dir=$(dirname "$MANIFEST")
+          # Passive voice reads the files prose caps reads, plus the crate's docs/. History
+          # phrases skip the CHANGELOG, the one file whose subject is history.
+          # One file per argument is the point; shellcheck wants quoting everywhere otherwise.
+          # shellcheck disable=SC2086
+          prose=$(ls "$crate_dir"/README* "$crate_dir"/CHANGELOG.md "$crate_dir"/docs/*.md 2>/dev/null || true)
+          # shellcheck disable=SC2086
+          past=$(ls "$crate_dir"/README* "$crate_dir"/docs/*.md 2>/dev/null || true)
+          # shellcheck disable=SC2086
+          [ -z "$prose" ] || python3 .crate-workflows/helpers/passive_voice.py $prose
+          # shellcheck disable=SC2086
+          [ -z "$past" ] || python3 .crate-workflows/helpers/history_phrases.py $past
       - name: file and comment ratchets
         run: |
           set -e
@@ -261,6 +276,8 @@ jobs:
           [ -z "$rs" ] || python3 .crate-workflows/helpers/file_length.py $rs
           # shellcheck disable=SC2086
           [ -z "$rs" ] || python3 .crate-workflows/helpers/comment_blocks.py $rs
+          # shellcheck disable=SC2086
+          [ -z "$rs" ] || python3 .crate-workflows/helpers/function_length.py $rs
       - name: orphan modules
         run: python3 .crate-workflows/helpers/orphan_modules.py "$(dirname "$MANIFEST")"
       - name: markdown links resolve

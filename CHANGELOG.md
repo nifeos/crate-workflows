@@ -16,6 +16,9 @@ call that sits behind the newest release.
 - The Disclosure section of CONTRIBUTING.md, in the repository and in `scaffold/`, now says a person
   outside the project may use any tools they like and need not say which. The first-line rule for
   agent-written pull requests is unchanged. Ruled 2026-10-31 (UTC).
+- `check` gains three gates from nife, with no baseline files. Passive voice stays at 2 per 1,000
+  prose words in the README, CHANGELOG and `docs/`. History phrases stay out of the README and
+  `docs/`; the CHANGELOG is exempt. Functions stay within 100 code lines. Ruled 2026-10-31 (UTC).
 
 ## BUGS
 
