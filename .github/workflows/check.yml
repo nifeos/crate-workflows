@@ -109,13 +109,15 @@ jobs:
       - run: |
           rustup toolchain install "$TOOLCHAIN" --profile minimal --component clippy
           for t in $TARGETS; do rustup +"$TOOLCHAIN" target add "$t"; done
-      # The host, then each bare-metal target the crate names.
+      # The host, then each bare-metal target the crate names. The host lints every target of the
+      # crate, tests included. A bare-metal target has no `test` crate, so its unit-test and
+      # example targets cannot compile there; it lints the library and binaries only.
       - run: |
           set -e
           cargo +"$TOOLCHAIN" clippy --manifest-path "$MANIFEST" --all-targets -- -D warnings
           for t in $TARGETS; do
             echo "==> clippy: $t"
-            cargo +"$TOOLCHAIN" clippy --manifest-path "$MANIFEST" --target "$t" --all-targets -- -D warnings
+            cargo +"$TOOLCHAIN" clippy --manifest-path "$MANIFEST" --target "$t" --lib --bins -- -D warnings
           done
       # The proof harnesses, which only `--cfg kani` compiles. The shim is enough of Kani's API for
       # clippy to type-check them; a clean pass here is not a proof, and proofs.yml is the thing
