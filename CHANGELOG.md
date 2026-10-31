@@ -10,6 +10,9 @@ call that sits behind the newest release.
   workflows (`check`, `proofs`, `weekly`, `release`), plus the architect label and hold workflows.
   One settings file, with an apply script and a drift check. The lag check sits in every reusable
   workflow's first job. `sample/` is the fixture crate the selftest runs everything against.
+- The Disclosure section of CONTRIBUTING.md, in the repository and in `scaffold/`, now says a person
+  outside the project may use any tools they like and need not say which. The first-line rule for
+  agent-written pull requests is unchanged. Ruled 2026-10-31 (UTC).
 ## BUGS
 
 - Nothing here is on crates.io yet, so no release row exists. The first release line lands with
