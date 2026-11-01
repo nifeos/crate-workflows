@@ -44,8 +44,9 @@ repository may pin.
 ## The release path
 
 `release.yml` runs on a dispatch naming a version. `gate` refuses while `docs/stranger-test.md`
-reads `Last run: none` (a stranger-test run must be on record before the first release), and unless
-the check and proof runs for that exact commit are green, so a tag whose proof job is red never gets made. `tag` creates
+reads `Last run: none`, because a stranger-test run must be on record before the first release. It
+also refuses unless the check and proof runs for that exact commit are green, so a tag whose proof
+job is red never gets made. `tag` creates
 `v<version>` on that commit, refusing a version that does not match the manifest or a tag that
 already exists. `publish` runs last, in the `crates-io` environment (a person approves), gets
 `id-token: write` and nothing else, and exchanges the OIDC token for a temporary crates.io token
@@ -231,7 +232,7 @@ never merges: a person reads the checks, and a release that renames a required c
 - The coverage floor here is 85, matching nife's current floor. The roadmap block still says 80
   because it predates the raise.
 - `weekly / semver` and `weekly / stranger` are reports: a semver break between releases is
-  deliberate waiting, and the stranger run needs a person, so neither fails a release (the release gate only refuses a stranger record that is still `none`). The
+  deliberate waiting, and the stranger run needs a person, so neither fails a release. The release gate refuses only a record that still reads `none`. The
   per-pull-request semver rule in the labeler is the one that holds a merge.
 - `weekly / settings-drift` reads the rulesets and environments APIs, which need repository
   Administration read-only. The GITHUB_TOKEN cannot carry that scope: GitHub's parser refuses
