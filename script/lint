@@ -29,13 +29,32 @@ fail() {
 }
 
 echo "==> shell checks"
-scripts="script/lint script/record-ruling script/stranger-due script/sync-labels helpers/*.sh"
+scripts="script/lint script/record-ruling script/stranger-due script/stranger-recorded script/sync-labels helpers/*.sh"
 shellcheck --severity=warning $scripts
 for f in $scripts; do
 	case "$(head -1 "$f")" in
 	'#!/bin/sh') sh -n "$f" ;;
 	esac
 done
+echo "ok"
+
+echo "==> stranger-recorded gate"
+# The release gate must fail on 'Last run: none' and pass on a dated line.
+fixtures="$(mktemp -d)"
+trap 'rm -rf "$fixtures"' EXIT
+printf 'Last run: none\n' >"$fixtures/none.md"
+printf 'Last run: 2026-11-01\n' >"$fixtures/dated.md"
+printf 'prose only\n' >"$fixtures/absent.md"
+script/stranger-recorded "$fixtures/dated.md" >/dev/null || fail "stranger-recorded refused a dated line"
+script/stranger-recorded "$fixtures/scaffold-copy.md" >/dev/null 2>&1 && fail "stranger-recorded passed a missing file"
+for bad in none absent; do
+	if script/stranger-recorded "$fixtures/$bad.md" >/dev/null 2>&1; then
+		fail "stranger-recorded passed $bad"
+	fi
+done
+if script/stranger-recorded scaffold/docs/stranger-test.md >/dev/null 2>&1; then
+	fail "the scaffold's stranger record must start at none, and the gate must refuse it"
+fi
 echo "ok"
 
 echo "==> python selftests"
