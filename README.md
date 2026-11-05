@@ -106,7 +106,8 @@ same environment approval as every later one, and a dry run reports which door i
 | architect label | the dependency rule, plus a semver rule (cargo-semver-checks against the last release) | `label / label` |
 | architect hold | red while `needs-architect` or `held-by-lane` is on, green on `architect-ruled`; a required check | `hold / architect hold` |
 | `script/record-ruling` | a ruling swaps `needs-architect` for `architect-ruled` | `script/record-ruling` |
-| naming checks, name provenance, citations, roadmap, branch names, merge drain | dropped: nife's own process. A TODO in a crate cites an issue there | |
+| spelled-out words, unit symbols | every name the crate defines spells out the ruled words (`receive`, not `rx`) and its unit (`_MILLISECONDS`, not `_MS`); the words are `helpers/naming_words.toml`, ceiling 0, no baseline. A name kept from a datasheet, a specification or the standard library opens its doc comment with `(<name>, <source>)` and carries `#[doc(alias)]` | `check / standalone` |
+| name provenance blocks, naming checks 1 to 3, citations, roadmap, branch names, merge drain | dropped: nife's own process. A crate carries no `Name:` block, and a TODO in a crate cites an issue there | |
 | audit and stranger cadence | a stranger builds and proves the crate from its README alone; the job fails when the recorded run is overdue | `weekly / stranger` |
 | kernel and image gates | dropped: a library crate has none | |
 
