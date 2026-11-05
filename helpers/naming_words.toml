@@ -224,7 +224,7 @@ stems = [
     "local", "modern", "memor", "apolog", "critic", "real", "recogn", "organ", "legal", "mobil",
     "stabil", "crystal", "equal", "item", "pressur", "harmon", "hospital", "sympath", "digit",
     "colon", "penal", "fertil", "jeopard", "subsid", "unit", "formal", "social", "factor",
-    "canon",
+    "canon", "unrecogn", "plural",
 ]
 endings = ["e", "ed", "ing", "es", "er", "ers", "ation", "ations"]
 

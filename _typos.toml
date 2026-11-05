@@ -1,0 +1,24 @@
+# Spell checking for this repository's own tree, run by script/lint through helpers/typos_gate.sh.
+# The scaffold's _typos.toml is what a crate repository copies; this one adds the files that name
+# British spellings on purpose.
+
+[default]
+locale = "en-us"
+
+[files]
+# These files list British forms so that the naming gate can refuse them. Spell-checking the list
+# is the same category error as spell-checking a lockfile.
+extend-exclude = [
+    "*.lock",
+    "target/",
+    "helpers/naming_words.toml",
+    "helpers/british_spelling.py",
+    # Its typos-gate section writes a misspelling and a British spelling to prove the gate refuses
+    # them.
+    "script/lint",
+]
+
+[default.extend-words]
+# The project this template serves. typos reads it as a misspelling of "knife"; the template's own
+# files name it, which a crate repository's files never do (scaffold/_typos.toml has no entry).
+nife = "nife"

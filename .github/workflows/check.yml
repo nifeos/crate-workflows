@@ -300,6 +300,16 @@ jobs:
           # shellcheck disable=SC2046
           python3 .crate-workflows/helpers/service_model.py --prose \
             $(git ls-files -- "$crate_dir" | grep -v 'Cargo[.]lock$')
+      # House style is American spelling, and typos with the en-us locale is the tool that knows the
+      # misspellings and the locale both. The tool is installed by taiki-e/install-action at an
+      # exact version, which checks the release archive against the checksum its manifest holds at
+      # the pinned action commit; a bump is a new version here and a new action pin together.
+      # helpers/typos_gate.sh refuses a crate without its own _typos.toml or with another locale.
+      - uses: taiki-e/install-action@5488ac5a951645ce95062214902ac4b6bc1a1037 # v2.87.32
+        with:
+          tool: typos@1.51.1
+      - name: typos (en-us spelling over the tree)
+        run: sh .crate-workflows/helpers/typos_gate.sh "$(dirname "$MANIFEST")"
       - name: orphan modules
         run: python3 .crate-workflows/helpers/orphan_modules.py "$(dirname "$MANIFEST")"
       - name: markdown links resolve

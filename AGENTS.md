@@ -43,3 +43,8 @@ doc comment's first paragraph names it and its source as `(<name>, <source>)`, a
 `#[doc(alias)]` carries the plain-English name. A package or program name, which has no item, is kept
 by opening the crate root docs with `(<name>, <source>)`. `helpers/rust_names.py` holds the form, and
 a kept name that lacks either part fails.
+
+Prose and comments are spell-checked by `helpers/typos_gate.sh` (typos, en-us locale), which
+`check / standalone` runs over the crate with the crate's own `_typos.toml`. The tool version is
+pinned in `check.yml` and `selftest.yml` together; a bump changes both. The template's own
+`_typos.toml` excludes the files that list British spellings on purpose.
