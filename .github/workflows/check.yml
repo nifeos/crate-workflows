@@ -279,20 +279,20 @@ jobs:
           # shellcheck disable=SC2086
           [ -z "$rs" ] || python3 .crate-workflows/helpers/function_length.py $rs
       # The naming rules, held after a crate leaves the tree that named it: every name the crate
-      # defines spells out the ruled words and its units, uses American spelling, claims no Unix
+      # defines spells out the ruled words and its units, follows the register rules, uses American spelling, claims no Unix
       # service model, and a function answering yes or no is named like a question; a contract
       # crate is spelled `_contract`. A crate carries no provenance block, so a name kept from a
       # datasheet, a specification or the standard library says so at the item
       # (helpers/rust_names.py has the form). Ceiling 0, no baseline file. A step of this job, so
       # the required check names do not change.
-      - name: naming (spelled-out words, units, spelling, service model, contracts, questions)
+      - name: naming (spelled-out words, units, registers, spelling, service model, contracts, questions)
         run: |
           set -e
           crate_dir=$(dirname "$MANIFEST")
           # One file per argument is the point; shellcheck wants quoting everywhere otherwise.
           # shellcheck disable=SC2086
           rs=$(git ls-files -- "$crate_dir" | grep '[.]rs$' || true)
-          for check in spelled_out unit_symbols british_spelling service_model contract_names question_shape; do
+          for check in spelled_out unit_symbols register_names british_spelling service_model contract_names question_shape; do
             # shellcheck disable=SC2086
             python3 ".crate-workflows/helpers/$check.py" --manifest "$MANIFEST" $rs
           done
