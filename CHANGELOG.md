@@ -23,6 +23,12 @@ call that sits behind the newest release.
   spells out the ruled words and its units (`helpers/spelled_out.py`, `helpers/unit_symbols.py`,
   words in `helpers/naming_words.toml`). A name kept from its source says so at the item, in its
   doc comment and a `#[doc(alias)]`, since a crate carries no provenance block.
+- `check / standalone` gains the rest of the naming checks. Each has a selftest, no baseline file
+  and the same kept form. They are American spelling (`helpers/british_spelling.py`), no Unix
+  service model in a name or in tracked text (`helpers/service_model.py`), contract crates spelled
+  `_contract` (`helpers/contract_names.py`), and yes-or-no functions named like questions
+  (`helpers/question_shape.py`). A package or program has no item to carry an attribute, so it keeps
+  a name through the crate root docs: `(<name>, <source>)`.
 
 ## BUGS
 
