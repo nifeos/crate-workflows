@@ -60,6 +60,15 @@ if script/stranger-recorded scaffold/docs/stranger-test.md >/dev/null 2>&1; then
 fi
 echo "ok"
 
+echo "==> the semver rule's trigger filter"
+# label.yml repeats helpers/semver-rule.sh's filter to skip the install; the selftest proves the
+# helper's copy, so the two must stay the same text.
+filter="grep -qE '(\\.rs|(^|/)Cargo\\.toml)\$'"
+for f in .github/workflows/label.yml helpers/semver-rule.sh; do
+	grep -qF "$filter" "$f" || fail "$f does not carry the semver trigger filter $filter"
+done
+echo "ok"
+
 echo "==> python selftests"
 py="$(command -v python3)"
 if ! "$py" -c 'import tomllib' 2>/dev/null; then

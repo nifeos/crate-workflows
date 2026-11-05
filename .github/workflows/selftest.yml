@@ -73,6 +73,29 @@ jobs:
       manifest-path: sample/Cargo.toml
       caller-checks: false
 
+  # The labeler's semver rule against a throwaway crate repository: no break passes, a new break
+  # fires, a break already on the base does not hold a later pull request, and a `_typos.toml`-only
+  # diff never runs the tool. label.yml needs a pull request event to run, so the rule's helper is
+  # what this job drives.
+  semver-rule:
+    name: selftest (semver rule)
+    needs: lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: clock
+        run: echo "JOB_STARTED_AT=$(date +%s)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: taiki-e/install-action@5488ac5a951645ce95062214902ac4b6bc1a1037 # v2.87.32
+        with:
+          tool: cargo-semver-checks
+      - run: helpers/semver-rule.sh --selftest
+      - name: budget
+        if: always()
+        run: python3 helpers/job_budget.py check "${{ github.job }}" "$JOB_STARTED_AT"
+
   # The release workflow is not called here: sample/ carries publish = false, on purpose, because a
   # fixture crate must never reach crates.io. Its gate and dry-run publish are exercised in a
   # throwaway repository before a template release is cut (the roadmap block's exit).

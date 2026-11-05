@@ -105,7 +105,7 @@ no credential: `cargo publish --dry-run`, then the door. It publishes nothing.
 | CodeQL | same job, advanced setup, `build-mode: none` | `check / supply-chain` |
 | `Co-Authored-By` commit hook | documented in the scaffold's `.githooks`; a crate repository copies nife's hook file | scaffold |
 | empty diff | a merge that changes no file is refused | `check / supply-chain` |
-| architect label | the dependency rule, plus a semver rule (cargo-semver-checks against the previous release tag) | `label / label` |
+| architect label | the dependency rule, plus a semver rule: a major break against the previous release tag that the merge base did not already carry, run only when the diff touches a `.rs` file or a `Cargo.toml` (`helpers/semver-rule.sh`) | `label / label` |
 | architect hold | red while `needs-architect` or `held-by-lane` is on, green on `architect-ruled`; a required check | `hold / architect hold` |
 | `script/record-ruling` | a ruling swaps `needs-architect` for `architect-ruled` | `script/record-ruling` |
 | spelled-out words, unit symbols | every name the crate defines spells out the ruled words (`receive`, not `rx`) and its unit (`_MILLISECONDS`, not `_MS`); the words are `helpers/naming_words.toml`, ceiling 0, no baseline. A name kept from a datasheet, a specification or the standard library opens its doc comment with `(<name>, <source>)` and carries `#[doc(alias)]`; a package or program keeps its name by opening the crate root docs with `(<name>, <source>)` | `check / standalone` |
@@ -141,7 +141,12 @@ back and fails on any difference. The weekly `settings-drift` job runs it, so a 
 hand in the web interface is a red run, not a surprise.
 
 The architect rules a crate repository keeps: a dependency new to the crate's graph, and a
-breaking change cargo-semver-checks reports against the previous release tag. Everything else
+breaking change cargo-semver-checks reports against the previous release tag. The semver rule holds
+only a break the pull request introduces. It checks the merge base against the same tag, and a
+break already on the base branch was ruled in its own pull request, so it does not hold a later
+one. A diff that touches no `.rs` file (build scripts included) and no `Cargo.toml` does not run
+the tool. `Cargo.lock` is not in that filter: a dependent resolves its own lockfile, and the tool
+reads only the crate's own items. Everything else
 nife's labeler watched (the ABI surface, the spawn protocol, the syscall errors, the decisions
 tree) lives in nife and stays there.
 

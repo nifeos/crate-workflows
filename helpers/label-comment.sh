@@ -39,7 +39,7 @@ cat >"$body_file" <<BODY
 
 $(printf '%s\n' "$report" | sed 's/^/- /')
 
-The two rules this repository keeps from nife's labeler are a dependency new to the crate's graph, and a breaking change \`cargo-semver-checks\` reports against the last published version. What each finding means is in that file's docstring. A ruling is recorded with \`script/record-ruling $pr_number --text '<the ruling>'\`, which swaps the label for \`architect-ruled\`; removing \`needs-architect\` by hand does not stick, because the labeler re-fires on the next push while a rule still fires. "False positive, nothing like that moved" is a ruling like any other.
+The two rules this repository keeps are a dependency new to the crate's graph, and a major break \`cargo-semver-checks\` reports against the previous release that this pull request introduces (a break already on the base branch does not count). What each finding means is in that file's docstring. A ruling is recorded with \`script/record-ruling $pr_number --text '<the ruling>'\`, which swaps the label for \`architect-ruled\`; removing \`needs-architect\` by hand does not stick, because the labeler re-fires on the next push while a rule still fires. "False positive, nothing like that moved" is a ruling like any other.
 
 <!-- $marker -->
 BODY
