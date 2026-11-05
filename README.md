@@ -43,8 +43,10 @@ repository may pin.
 
 ## The release path
 
-`release.yml` runs on a dispatch naming a version. `gate` refuses unless the check and proof runs
-for that exact commit are green, so a tag whose proof job is red never gets made. `tag` creates
+`release.yml` runs on a dispatch naming a version. `gate` refuses while `docs/stranger-test.md`
+reads `Last run: none`, because a stranger-test run must be on record before the first release. It
+also refuses unless the check and proof runs for that exact commit are green, so a tag whose proof
+job is red never gets made. `tag` creates
 `v<version>` on that commit, refusing a version that does not match the manifest or a tag that
 already exists. `publish` runs last, in the `crates-io` environment (a person approves), gets
 `id-token: write` and nothing else, and exchanges the OIDC token for a temporary crates.io token
@@ -89,6 +91,9 @@ no credential: `cargo publish --dry-run`, then the door. It publishes nothing.
 | workspace lints | `unsafe_op_in_unsafe_fn`, `missing_docs`, and `unexpected_cfgs` naming `cfg(kani)` required in the crate's own `[lints]` | `check / standalone` |
 | orphan Rust files | every `.rs` file sits in the module tree | `check / standalone` |
 | prose ratchet | README and CHANGELOG at nife's caps (3,000 words, median 20, longest 40) | `check / standalone` |
+| passive-voice ratchet | README, CHANGELOG and `docs/*.md` at nife's limit of 2 passives per 1,000 prose words; no baseline | `check / standalone` |
+| history ratchet | README and `docs/*.md` carry no phrase that only a history uses (`supersede`, `renamed from`, `moved from` a document, a Timeline heading); the CHANGELOG is exempt; no baseline | `check / standalone` |
+| function-length ratchet, 100 code lines | the count clippy's `too_many_lines` makes, read from source; no baseline | `check / standalone` |
 | house style, typos | `typos` over the tree | `check / standalone` |
 | markdown links resolve | every relative link resolves | `check / standalone` |
 | EXAMPLES and BUGS | the README must carry both headings | `check / standalone` |
@@ -155,6 +160,10 @@ checkout of this repository. Then run `script/apply-settings <owner/name>` once,
 as somebody with repository administration rights. `.github/ci-job-budgets` is optional; without
 it every heavy job assumes 20 minutes. `mutants-baseline.txt` is optional; without it one survivor
 fails `weekly / mutation`.
+
+Before the first release, run the stranger test and record its date as `Last run: YYYY-MM-DD` in
+`docs/stranger-test.md` (ruled 2026-11-01 UTC). The scaffold starts at `Last run: none`, and
+`release / gate` fails on it with a message saying so; the weekly `stranger` job stays as it is.
 
 ## EXAMPLES
 
@@ -228,7 +237,7 @@ never merges: a person reads the checks, and a release that renames a required c
   passed by revision, so a crate not yet on crates.io has one. With no tag the tool falls back to the
   last published version, and a crate with neither has no baseline, which counts as nothing major.
 - `weekly / semver` and `weekly / stranger` are reports: a semver break between releases is
-  deliberate waiting, and the stranger run needs a person, so neither fails a release. The
+  deliberate waiting, and the stranger run needs a person, so neither fails a release. The release gate refuses only a record that still reads `none`. The
   per-pull-request semver rule in the labeler is the one that holds a merge.
 - `weekly / settings-drift` reads the rulesets and environments APIs, which need repository
   Administration read-only. The GITHUB_TOKEN cannot carry that scope: GitHub's parser refuses

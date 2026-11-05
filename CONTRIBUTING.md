@@ -22,4 +22,5 @@ green selftest is not done.
 This project's code is written by AI agents working in parallel lanes, with one human reviewing
 architecture and outcomes (ruled for nife by 857's Fork 8, and adopted here). Outside
 contributions are welcome and reviewed the same way as agent-written ones: by what the diff does
-and what the selftest says. A pull request written by an agent opens by saying so.
+and what the selftest says. A pull request written by an agent opens by saying so. A person outside the project who submits a change may use any tools
+they like and does not need to say which.

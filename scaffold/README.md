@@ -33,7 +33,7 @@ github-actions ecosystem opens the bumps afterward; the lag check fails closed i
 | deny.toml | nife's cargo-deny policy without its exceptions |
 | rustfmt.toml | the stable subset; nife's two unstable options would be refused |
 | .githooks/commit-msg | the Co-Authored-By trailer, required of every agent's commit |
-| docs/stranger-test.md | the stranger cadence record; the first run is overdue until it exists |
+| docs/stranger-test.md | the stranger cadence record; starts at `Last run: none`, which the release gate refuses |
 
 The caller workflow files fix the job ids (`check`, `proofs`, `weekly`, `release`, `label`, `hold`),
 which is what makes the required-check names in the settings file stable: GitHub shows a called

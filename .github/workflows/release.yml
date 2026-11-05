@@ -67,6 +67,11 @@ jobs:
             echo "Bump the manifest (and the changelog) first, then dispatch again."
             exit 1
           fi
+      # A crate needs a stranger-test run on record before its first release (ruled 2026-11-01
+      # UTC). The weekly cadence job is separate and unchanged, so a new repository is not red for
+      # being new; only a release refuses 'Last run: none'.
+      - name: a stranger-test run is on record
+        run: .crate-workflows/script/stranger-recorded docs/stranger-test.md
       - name: check and proofs are green on this commit
         run: .crate-workflows/helpers/release-gate.sh "$GITHUB_REPOSITORY" "$GITHUB_SHA"
         env:

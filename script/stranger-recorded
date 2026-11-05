@@ -1,0 +1,33 @@
+#!/bin/sh
+# shellcheck shell=sh
+#
+# script/stranger-recorded: fail when no stranger run is on record.
+#
+#     script/stranger-recorded [docs/stranger-test.md]
+#
+# The release workflow calls this before it tags anything. A crate must have a stranger-test run on
+# record before its first release (ruled 2026-11-01 UTC), and a new repository starts at
+# 'Last run: none', which script/stranger-due, the weekly cadence check, does not complain about
+# until a date exists to age. This script only asks that a dated line exists; how old it is stays
+# the weekly job's question, so a new repository is not red for being new. A missing file or a
+# line that is not 'Last run: YYYY-MM-DD' fails closed.
+
+set -eu
+
+file="${1:-docs/stranger-test.md}"
+
+[ -f "$file" ] || {
+	echo "stranger-recorded: no $file. Run the stranger test (build the crate and run its proofs from"
+	echo "stranger-recorded: the README alone), then record the date as 'Last run: YYYY-MM-DD' there."
+	exit 1
+}
+
+if grep -qE '^Last run: [0-9]{4}-[0-9]{2}-[0-9]{2}$' "$file"; then
+	echo "==> stranger-recorded: $file carries a dated stranger run"
+	exit 0
+fi
+
+echo "stranger-recorded: $file reads '$(grep -E '^Last run:' "$file" | tail -1)', so no stranger run is on record."
+echo "stranger-recorded: run the stranger test before the first release, then record the date as"
+echo "stranger-recorded: 'Last run: YYYY-MM-DD' in $file."
+exit 1
