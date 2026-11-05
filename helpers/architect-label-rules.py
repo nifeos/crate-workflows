@@ -16,9 +16,9 @@ means new against every manifest at the base, not just the ones this diff touche
 dependency to one crate is new even when another crate already had it. `Cargo.lock` is not a
 manifest and is skipped.
 
-The second rule nife kept for crates (a semver break against the last release) is not here: it
-needs `cargo-semver-checks` run against the crate, which the calling workflow does as its own
-step and merges into the same findings list.
+The second rule (a semver break new against the last release) is not here:
+it needs `cargo-semver-checks` run against the crate twice, which helpers/semver-rule.sh does as
+the calling workflow's own step, merged into the same findings list.
 """
 
 import argparse

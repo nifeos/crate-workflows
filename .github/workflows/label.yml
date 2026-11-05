@@ -2,7 +2,8 @@
 
 # Two rules, both from nife's labeler, reduced to what a standalone crate carries:
 #   1. a dependency new to the crate's graph (helpers/architect-label-rules.py);
-#   2. a breaking change cargo-semver-checks reports against the last published version.
+#   2. a major break cargo-semver-checks reports against the last release that the pull request
+#      introduces (helpers/semver-rule.sh); a break already on the base branch does not count.
 # The labeler only ever adds `needs-architect`; a recorded ruling swaps it, through
 # script/record-ruling or the ruled workflow. The hold check (hold.yml) is the required gate that
 # keeps the pull request red until then.
@@ -85,34 +86,38 @@ jobs:
             1) : > findings.txt; echo "no new dependency" ;;
             *) echo "architect-label-rules.py exited $rc; routing to a person"; exit 1 ;;
           esac
-      - name: rule 2, a semver break against the last release
+      - name: rule 2, a semver break new in this pull request
         if: env.SKIP != '1'
         run: |
           set -e
           base=$(.crate-workflows/helpers/scope-merge-base.sh \
               "${{ github.event.pull_request.base.ref }}" \
               "${{ github.event.pull_request.base.sha }}")
-          if ! git diff --name-only "$base" HEAD | grep -qE '\.(rs|toml)$'; then
-            echo "no Rust or manifest change; the semver rule does not run"
+          if ! git diff --name-only "$base" HEAD | grep -qE '(\.rs|(^|/)Cargo\.toml)$'; then
+            echo "no Rust source or manifest change; the semver rule does not run"
             exit 0
           fi
           rustup toolchain install stable --profile minimal
           cargo +stable semver-checks --version >/dev/null 2>&1 || cargo install --locked cargo-semver-checks
-          # The tool exits non-zero when it finds a major break; the report is the input, and
-          # semver_major.py decides. A crate never published has no baseline, which is "nothing
-          # major yet", not a failure.
-          # The baseline is the newest release tag before this commit (--baseline-rev), so a crate
-          # not yet on crates.io has one; with no tag the tool uses the last published version.
-          RUSTUP_TOOLCHAIN=stable .crate-workflows/helpers/semver-run.sh "$MANIFEST" semver-report.txt
+          # The baseline is the newest release tag before this commit, else the last published
+          # version; a crate with neither has no baseline, which is "nothing major yet". The rule
+          # holds only a major break the merge base did not already carry: a break that reached
+          # main in an earlier pull request was ruled there and waits for its release.
+          # helpers/semver-rule.sh says how. Its trigger filter is the one above, repeated here so a
+          # pull request that runs no tool installs none; script/lint keeps the two the same.
           set +e
-          python3 .crate-workflows/helpers/semver_major.py semver-report.txt > semver-found.txt 2>> semver.err
+          RUSTUP_TOOLCHAIN=stable .crate-workflows/helpers/semver-rule.sh "$MANIFEST" "$base" semver-found.txt
           rc=$?
           set -e
-          case "$rc" in
-            0) cat semver-found.txt >> findings.txt; echo "the semver rule fired" ;;
-            1) echo "no major break against the last release" ;;
-            *) cat semver.err >&2; echo "semver_major.py exited $rc; routing to a person"; exit 1 ;;
-          esac
+          if [ "$rc" -ne 0 ]; then
+            cat semver.err >&2 || true
+            echo "semver-rule.sh exited $rc; routing to a person"
+            exit 1
+          fi
+          if [ -s semver-found.txt ]; then
+            cat semver-found.txt >> findings.txt
+            echo "the semver rule fired"
+          fi
       - name: hold the pull request when a rule fired
         if: env.SKIP != '1'
         run: |

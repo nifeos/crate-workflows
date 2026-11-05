@@ -35,6 +35,12 @@ call that sits behind the newest release.
   `scaffold/` carries; the gate fails without it or with another locale. `script/lint` proves the
   gate passes a clean tree and refuses a misspelling, a British spelling, a missing config and
   another locale.
+- The labeler's semver rule holds only a break the pull request introduces. When the pull request
+  carries a major break against the previous release tag, `helpers/semver-rule.sh` checks its
+  merge base against the same tag. `helpers/semver_major.py` keeps only the major findings the
+  merge base did not have, so a break already on `main` does not hold a later pull request. The
+  rule runs only when the diff touches a `.rs` file or a `Cargo.toml`; `Cargo.lock` stays out. The
+  `selftest (semver rule)` job proves five cases against a throwaway crate repository.
 - The American-spelling name check also refuses the `ise` forms of two more stems
   (`unrecogn` and `plural`). The doubled-`l` forms stay refused, a stricter reading than typos takes.
 
