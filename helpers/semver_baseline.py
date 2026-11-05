@@ -41,10 +41,10 @@ def baseline(tags_at_rev, ancestor_tags):
 
 def from_repo(repo, ref):
     at = git(repo, 'tag', '--points-at', ref)
-    anc = git(repo, 'tag', '--merged', ref)
-    if at.returncode or anc.returncode:
-        raise RuntimeError((at.stderr or anc.stderr).strip() or 'git failed')
-    return baseline(at.stdout.split(), anc.stdout.split())
+    ancestors = git(repo, 'tag', '--merged', ref)
+    if at.returncode or ancestors.returncode:
+        raise RuntimeError((at.stderr or ancestors.stderr).strip() or 'git failed')
+    return baseline(at.stdout.split(), ancestors.stdout.split())
 
 
 def selftest():
