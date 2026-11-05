@@ -265,6 +265,24 @@ jobs:
           [ -z "$prose" ] || python3 .crate-workflows/helpers/passive_voice.py $prose
           # shellcheck disable=SC2086
           [ -z "$past" ] || python3 .crate-workflows/helpers/history_phrases.py $past
+      # Two prose gates, ceiling 0 and no baseline file. Acronyms: two or more capitals are expanded
+      # at the file's first use or sit on helpers/prose_acronyms.toml. Figures: the phrases in
+      # helpers/prose_figures.toml, each with its plain replacement. Both read the README, the
+      # CHANGELOG, docs/*.md and Rust doc comments. A step of this job, so the required check names do
+      # not change.
+      - name: acronyms and banned figures (README, CHANGELOG, docs, doc comments)
+        run: |
+          set -e
+          crate_dir=$(dirname "$MANIFEST")
+          # One file per argument is the point; shellcheck wants quoting everywhere otherwise.
+          # shellcheck disable=SC2086
+          md=$(ls "$crate_dir"/README* "$crate_dir"/CHANGELOG.md "$crate_dir"/docs/*.md 2>/dev/null || true)
+          # shellcheck disable=SC2086
+          rs=$(git ls-files -- "$crate_dir" | grep '[.]rs$' || true)
+          for check in prose_acronyms prose_figures; do
+            # shellcheck disable=SC2086
+            [ -z "$md$rs" ] || python3 ".crate-workflows/helpers/$check.py" $md $rs
+          done
       - name: file and comment ratchets
         run: |
           set -e

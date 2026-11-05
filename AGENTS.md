@@ -33,6 +33,14 @@ Crate repositories follow nife's comment standard (ruled 2026-11-01 UTC), which 
 [section 267 of nifeos/nife](https://github.com/nifeos/nife/blob/main/design/decisions/0267-a-comment-states-the-constraint-as-it-is-now.md)
 (a comment states the constraint as it is now).
 
+Two prose gates run in `check / standalone` beside the passive-voice and history gates, with a
+ceiling of 0 and no baseline. `helpers/prose_acronyms.py` wants every acronym expanded at its first
+use in a file, in `Extensible Firmware Interface (EFI)` or `EFI (Extensible Firmware Interface)`
+form, unless `helpers/prose_acronyms.toml` allows it; keep that allowlist short.
+`helpers/prose_figures.py` refuses the phrases in `helpers/prose_figures.toml`, and every entry
+there needs a plain replacement, which the failure prints. Both read doc comments through
+`helpers/prose_text.py`. A new gate of this kind gets a selftest with a bad and a good fixture.
+
 A crate carries no `Name:` provenance block; git holds a name's history, and `standalone.py`
 refuses a block. The naming rules still hold after a crate moves: `check / standalone` runs
 `helpers/spelled_out.py`, `unit_symbols.py`, `register_names.py`, `british_spelling.py`, `service_model.py`,

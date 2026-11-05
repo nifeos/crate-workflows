@@ -3,12 +3,69 @@
 
     python3 prose_text.py --selftest
 """
+import re
 import sys
+
+CODE = re.compile(r'`[^`\n]*`')
+COMMENT = re.compile(r'<!--.*?-->', re.S)
+URL = re.compile(r'<https?://[^>\s]*>|\]\([^)\s]*\)|https?://\S+')
+FENCE = re.compile(r'\s*(```|~~~)')
+
+
+def clean(line):
+    """A line of prose with inline code and addresses removed."""
+    line = URL.sub(lambda m: ']()' if m.group(0).startswith('](') else '', line)
+    return CODE.sub('``', line)
+
+
+def markdown_lines(text):
+    text = COMMENT.sub(lambda m: '\n' * m.group(0).count('\n'), text)
+    lines = text.split('\n')
+    start = 0
+    if lines and lines[0] == '---':
+        for i in range(1, len(lines)):
+            if lines[i] == '---':
+                start = i + 1
+                break
+    out, fence = [], None
+    for n in range(start, len(lines)):
+        line = lines[n]
+        mark = FENCE.match(line)
+        if mark:
+            fence = None if fence == mark.group(1) else (fence or mark.group(1))
+            continue
+        if fence or not line.strip():
+            continue
+        out.append((n + 1, clean(line), bool(re.match(r'#{1,6} ', line))))
+    return out
+
+
+def rust_lines(text):
+    """Doc comments only (`///` and `//!`), with their fenced examples removed."""
+    out, fence = [], None
+    for n, line in enumerate(text.split('\n'), 1):
+        m = re.match(r'\s*//[/!](?!/)\s?(.*)$', line)
+        if not m:
+            fence = None
+            continue
+        body = m.group(1)
+        mark = FENCE.match(body)
+        if mark:
+            fence = None if fence == mark.group(1) else (fence or mark.group(1))
+            continue
+        if fence or not body.strip():
+            continue
+        out.append((n, clean(body), bool(re.match(r'#{1,6} ', body))))
+    return out
 
 
 def prose_lines(path, text):
-    """[(line number, text, is_heading)] for the sentences of one file. Not yet written."""
-    raise NotImplementedError
+    """[(line number, text, is_heading)] for the sentences of one file."""
+    if path.endswith('.md'):
+        return markdown_lines(text)
+    if path.endswith('.rs'):
+        return rust_lines(text)
+    return []
 
 
 def selftest():
