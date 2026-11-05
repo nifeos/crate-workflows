@@ -143,7 +143,10 @@ jobs:
     steps:
       - name: clock
         run: echo "JOB_STARTED_AT=$(date +%s)" >> "$GITHUB_ENV"
+      # Full history and tags: the baseline is the newest release tag, named by revision.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           repository: ${{ job.workflow_repository }}
@@ -153,15 +156,15 @@ jobs:
       - uses: taiki-e/install-action@5488ac5a951645ce95062214902ac4b6bc1a1037 # v2.87.32
         with:
           tool: cargo-semver-checks
-      - name: cargo-semver-checks against the last published version
+      - name: cargo-semver-checks against the previous release tag
         run: |
           set -e
-          cargo semver-checks --manifest-path "$MANIFEST" --json > semver-report.json 2> semver.err || true
+          baseline=$(.crate-workflows/helpers/semver-run.sh "$MANIFEST" semver-report.txt)
           {
-            echo "### semver against the last release"
+            echo "### semver against the last release ($baseline)"
             echo '```'
-            python3 .crate-workflows/helpers/semver_major.py semver-report.json || true
-            head -5 semver.err
+            python3 .crate-workflows/helpers/semver_major.py semver-report.txt || true
+            tail -8 semver.err
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
       - name: budget
