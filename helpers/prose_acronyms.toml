@@ -11,6 +11,8 @@
 allow = [
     "AI", "API", "ASCII", "BSD", "CI", "CLI", "CPU", "GPL", "HTML", "HTTP", "HTTPS", "ID", "JSON",
     "MIT", "MSRV", "OS", "RAM", "ROM", "SHA", "SPDX", "TOML", "URL", "UTC", "UTF", "YAML",
+    # Names that are read as names: QEMU, RISC (as in RISC-V) and the chip part number JH7110.
+    "JH7110", "QEMU", "RISC",
 ]
 words = [
     # Document and section names.

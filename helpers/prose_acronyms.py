@@ -21,6 +21,10 @@ or when it opens a line and ends in a colon (`SAFETY:`). Document and section na
 **What is not read.** Inline code, fenced code, addresses, HTML comments, front matter and
 headings. Rust is read only in doc comments; a `//` comment and code are not prose here.
 
+**Widths.** A token that is an expanded acronym followed by digits (`FAT32` once `FAT` is expanded in the
+same file, or in the same crate for doc comments) is covered. A single word the letters are cut from
+is an expansion (`null (NUL)`).
+
 **Where "first use" is.** Markdown is judged per file: the README, the CHANGELOG and each
 `docs/*.md` expand an acronym at that file's first use. Rust doc comments are judged once per crate,
 because a reader does not need the same expansion in every source file: the README's expansions
@@ -85,6 +89,11 @@ def spells(token, words):
     """Do the words' initials spell the token (or its leading part)?"""
     want = re.sub(r'[0-9]', '', token).lower()
     got = initials(words)
+    if len(words) == 1 and len(want) >= 3 and words[0][0].lower() == want[0]:
+        # One word the letters are cut from, as `null (NUL)`.
+        rest = iter(words[0].lower())
+        if all(c in rest for c in want):
+            return True
     return len(got) >= 2 and want.startswith(got)
 
 
@@ -93,15 +102,21 @@ def expanded(stream, start, end, token):
     before = stream[:start].rstrip()
     if before.endswith('(') and stream[end:].startswith(')'):
         words = WORD.findall(before[:-1])[-8:]
-        return any(spells(token, words[-k:]) for k in range(2, len(words) + 1))
+        return any(spells(token, words[-k:]) for k in range(1, len(words) + 1))
     after = re.match(r'\s*\(([^)]*)\)', stream[end:])
     if after:
         return spells(token, WORD.findall(after.group(1)))
     return False
 
 
-def scan(path, text, allow, known):
-    """([(line, token)], expanded tokens) for one file; `known` tokens are already settled."""
+WIDTH = re.compile(r'^([A-Z]{2,})[0-9]+$')
+
+
+def scan(path, text, allow, known, known_expanded=()):
+    """([(line, token)], expanded, seen) for one file.
+
+    `known` tokens were used earlier in the crate and `known_expanded` were expanded there. A token
+    that is an expanded acronym and a width (`FAT32` after `FAT`) is covered."""
     stream, marks, starts = '', [], set()
     for n, line, heading in prose_lines(path, text):
         if heading:
@@ -109,7 +124,7 @@ def scan(path, text, allow, known):
         marks.append((len(stream), n))
         starts.add(len(stream))
         stream += line + ' '
-    out, seen, settled = [], set(known), set()
+    out, seen, settled = [], set(known), set(known_expanded)
     for m in TOKEN.finditer(stream):
         token = normal(m.group(0))
         if token in seen:
@@ -117,12 +132,15 @@ def scan(path, text, allow, known):
         seen.add(token)
         if token in allow or is_hex(token) or is_word_or_label(stream, m, token, starts):
             continue
+        width = WIDTH.match(token)
+        if width and width.group(1) in settled:
+            continue
         if expanded(stream, m.start(), m.end(), token):
             settled.add(token)
             continue
         line = [n for off, n in marks if off <= m.start()][-1]
         out.append((line, m.group(0)))
-    return out, settled | seen
+    return out, settled, seen
 
 
 def is_word_or_label(stream, m, token, starts):
@@ -145,20 +163,22 @@ def crate_violations(files, allow):
     A Markdown file is judged on its own. Rust doc comments are judged once per crate: the README's
     expansions count for every source file, and so does the first use in the crate root (`lib.rs`
     or `main.rs`), then the other files in path order."""
-    out, known = [], set()
+    out, known, known_expanded = [], set(), set()
     mds = [f for f in files if f[0].endswith('.md')]
     rss = [f for f in files if f[0].endswith('.rs')]
     for path, text in sorted(mds, key=lambda f: (not Path(f[0]).name.upper().startswith('README'), f[0])):
-        hits, settled = scan(path, text, allow, ())
+        hits, settled, seen = scan(path, text, allow, ())
         out += [(path, n, t) for n, t in hits]
         if Path(path).name.upper().startswith('README'):
-            known |= settled - {t for _, t in hits}
+            known_expanded |= settled
+            known |= settled
     def order(f):
         return (Path(f[0]).name not in ('lib.rs', 'main.rs'), f[0].count('/'), f[0])
     for path, text in sorted(rss, key=order):
-        hits, seen = scan(path, text, allow, known)
+        hits, settled, seen = scan(path, text, allow, known, known_expanded)
         out += [(path, n, t) for n, t in hits]
         known |= seen
+        known_expanded |= settled
     return out
 
 
@@ -208,6 +228,12 @@ def selftest():
         failed += 1
         print('FAIL rust good fixture failed', file=sys.stderr)
     word_cases = [
+        ('File Allocation Table (FAT) and FAT32 and FAT12. The FAT16 too.\n', []),
+        ('The FAT32 volume. File Allocation Table (FAT) later.\n', ['FAT32']),
+        ('The FAT32 volume.\n', ['FAT32']),
+        ('The null (NUL) byte. The NUL again.\n', []),
+        ('The word (EFI) is not an expansion.\n', ['EFI']),
+        ('Input and output (IO) and then IO.\n', []),
         ('The decisions are listed. See DECISIONS.\n', []),
         ('See DECISIONS and QEMU.\n', ['DECISIONS', 'QEMU']),
         ('SAFETY: the pointer is valid.\nNOTE: more.\n', []),
@@ -224,6 +250,8 @@ def selftest():
         # (files, wanted [(path, token)])
         ([('src/lib.rs', '/// The EFI.\n'), ('src/a.rs', '/// The EFI again.\n')], [('src/lib.rs', 'EFI')]),
         ([('src/a.rs', '/// The EFI again.\n'), ('src/lib.rs', '/// Extensible Firmware Interface (EFI).\n')], []),
+        ([('src/lib.rs', '/// File Allocation Table (FAT).\n'), ('src/a.rs', '/// The FAT32 volume.\n')], []),
+        ([('README.md', 'File Allocation Table (FAT).\n'), ('src/a.rs', '/// The FAT16 volume.\n')], []),
         ([('src/a.rs', '/// The EFI.\n'), ('README.md', 'Extensible Firmware Interface (EFI).\n')], []),
         ([('README.md', 'The EFI.\n'), ('docs/a.md', 'The EFI.\n')], [('README.md', 'EFI'), ('docs/a.md', 'EFI')]),
         ([('README.md', 'The EFI.\n'), ('src/lib.rs', '/// The EFI.\n')], [('README.md', 'EFI'), ('src/lib.rs', 'EFI')]),

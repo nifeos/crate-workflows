@@ -25,7 +25,7 @@ call that sits behind the newest release.
   first use, as `Extensible Firmware Interface (EFI)` or `EFI (Extensible Firmware
   Interface)`, or to sit on the short allowlist `helpers/prose_acronyms.toml`. Documents are judged
   per file and Rust doc comments once per crate. Document names, labels and capitalized words are
-  not acronyms. The banned-figures
+  not acronyms, and a width such as `FAT32` is covered once `FAT` is expanded. The banned-figures
   gate (`helpers/prose_figures.py`) refuses the figurative or vague phrases in
   `helpers/prose_figures.toml` and shows each plain replacement.
 - `check / standalone` gains the naming checks, with no baseline files: every name a crate defines
