@@ -1,6 +1,6 @@
-# Spell checking for the crate's prose and source, run by `check / standalone` as
-# helpers/typos_gate.sh. The house spelling is American, so the locale is fixed here; the gate
-# refuses a file whose locale is anything else.
+# Spell checking for the crate's prose and source, run by the `check / standalone` typos step. The
+# house spelling is American, so the locale is fixed here, and the
+# gate refuses a file whose locale is anything else.
 #
 # Add a word under [default.extend-words] only when it is a real name in a real document (a register
 # mnemonic, a vendor, a quoted source), with the reason on the line above it. Do not add a
@@ -15,5 +15,5 @@ extend-exclude = ["*.lock", "target/"]
 
 [default.extend-words]
 # The project this template serves. typos reads it as a misspelling of "knife"; the template's own
-# files name it, which a crate repository's files never do (scaffold/_typos.toml has no entry).
+# files name it, which a crate repository's files never do (the scaffold's file has no entry).
 nife = "nife"
