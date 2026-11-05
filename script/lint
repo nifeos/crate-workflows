@@ -92,6 +92,34 @@ done
 "$py" helpers/service_model.py --prose $(git ls-files sample | grep -v 'Cargo[.]lock$')
 echo "ok"
 
+echo "==> typos gate (en-us spelling)"
+# The gate must pass a clean tree, fail a misspelling, fail a British spelling, and refuse a
+# missing config or another locale. typos is required: without it the check would prove nothing.
+command -v typos >/dev/null 2>&1 || fail "typos is not installed (the gate pins typos@1.51.1)"
+t="$fixtures/typos"
+mkdir -p "$t/clean" "$t/typo" "$t/british" "$t/noconfig" "$t/locale"
+for d in clean typo british noconfig locale; do
+	cp scaffold/_typos.toml "$t/$d/_typos.toml"
+	printf 'The receiver is idle.\n' >"$t/$d/README.md"
+done
+printf 'The receiver is idle, and we recieve nothing.\n' >"$t/typo/README.md"
+printf 'The colour is grey and the buffer is initialised.\n' >"$t/british/README.md"
+rm "$t/noconfig/_typos.toml"
+printf '[default]\nlocale = "en"\n' >"$t/locale/_typos.toml"
+sh helpers/typos_gate.sh "$t/clean" >/dev/null || fail "typos gate refused a clean tree"
+for bad in typo british noconfig locale; do
+	if sh helpers/typos_gate.sh "$t/$bad" >/dev/null 2>&1; then
+		fail "typos gate passed the $bad fixture"
+	fi
+done
+# The fixtures that caller repositories copy, and this repository's own tree, pass.
+sh helpers/typos_gate.sh sample >/dev/null || fail "typos gate refused sample/"
+sh helpers/typos_gate.sh . >/dev/null || fail "typos gate refused this repository's tree"
+for f in scaffold/_typos.toml sample/_typos.toml _typos.toml; do
+	grep -Eq '^locale[[:space:]]*=[[:space:]]*"en-us"' "$f" || fail "$f does not set the en-us locale"
+done
+echo "ok"
+
 echo "==> actions are pinned to a commit SHA"
 unpinned="$(git grep -nE '^[[:space:]]*(-[[:space:]]+)?uses:[[:space:]]' -- .github |
 	grep -vE 'uses:[[:space:]]+\./' |

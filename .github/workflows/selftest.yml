@@ -34,6 +34,10 @@ jobs:
       - name: clock
         run: echo "JOB_STARTED_AT=$(date +%s)" >> "$GITHUB_ENV"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      # script/lint's typos gate needs the tool; the same exact version check.yml installs.
+      - uses: taiki-e/install-action@5488ac5a951645ce95062214902ac4b6bc1a1037 # v2.87.32
+        with:
+          tool: typos@1.51.1
       - run: script/lint
       - name: budget
         if: always()

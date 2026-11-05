@@ -29,6 +29,14 @@ call that sits behind the newest release.
   `_contract` (`helpers/contract_names.py`), and yes-or-no functions named like questions
   (`helpers/question_shape.py`). A package or program has no item to carry an attribute, so it keeps
   a name through the crate root docs: `(<name>, <source>)`.
+- `check / standalone` gains the typos step the README always listed: typos 1.51.1, installed at an
+  exact version with the release checksum the pinned `install-action` holds, run by
+  `helpers/typos_gate.sh` with the en-us locale. A crate repository needs the `_typos.toml` that
+  `scaffold/` carries; the gate fails without it or with another locale. `script/lint` proves the
+  gate passes a clean tree and refuses a misspelling, a British spelling, a missing config and
+  another locale.
+- The American-spelling name check also refuses the `ise` forms of two more stems
+  (`unrecogn` and `plural`). The doubled-`l` forms stay refused, a stricter reading than typos takes.
 
 ## BUGS
 
