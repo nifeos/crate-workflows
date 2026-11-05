@@ -96,6 +96,45 @@ jobs:
         if: always()
         run: python3 helpers/job_budget.py check "${{ github.job }}" "$JOB_STARTED_AT"
 
+  # The clean fixture goes through the live reusable workflow and must pass.
+  fuzz-clean:
+    name: selftest (fuzz passes on a clean target)
+    needs: lint
+    permissions:
+      contents: read
+    uses: ./.github/workflows/fuzz.yml
+    with:
+      manifest-path: fixtures/fuzz-clean/Cargo.toml
+      seconds-per-target: 20
+      total-seconds: 20
+
+  # A reusable workflow's failure cannot be inverted by its caller, so the seeded crash runs the
+  # same script the workflow runs, with the real cargo-fuzz, and the job passes only when the
+  # script is red and left a crashing input behind.
+  fuzz-crash:
+    name: selftest (fuzz fails on a seeded crash)
+    needs: lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - run: rustup toolchain install nightly --profile minimal
+      - run: cargo install --locked cargo-fuzz --version 0.13.2
+      - run: |
+          if helpers/fuzz-weekly.sh fixtures/fuzz-crash/Cargo.toml 20 20; then
+            echo "the fuzz script passed on a seeded crash; the gate is broken"
+            exit 1
+          fi
+          if ! ls fixtures/fuzz-crash/fuzz/artifacts/seeded_crash/crash-* >/dev/null; then
+            echo "the fuzz script failed but left no crashing input to upload"
+            exit 1
+          fi
+          echo "==> the fuzz script was red on a seeded crash and kept the input"
+
   # The release workflow is not called here: sample/ carries publish = false, on purpose, because a
   # fixture crate must never reach crates.io. Its gate and dry-run publish are exercised in a
   # throwaway repository before a template release is cut (the roadmap block's exit).

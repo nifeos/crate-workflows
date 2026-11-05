@@ -1,0 +1,10 @@
+name: fuzz
+on:
+  schedule:
+    - cron: '45 6 * * 2'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  fuzz:
+    uses: nifeos/crate-workflows/.github/workflows/fuzz.yml@PINS@

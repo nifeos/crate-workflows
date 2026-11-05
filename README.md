@@ -16,7 +16,8 @@ publishing from a `nifeos` workflow. This repository is where all three land.
 |---|---|---|
 | `.github/workflows/check.yml` | every pull request | `lag`, `fmt`, `clippy`, `tests`, `coverage`, `standalone`, `supply-chain` |
 | `.github/workflows/proofs.yml` | every pull request | `lag`, `kani`, `falsify` |
-| `.github/workflows/weekly.yml` | a weekly schedule, no pull request open | `lag`, `drift`, `msrv`, `semver`, `miri`, `mutation`, `fuzz`, `settings-drift`, `stranger` |
+| `.github/workflows/weekly.yml` | a weekly schedule, no pull request open | `lag`, `drift`, `msrv`, `semver`, `miri`, `mutation`, `settings-drift`, `stranger` |
+| `.github/workflows/fuzz.yml` | a weekly schedule, no pull request open | `lag`, `fuzz` |
 | `.github/workflows/release.yml` | a dispatch naming a version | `gate`, `tag`, `publish` |
 | `.github/workflows/label.yml` | every pull request push | `label` |
 | `.github/workflows/hold.yml` | pull request and label events | `hold` |
@@ -26,10 +27,33 @@ Inputs every workflow takes (all optional unless named): `manifest-path` (defaul
 `targets` (space-separated bare-metal targets to build and lint for, default none), `toolchain`
 (default `stable`), `coverage-floor` (default 85). `check.yml` takes `allow-unpublished` for
 fixture crates that carry `publish = false` on purpose. `proofs.yml` takes `kani-args`.
-`weekly.yml` takes `fuzz` (a boolean, default false, since cargo-fuzz needs nightly and only
-parsing crates want it) and `caller-checks` (the settings-drift and stranger jobs, off for this
-template's own selftest). `release.yml` takes `version` (required, e.g. `0.1.0`) and `dry-run`
+`weekly.yml` takes `caller-checks` (the settings-drift and stranger jobs, off for this template's
+own selftest). `fuzz.yml` takes `seconds-per-target` (default 300) and `total-seconds` (default
+1,200). `release.yml` takes `version` (required, e.g. `0.1.0`) and `dry-run`
 (default true).
+
+## The weekly fuzz run
+
+Every crate repository carries the `fuzz.yml` caller. A crate with a `fuzz/Cargo.toml` runs every
+target it lists for a bounded time each, on a hosted runner, on a Tuesday cron and on dispatch. A
+crate without one passes with a note, so the caller is the same everywhere and a crate gains its
+run the day it gains a target. Each target runs for the smaller of `seconds-per-target` and an even
+share of `total-seconds`, and never under 10 seconds, so a crate with many targets still ends
+inside the job's budget.
+
+The run files nothing. It opens no issue, creates no advisory and posts no comment. A crash, a
+timeout, an out-of-memory or a leak turns the run red, and the run uploads `fuzz/artifacts` as the
+`fuzz-artifacts` artifact for 14 days. A person reads the run and decides what the crash is. The
+repository is public, so its logs and artifacts are readable by anyone signed in to GitHub; a
+person who suspects a security flaw reports it through the repository's private channel in
+`SECURITY.md` and deletes the run.
+
+The job never runs on a pull request: the caller has no `pull_request` trigger, the job refuses a
+pull request from a fork, and it never uses a self-hosted runner. `script/lint` holds those rules
+(`helpers/fuzz-ci-selftest.sh`) and proves the script red on a seeded crash and green on a clean
+target against a stand-in cargo. The selftest workflow proves the same with cargo-fuzz itself:
+`fixtures/fuzz-clean` goes through the live workflow and must pass, and `fixtures/fuzz-crash` runs
+through the same script and must fail and leave its input behind.
 
 ## The lag check
 
@@ -73,7 +97,7 @@ no credential: `cargo publish --dry-run`, then the door. It publishes nothing.
 | cargo-machete | `cargo machete` on the manifest | `check / supply-chain` |
 | host tests | `cargo test` | `check / tests` |
 | coverage, 85% per file | cargo-llvm-cov, per-file floor | `check / coverage` |
-| fuzz (cargo-fuzz) | nightly, weekly, only when the caller asks | `weekly / fuzz` |
+| fuzz (cargo-fuzz) | nightly, weekly, a bounded time per target; see below | `fuzz / fuzz` |
 | Miri, weekly | `cargo +nightly miri test` | `weekly / miri` |
 | mutation, weekly | cargo-mutants; new survivors fail against `mutants-baseline.txt` | `weekly / mutation` |
 | `script/verify` (Kani) | `cargo kani` at the version in `.kani-version`, on every pull request | `proofs / kani` |

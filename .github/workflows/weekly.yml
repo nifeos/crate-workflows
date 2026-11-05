@@ -1,4 +1,4 @@
-# The reusable weekly workflow: drift, MSRV, semver, Miri, mutation, fuzz, and the two checks that
+# The reusable weekly workflow: drift, MSRV, semver, Miri, mutation, and the two checks that
 # need no pull request (settings drift, stranger cadence).
 
 # The caller's thin workflow carries the schedule (a weekly cron and workflow_dispatch); everything
@@ -15,10 +15,6 @@ on:
       targets:
         type: string
         default: ''
-      fuzz:
-        description: Run cargo-fuzz (nightly, for crates that parse bytes).
-        type: boolean
-        default: false
       caller-checks:
         description: Run the settings-drift and stranger jobs (off for the template's selftest).
         type: boolean
@@ -223,35 +219,6 @@ jobs:
         with:
           name: mutants
           path: ${{ env.MUTANTS_OUT }}
-      - name: budget
-        if: always()
-        run: python3 .crate-workflows/helpers/job_budget.py check "${{ github.job }}" "$JOB_STARTED_AT"
-
-  fuzz:
-    name: fuzz
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    if: ${{ inputs.fuzz }}
-    steps:
-      - name: clock
-        run: echo "JOB_STARTED_AT=$(date +%s)" >> "$GITHUB_ENV"
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-        with:
-          repository: ${{ job.workflow_repository }}
-          ref: ${{ job.workflow_sha }}
-          path: .crate-workflows
-          persist-credentials: false
-      - run: rustup toolchain install nightly --profile minimal
-      - run: cargo install --locked cargo-fuzz --version 0.13.2
-      - name: five minutes per target
-        run: |
-          set -e
-          cd "$(dirname "$MANIFEST")"
-          for t in $(cargo fuzz list); do
-            echo "==> cargo fuzz run $t"
-            cargo +nightly fuzz run "$t" -- -max_total_time=300
-          done
       - name: budget
         if: always()
         run: python3 .crate-workflows/helpers/job_budget.py check "${{ github.job }}" "$JOB_STARTED_AT"

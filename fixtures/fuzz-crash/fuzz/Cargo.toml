@@ -1,0 +1,23 @@
+[package]
+name = "fuzz-crash-fuzz"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+
+[dependencies.fuzz-crash]
+path = ".."
+
+[[bin]]
+name = "seeded_crash"
+path = "fuzz_targets/seeded_crash.rs"
+test = false
+doc = false
+bench = false
+
+[workspace]

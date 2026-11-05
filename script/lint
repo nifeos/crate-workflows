@@ -85,6 +85,11 @@ done
 "$py" script/apply-settings --help >/dev/null && echo "apply-settings --help ok"
 echo "ok"
 
+echo "==> the weekly fuzz job files nothing and fails on a crash"
+# Reads the workflow and its caller, then runs the fuzz script against a stand-in cargo.
+sh helpers/fuzz-ci-selftest.sh
+echo "ok"
+
 echo "==> the naming checks hold the template's own Rust"
 # The sample crate and the lint shim are the Rust a caller's check job would judge here; a word
 # list change that refuses the template's own fixture fails before any caller sees it.
