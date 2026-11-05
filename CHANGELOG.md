@@ -19,6 +19,24 @@ call that sits behind the newest release.
 - `check` gains three gates from nife, with no baseline files. Passive voice stays at 2 per 1,000
   prose words in the README, CHANGELOG and `docs/`. History phrases stay out of the README and
   `docs/`; the CHANGELOG is exempt. Functions stay within 100 code lines. Ruled 2026-10-31 (UTC).
+- `check / standalone` gains the naming checks, with no baseline files: every name a crate defines
+  spells out the ruled words and its units (`helpers/spelled_out.py`, `helpers/unit_symbols.py`,
+  words in `helpers/naming_words.toml`). A name kept from its source says so at the item, in its
+  doc comment and a `#[doc(alias)]`, since a crate carries no provenance block.
+- `check / standalone` gains the rest of the naming checks. Each has a selftest, no baseline file
+  and the same kept form. They are American spelling (`helpers/british_spelling.py`), no Unix
+  service model in a name or in tracked text (`helpers/service_model.py`), contract crates spelled
+  `_contract` (`helpers/contract_names.py`), and yes-or-no functions named like questions
+  (`helpers/question_shape.py`). A package or program has no item to carry an attribute, so it keeps
+  a name through the crate root docs: `(<name>, <source>)`.
+- `check / standalone` gains the typos step the README always listed: typos 1.51.1, installed at an
+  exact version with the release checksum the pinned `install-action` holds, run by
+  `helpers/typos_gate.sh` with the en-us locale. A crate repository needs the `_typos.toml` that
+  `scaffold/` carries; the gate fails without it or with another locale. `script/lint` proves the
+  gate passes a clean tree and refuses a misspelling, a British spelling, a missing config and
+  another locale.
+- The American-spelling name check also refuses the `ise` forms of two more stems
+  (`unrecogn` and `plural`). The doubled-`l` forms stay refused, a stricter reading than typos takes.
 
 ## BUGS
 

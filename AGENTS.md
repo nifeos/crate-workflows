@@ -14,8 +14,8 @@ from nife's own CI.
 - Names here are provisional until calef's naming pass rules on them. The repository's own name is
   provisional. Say so beside anything you mint.
 - A crate repository that calls these workflows must never carry nife's vocabulary: no roadmap
-  citations and no `design/` paths (a `Name:` provenance block is the one exception; see
-  "Comments and names"). `sample/` and `scaffold/` are the only
+  citations, no `design/` paths and no `Name:` provenance block (see "Comments and names").
+  `sample/` and `scaffold/` are the only
   places nife may be named, because they are the template's own voice.
 - Every third-party action is pinned to a full commit SHA, with the tag in a trailing comment.
   `script/lint` refuses anything else.
@@ -29,10 +29,22 @@ runs; a change that only edits YAML and never sees a green selftest is not done.
 
 ## Comments and names
 
-Crate repositories follow nife's comment standard (ruled 2026-11-01 UTC), including the `Name:`
-provenance blocks. The standard is
+Crate repositories follow nife's comment standard (ruled 2026-11-01 UTC), which is
 [section 267 of nifeos/nife](https://github.com/nifeos/nife/blob/main/design/decisions/0267-a-comment-states-the-constraint-as-it-is-now.md)
-(a comment states the constraint as it is now) and the "Where a name's provenance lives" part of
-[nifeos/nife design/naming.md](https://github.com/nifeos/nife/blob/main/design/naming.md). A `Name:`
-block stays where it is, with its refusals and dates, and a crate keeps its blocks when it moves
-out of nife. This repository adds no lint for it.
+(a comment states the constraint as it is now).
+
+A crate carries no `Name:` provenance block; git holds a name's history, and `standalone.py`
+refuses a block. The naming rules still hold after a crate moves: `check / standalone` runs
+`helpers/spelled_out.py`, `unit_symbols.py`, `british_spelling.py`, `service_model.py`,
+`contract_names.py` and `question_shape.py` over every name the crate defines, with the words in
+`helpers/naming_words.toml`, a ceiling of 0 and no baseline. A name that mirrors a
+datasheet, a specification or the standard library keeps its spelling by saying so at the item: its
+doc comment's first paragraph names it and its source as `(<name>, <source>)`, and a
+`#[doc(alias)]` carries the plain-English name. A package or program name, which has no item, is kept
+by opening the crate root docs with `(<name>, <source>)`. `helpers/rust_names.py` holds the form, and
+a kept name that lacks either part fails.
+
+Prose and comments are spell-checked by `helpers/typos_gate.sh` (typos, en-us locale), which
+`check / standalone` runs over the crate with the crate's own `_typos.toml`. The tool version is
+pinned in `check.yml` and `selftest.yml` together; a bump changes both. The template's own
+`_typos.toml` excludes the files that list British spellings on purpose.

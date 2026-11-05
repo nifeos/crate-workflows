@@ -94,7 +94,7 @@ no credential: `cargo publish --dry-run`, then the door. It publishes nothing.
 | passive-voice ratchet | README, CHANGELOG and `docs/*.md` at nife's limit of 2 passives per 1,000 prose words; no baseline | `check / standalone` |
 | history ratchet | README and `docs/*.md` carry no phrase that only a history uses (`supersede`, `renamed from`, `moved from` a document, a Timeline heading); the CHANGELOG is exempt; no baseline | `check / standalone` |
 | function-length ratchet, 100 code lines | the count clippy's `too_many_lines` makes, read from source; no baseline | `check / standalone` |
-| house style, typos | `typos` over the tree | `check / standalone` |
+| house style, typos | `typos` 1.51.1 with the en-us locale over the tree, through `helpers/typos_gate.sh`; the crate carries its own `_typos.toml` (copied from `scaffold/`), and the gate refuses a missing file or another locale | `check / standalone` |
 | markdown links resolve | every relative link resolves | `check / standalone` |
 | EXAMPLES and BUGS | the README must carry both headings | `check / standalone` |
 | actions pinned to a SHA | the same grep nife runs, over the caller's workflows | `check / supply-chain` |
@@ -108,7 +108,12 @@ no credential: `cargo publish --dry-run`, then the door. It publishes nothing.
 | architect label | the dependency rule, plus a semver rule (cargo-semver-checks against the previous release tag) | `label / label` |
 | architect hold | red while `needs-architect` or `held-by-lane` is on, green on `architect-ruled`; a required check | `hold / architect hold` |
 | `script/record-ruling` | a ruling swaps `needs-architect` for `architect-ruled` | `script/record-ruling` |
-| naming checks, name provenance, citations, roadmap, branch names, merge drain | dropped: nife's own process. A TODO in a crate cites an issue there | |
+| spelled-out words, unit symbols | every name the crate defines spells out the ruled words (`receive`, not `rx`) and its unit (`_MILLISECONDS`, not `_MS`); the words are `helpers/naming_words.toml`, ceiling 0, no baseline. A name kept from a datasheet, a specification or the standard library opens its doc comment with `(<name>, <source>)` and carries `#[doc(alias)]`; a package or program keeps its name by opening the crate root docs with `(<name>, <source>)` | `check / standalone` |
+| American spelling | no name the crate defines holds a British form (an `our` ending for `or`, an `ise` ending for `ize`, a doubled `l` before `ed`); the forms are `[british]` and the three stem families in `helpers/naming_words.toml`; ceiling 0 | `check / standalone` |
+| no Unix service model | no name holds `daemon` or ends in a lone `d` component; a crate or program name of four or more characters does not end in `d`; the word `daemon` appears in no tracked text; ceiling 0 | `check / standalone` |
+| contract crates | a package or program name does not end in `proto` or `protocol` (spell it `_contract`) nor glue `contract` on (`fscontract`); ceiling 0 | `check / standalone` |
+| question-shaped functions | a function returning `bool` and taking no `&mut` is named `is_`, `has_`, `can_`, `was_`, `will_`, `all_`, `any_` or with a finite verb; ceiling 0 | `check / standalone` |
+| name provenance blocks, citations, roadmap, branch names, merge drain | dropped: another project's process. A crate carries no `Name:` block, and a TODO in a crate cites an issue there | |
 | audit and stranger cadence | a stranger builds and proves the crate from its README alone; the job fails when the recorded run is overdue | `weekly / stranger` |
 | kernel and image gates | dropped: a library crate has none | |
 

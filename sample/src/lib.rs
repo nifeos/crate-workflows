@@ -24,7 +24,7 @@ mod tests {
     use crate::saturating_add_percent;
 
     #[test]
-    fn caps_at_100() {
+    fn saturates_at_100() {
         assert_eq!(saturating_add_percent(60, 60), 100);
         // The saturating add, not only the clamp: 200 + 100 overflows u8 first.
         assert_eq!(saturating_add_percent(200, 100), 100);
