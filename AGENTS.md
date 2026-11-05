@@ -35,9 +35,11 @@ Crate repositories follow nife's comment standard (ruled 2026-11-01 UTC), which 
 
 A crate carries no `Name:` provenance block; git holds a name's history, and `standalone.py`
 refuses a block. The naming rules still hold after a crate moves: `check / standalone` runs
-`helpers/spelled_out.py` and `helpers/unit_symbols.py` over every name the crate defines, with the
-words in `helpers/naming_words.toml`, a ceiling of 0 and no baseline. A name that mirrors a
+`helpers/spelled_out.py`, `unit_symbols.py`, `british_spelling.py`, `service_model.py`,
+`contract_names.py` and `question_shape.py` over every name the crate defines, with the words in
+`helpers/naming_words.toml`, a ceiling of 0 and no baseline. A name that mirrors a
 datasheet, a specification or the standard library keeps its spelling by saying so at the item: its
 doc comment's first paragraph names it and its source as `(<name>, <source>)`, and a
-`#[doc(alias)]` carries the plain-English name. `helpers/rust_names.py` holds the form, and a kept
-name that lacks either part fails.
+`#[doc(alias)]` carries the plain-English name. A package or program name, which has no item, is kept
+by opening the crate root docs with `(<name>, <source>)`. `helpers/rust_names.py` holds the form, and
+a kept name that lacks either part fails.

@@ -106,8 +106,12 @@ same environment approval as every later one, and a dry run reports which door i
 | architect label | the dependency rule, plus a semver rule (cargo-semver-checks against the last release) | `label / label` |
 | architect hold | red while `needs-architect` or `held-by-lane` is on, green on `architect-ruled`; a required check | `hold / architect hold` |
 | `script/record-ruling` | a ruling swaps `needs-architect` for `architect-ruled` | `script/record-ruling` |
-| spelled-out words, unit symbols | every name the crate defines spells out the ruled words (`receive`, not `rx`) and its unit (`_MILLISECONDS`, not `_MS`); the words are `helpers/naming_words.toml`, ceiling 0, no baseline. A name kept from a datasheet, a specification or the standard library opens its doc comment with `(<name>, <source>)` and carries `#[doc(alias)]` | `check / standalone` |
-| name provenance blocks, naming checks 1 to 3, citations, roadmap, branch names, merge drain | dropped: nife's own process. A crate carries no `Name:` block, and a TODO in a crate cites an issue there | |
+| spelled-out words, unit symbols | every name the crate defines spells out the ruled words (`receive`, not `rx`) and its unit (`_MILLISECONDS`, not `_MS`); the words are `helpers/naming_words.toml`, ceiling 0, no baseline. A name kept from a datasheet, a specification or the standard library opens its doc comment with `(<name>, <source>)` and carries `#[doc(alias)]`; a package or program keeps its name by opening the crate root docs with `(<name>, <source>)` | `check / standalone` |
+| American spelling | no name the crate defines holds a British form (`colour`, `initialise`, `cancelled`); the forms are `[british]` and the three stem families in `helpers/naming_words.toml`; ceiling 0 | `check / standalone` |
+| no Unix service model | no name holds `daemon` or ends in a lone `d` component; a crate or program name of four or more characters does not end in `d`; the word `daemon` appears in no tracked text; ceiling 0 | `check / standalone` |
+| contract crates | a package or program name does not end in `proto` or `protocol` (spell it `_contract`) nor glue `contract` on (`fscontract`); ceiling 0 | `check / standalone` |
+| question-shaped functions | a function returning `bool` and taking no `&mut` is named `is_`, `has_`, `can_`, `was_`, `will_`, `all_`, `any_` or with a finite verb; ceiling 0 | `check / standalone` |
+| name provenance blocks, citations, roadmap, branch names, merge drain | dropped: another project's process. A crate carries no `Name:` block, and a TODO in a crate cites an issue there | |
 | audit and stranger cadence | a stranger builds and proves the crate from its README alone; the job fails when the recorded run is overdue | `weekly / stranger` |
 | kernel and image gates | dropped: a library crate has none | |
 
