@@ -278,6 +278,22 @@ jobs:
           [ -z "$rs" ] || python3 .crate-workflows/helpers/comment_blocks.py $rs
           # shellcheck disable=SC2086
           [ -z "$rs" ] || python3 .crate-workflows/helpers/function_length.py $rs
+      # The naming rules, held after a crate leaves the tree that named it: every name the crate
+      # defines spells out the ruled words and its units. A crate carries no provenance block, so a
+      # name kept from a datasheet, a specification or the standard library says so at the item
+      # (helpers/rust_names.py has the form). Ceiling 0, no baseline. A step of this job, so the
+      # required check names do not change.
+      - name: naming (spelled-out words, unit symbols)
+        run: |
+          set -e
+          crate_dir=$(dirname "$MANIFEST")
+          # One file per argument is the point; shellcheck wants quoting everywhere otherwise.
+          # shellcheck disable=SC2086
+          rs=$(git ls-files -- "$crate_dir" | grep '[.]rs$' || true)
+          # shellcheck disable=SC2086
+          python3 .crate-workflows/helpers/spelled_out.py --manifest "$MANIFEST" $rs
+          # shellcheck disable=SC2086
+          python3 .crate-workflows/helpers/unit_symbols.py --manifest "$MANIFEST" $rs
       - name: orphan modules
         run: python3 .crate-workflows/helpers/orphan_modules.py "$(dirname "$MANIFEST")"
       - name: markdown links resolve

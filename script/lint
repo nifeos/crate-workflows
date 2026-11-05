@@ -8,6 +8,8 @@
 #   red at once.
 # - selftests: the python helpers carry their own; a change to a gate without a test of the gate is
 #   not done.
+# - naming checks: the spelled-out words and unit symbols, run over the template's own Rust, so a
+#   word list change that refuses the fixture fails here first.
 # - SHA pinning: the same grep nife runs. A floating `uses:` is a supply-chain hole in every caller
 #   at once.
 # - workflow shape: reusable workflows declare permissions; the lag check is the first job where a
@@ -64,12 +66,23 @@ if ! "$py" -c 'import tomllib' 2>/dev/null; then
 fi
 # The helpers that carry their own tests, named here so a helper without a selftest is a visible
 # gap in this list rather than an invisible gap in a grep.
-for f in standalone prose_caps passive_voice history_phrases function_length orphan_modules check_links falsify architect-label-rules \
+for f in rust_names spelled_out unit_symbols standalone prose_caps passive_voice history_phrases function_length orphan_modules check_links falsify architect-label-rules \
 	mutants_gate job_budget workflow_shape kani_bump publish_mode; do
 	"$py" "helpers/$f.py" --selftest
 done
 "$py" script/check-settings --selftest
 "$py" script/apply-settings --help >/dev/null && echo "apply-settings --help ok"
+echo "ok"
+
+echo "==> the naming checks hold the template's own Rust"
+# The sample crate and the lint shim are the Rust a caller's check job would judge here; a word
+# list change that refuses the template's own fixture fails before any caller sees it.
+rs="$(git ls-files 'sample/*.rs' 'helpers/*.rs' 'helpers/**/*.rs')"
+# One file per argument is the point.
+# shellcheck disable=SC2086
+"$py" helpers/spelled_out.py --manifest sample/Cargo.toml $rs
+# shellcheck disable=SC2086
+"$py" helpers/unit_symbols.py --manifest sample/Cargo.toml $rs
 echo "ok"
 
 echo "==> actions are pinned to a commit SHA"

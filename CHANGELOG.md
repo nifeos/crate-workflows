@@ -19,6 +19,10 @@ call that sits behind the newest release.
 - `check` gains three gates from nife, with no baseline files. Passive voice stays at 2 per 1,000
   prose words in the README, CHANGELOG and `docs/`. History phrases stay out of the README and
   `docs/`; the CHANGELOG is exempt. Functions stay within 100 code lines. Ruled 2026-10-31 (UTC).
+- `check / standalone` gains the naming checks, with no baseline files: every name a crate defines
+  spells out the ruled words and its units (`helpers/spelled_out.py`, `helpers/unit_symbols.py`,
+  words in `helpers/naming_words.toml`). A name kept from its source says so at the item, in its
+  doc comment and a `#[doc(alias)]`, since a crate carries no provenance block.
 
 ## BUGS
 
