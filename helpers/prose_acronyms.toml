@@ -1,9 +1,23 @@
-# Acronyms that need no expansion, read by prose_acronyms.py (its header is the manual). Words every
-# reader of a Rust crate and its repository knows. Keep the list short: an acronym that is not here
-# is expanded where the file first uses it. The file's name and its key are provisional.
+# Words that need no expansion, read by prose_acronyms.py (its header is the manual). Two lists.
+#
+# `allow`: acronyms every reader of a Rust crate and its repository knows. Keep it short: an
+# acronym that is not here is expanded where the file or crate first uses it.
+#
+# `words`: capitals that are not abbreviations. A word of four or more letters is already exempt
+# when its lowercase form appears in the same file, or when it opens a line as a label (`SAFETY:`);
+# this list holds the rest: document names, rule words and short English words.
+#
+# The file's name and its keys are provisional.
 allow = [
-    "AI", "API", "ASCII", "BSD", "CI", "CLI", "CPU", "GPL", "HTML", "HTTP", "HTTPS", "ID", "JSON", "MIT",
-    "MSRV", "OS", "RAM", "ROM", "SHA", "SPDX", "TOML", "URL", "UTC", "UTF", "YAML",
-    # Plain capitalized words and document names, not abbreviations.
-    "CHANGELOG", "FIXME", "LICENSE", "MAY", "MUST", "NOT", "NOTE", "README", "SAFETY", "SHOULD", "TODO",
+    "AI", "API", "ASCII", "BSD", "CI", "CLI", "CPU", "GPL", "HTML", "HTTP", "HTTPS", "ID", "JSON",
+    "MIT", "MSRV", "OS", "RAM", "ROM", "SHA", "SPDX", "TOML", "URL", "UTC", "UTF", "YAML",
+]
+words = [
+    # Document and section names.
+    "AGENTS", "APACHE", "BUGS", "CHANGELOG", "CODEOWNERS", "CONTRIBUTING", "DECISIONS", "EXAMPLES",
+    "LICENSE", "README", "SECURITY",
+    # Labels and rule words.
+    "FIXME", "MAY", "MUST", "NOTE", "SAFETY", "SHOULD", "TODO",
+    # Short English words and numerals.
+    "ALL", "AND", "ANY", "IF", "II", "IS", "NO", "NOT", "OR",
 ]

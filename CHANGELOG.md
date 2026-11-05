@@ -22,8 +22,10 @@ call that sits behind the newest release.
 - `check / standalone` gains two prose gates, each with a selftest, ceiling 0 and no baseline file,
   over the README, CHANGELOG, `docs/*.md` and Rust doc comments. The acronym gate
   (`helpers/prose_acronyms.py`) requires every acronym of two or more capitals to be expanded at its
-  first use in the file, as `Extensible Firmware Interface (EFI)` or `EFI (Extensible Firmware
-  Interface)`, or to sit on the short allowlist `helpers/prose_acronyms.toml`. The banned-figures
+  first use, as `Extensible Firmware Interface (EFI)` or `EFI (Extensible Firmware
+  Interface)`, or to sit on the short allowlist `helpers/prose_acronyms.toml`. Documents are judged
+  per file and Rust doc comments once per crate. Document names, labels and capitalized words are
+  not acronyms. The banned-figures
   gate (`helpers/prose_figures.py`) refuses the figurative or vague phrases in
   `helpers/prose_figures.toml` and shows each plain replacement.
 - `check / standalone` gains the naming checks, with no baseline files: every name a crate defines

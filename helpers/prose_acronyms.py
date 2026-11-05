@@ -12,8 +12,20 @@ first uses it, or be listed in `prose_acronyms.toml`. Ceiling 0, no baseline.
 lowercase `s` after capitals is a plural (`LBAs` is `LBA`). A constant (`MAX_SIZE`), a hex literal
 (`0xFF`), a bare byte (`FF`) and a hex word with a digit (`AA55`) are not tokens.
 
+**What is not an acronym.** A word of four or more letters in capitals is emphasis or a label, and
+passes, when its lowercase form appears in the same file (`THIS` beside "this", `BUGS` beside "bugs")
+or when it opens a line and ends in a colon (`SAFETY:`). Document and section names (`README`,
+`DECISIONS`), rule words and short English words (`OR`, `NOT`) are the `words` list in
+`prose_acronyms.toml`.
+
 **What is not read.** Inline code, fenced code, addresses, HTML comments, front matter and
 headings. Rust is read only in doc comments; a `//` comment and code are not prose here.
+
+**Where "first use" is.** Markdown is judged per file: the README, the CHANGELOG and each
+`docs/*.md` expand an acronym at that file's first use. Rust doc comments are judged once per crate,
+because a reader does not need the same expansion in every source file: the README's expansions
+count for all source files, and so does the first use in the crate root (`lib.rs` or `main.rs`,
+then the other files in path order). All files named in one run are one crate.
 
 **The expansion pattern the gate accepts.** The first use of the token is one of
 
@@ -26,7 +38,7 @@ is `NVMe`), a word that is itself an acronym gives all its letters (`PCI Express
 the words may be a prefix of the token (`File System Information (FSInfo)`). A line break inside
 the words is fine. Expanding a token later in the file does not excuse an earlier bare use.
 
-**Allowlist.** `prose_acronyms.toml` beside this file, key `allow`: words every reader of a Rust
+**Allowlist.** `prose_acronyms.toml` beside this file, key `allow`: acronyms every reader of a Rust
 crate knows. A name that is not on it is expanded, not added.
 
 Name: provisional, from the prose gates lane.
@@ -88,32 +100,72 @@ def expanded(stream, start, end, token):
     return False
 
 
-def violations(path, text, allow):
-    """[(line, token)] for each acronym whose first use in the file is not expanded."""
-    stream, marks = '', []
+def scan(path, text, allow, known):
+    """([(line, token)], expanded tokens) for one file; `known` tokens are already settled."""
+    stream, marks, starts = '', [], set()
     for n, line, heading in prose_lines(path, text):
         if heading:
             continue
         marks.append((len(stream), n))
+        starts.add(len(stream))
         stream += line + ' '
-    out, seen = [], set()
+    out, seen, settled = [], set(known), set()
     for m in TOKEN.finditer(stream):
         token = normal(m.group(0))
         if token in seen:
             continue
         seen.add(token)
-        if token in allow or is_hex(token):
+        if token in allow or is_hex(token) or is_word_or_label(stream, m, token, starts):
             continue
         if expanded(stream, m.start(), m.end(), token):
+            settled.add(token)
             continue
         line = [n for off, n in marks if off <= m.start()][-1]
         out.append((line, m.group(0)))
+    return out, settled | seen
+
+
+def is_word_or_label(stream, m, token, starts):
+    """Capitals used as emphasis or as a label, not as an abbreviation."""
+    if len(token) < 4 or not token.isalpha():
+        return False
+    if re.search(r'\b%s\b' % token.lower(), stream):
+        return True
+    return m.start() in starts and stream[m.end():m.end() + 1] == ':'
+
+
+def violations(path, text, allow, known=()):
+    """[(line, token)] for each acronym whose first use in the file is not expanded."""
+    return scan(path, text, allow, known)[0]
+
+
+def crate_violations(files, allow):
+    """[(path, line, token)] for a crate's files, [(path, text)] in any order.
+
+    A Markdown file is judged on its own. Rust doc comments are judged once per crate: the README's
+    expansions count for every source file, and so does the first use in the crate root (`lib.rs`
+    or `main.rs`), then the other files in path order."""
+    out, known = [], set()
+    mds = [f for f in files if f[0].endswith('.md')]
+    rss = [f for f in files if f[0].endswith('.rs')]
+    for path, text in sorted(mds, key=lambda f: (not Path(f[0]).name.upper().startswith('README'), f[0])):
+        hits, settled = scan(path, text, allow, ())
+        out += [(path, n, t) for n, t in hits]
+        if Path(path).name.upper().startswith('README'):
+            known |= settled - {t for _, t in hits}
+    def order(f):
+        return (Path(f[0]).name not in ('lib.rs', 'main.rs'), f[0].count('/'), f[0])
+    for path, text in sorted(rss, key=order):
+        hits, seen = scan(path, text, allow, known)
+        out += [(path, n, t) for n, t in hits]
+        known |= seen
     return out
 
 
 def load_allow():
     path = Path(__file__).resolve().with_name('prose_acronyms.toml')
-    return set(tomllib.loads(path.read_text(encoding='utf-8'))['allow'])
+    table = tomllib.loads(path.read_text(encoding='utf-8'))
+    return set(table['allow']) | set(table['words'])
 
 
 
@@ -155,6 +207,32 @@ def selftest():
     if violations('a.rs', good, ALLOW):
         failed += 1
         print('FAIL rust good fixture failed', file=sys.stderr)
+    word_cases = [
+        ('The decisions are listed. See DECISIONS.\n', []),
+        ('See DECISIONS and QEMU.\n', ['DECISIONS', 'QEMU']),
+        ('SAFETY: the pointer is valid.\nNOTE: more.\n', []),
+        ('A SAFETY: label after text is still a hit? Mid SAFETY: line.\n', ['SAFETY']),
+        ('THIS is not an abbreviation, and this is the lowercase proof. ELF is.\n', ['ELF']),
+        ('A CRC and a TRNG, both short, with crc in lowercase.\n', ['CRC', 'TRNG']),
+    ]
+    for src, want in word_cases:
+        got = [t for _, t in violations('a.md', src, ALLOW)]
+        if got != want:
+            failed += 1
+            print(f'FAIL {src!r} gave {got}, wanted {want}', file=sys.stderr)
+    crate_cases = [
+        # (files, wanted [(path, token)])
+        ([('src/lib.rs', '/// The EFI.\n'), ('src/a.rs', '/// The EFI again.\n')], [('src/lib.rs', 'EFI')]),
+        ([('src/a.rs', '/// The EFI again.\n'), ('src/lib.rs', '/// Extensible Firmware Interface (EFI).\n')], []),
+        ([('src/a.rs', '/// The EFI.\n'), ('README.md', 'Extensible Firmware Interface (EFI).\n')], []),
+        ([('README.md', 'The EFI.\n'), ('docs/a.md', 'The EFI.\n')], [('README.md', 'EFI'), ('docs/a.md', 'EFI')]),
+        ([('README.md', 'The EFI.\n'), ('src/lib.rs', '/// The EFI.\n')], [('README.md', 'EFI'), ('src/lib.rs', 'EFI')]),
+    ]
+    for files, want in crate_cases:
+        got = [(p, t) for p, _, t in crate_violations(files, ALLOW)]
+        if got != want:
+            failed += 1
+            print(f'FAIL crate {files} gave {got}, wanted {want}', file=sys.stderr)
     print('prose_acronyms selftest: %s' % ('FAILED' if failed else 'ok'))
     return 1 if failed else 0
 
@@ -162,20 +240,20 @@ def selftest():
 def main(argv):
     if '--selftest' in argv:
         return selftest()
-    files = argv[1:]
-    if not files:
+    if not argv[1:]:
         print(__doc__, file=sys.stderr)
         return 2
     allow = load_allow()
-    bad = 0
-    for f in files:
+    files = []
+    for f in argv[1:]:
         try:
-            text = open(f, encoding='utf-8').read()
+            files.append((f, open(f, encoding='utf-8').read()))
         except (UnicodeDecodeError, OSError):
             continue
-        for line, token in violations(f, text, allow):
-            print(f'prose_acronyms: {f}:{line}: {token} is not expanded at its first use', file=sys.stderr)
-            bad += 1
+    bad = 0
+    for path, line, token in crate_violations(files, allow):
+        print(f'prose_acronyms: {path}:{line}: {token} is not expanded at its first use', file=sys.stderr)
+        bad += 1
     if bad:
         print("prose_acronyms: write the words first, then the acronym in parentheses "
               "('Extensible Firmware Interface (EFI)'), or the acronym first with the words in "

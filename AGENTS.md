@@ -35,7 +35,7 @@ Crate repositories follow nife's comment standard (ruled 2026-11-01 UTC), which 
 
 Two prose gates run in `check / standalone` beside the passive-voice and history gates, with a
 ceiling of 0 and no baseline. `helpers/prose_acronyms.py` wants every acronym expanded at its first
-use in a file, in `Extensible Firmware Interface (EFI)` or `EFI (Extensible Firmware Interface)`
+use (per file for documents, once per crate for doc comments), in `Extensible Firmware Interface (EFI)` or `EFI (Extensible Firmware Interface)`
 form, unless `helpers/prose_acronyms.toml` allows it; keep that allowlist short.
 `helpers/prose_figures.py` refuses the phrases in `helpers/prose_figures.toml`, and every entry
 there needs a plain replacement, which the failure prints. Both read doc comments through
