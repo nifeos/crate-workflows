@@ -11,6 +11,7 @@
 # - naming checks: the spelled-out words, unit symbols, American spelling, service-model names,
 #   contract crates and question-shaped functions, run over the template's own Rust, so a word list
 #   change that refuses the fixture fails here first.
+# - scaffold: the files a crate repository copies name no other tree (nife, roadmap citations).
 # - SHA pinning: the same grep nife runs. A floating `uses:` is a supply-chain hole in every caller
 #   at once.
 # - workflow shape: reusable workflows declare permissions; the lag check is the first job where a
@@ -127,6 +128,14 @@ sh helpers/typos_gate.sh . >/dev/null || fail "typos gate refused this repositor
 for f in scaffold/_typos.toml sample/_typos.toml _typos.toml; do
 	grep -Eq '^locale[[:space:]]*=[[:space:]]*"en-us"' "$f" || fail "$f does not set the en-us locale"
 done
+echo "ok"
+
+echo "==> the scaffold stands alone"
+# Everything under scaffold/ is copied into a crate repository, which carries no vocabulary from
+# another tree. The release app's secret names (NIFE_SMELTER_*) are one word and are not matched.
+alone="$(git grep -niE '(^|[^[:alnum:]_])(nife|calef)([^[:alnum:]_]|$)|fork [0-9]|milestone|design/|§[0-9]' -- scaffold || true)"
+[ -z "$alone" ] || fail "the scaffold names another tree's vocabulary:
+$alone"
 echo "ok"
 
 echo "==> actions are pinned to a commit SHA"

@@ -15,8 +15,8 @@ from nife's own CI.
   provisional. Say so beside anything you mint.
 - A crate repository that calls these workflows must never carry nife's vocabulary: no roadmap
   citations, no `design/` paths and no `Name:` provenance block (see "Comments and names").
-  `sample/` and `scaffold/` are the only
-  places nife may be named, because they are the template's own voice.
+  `sample/` is the template's own fixture and may name nife; `scaffold/`
+  is copied into every crate repository and may not (`script/lint` refuses it).
 - Every third-party action is pinned to a full commit SHA, with the tag in a trailing comment.
   `script/lint` refuses anything else.
 - A workflow that swallows a failure says where the failure goes.
