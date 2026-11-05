@@ -101,9 +101,11 @@ jobs:
           # The tool exits non-zero when it finds a major break; the report is the input, and
           # semver_major.py decides. A crate never published has no baseline, which is "nothing
           # major yet", not a failure.
-          cargo +stable semver-checks --manifest-path "$MANIFEST" --json > semver-report.json 2> semver.err || true
+          # The baseline is the newest release tag before this commit (--baseline-rev), so a crate
+          # not yet on crates.io has one; with no tag the tool uses the last published version.
+          RUSTUP_TOOLCHAIN=stable .crate-workflows/helpers/semver-run.sh "$MANIFEST" semver-report.txt
           set +e
-          python3 .crate-workflows/helpers/semver_major.py semver-report.json > semver-found.txt 2>> semver.err
+          python3 .crate-workflows/helpers/semver_major.py semver-report.txt > semver-found.txt 2>> semver.err
           rc=$?
           set -e
           case "$rc" in

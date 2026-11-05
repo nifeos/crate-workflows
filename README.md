@@ -60,6 +60,8 @@ provisional. The maintainer creates it as a `publish-new` token limited to the c
 short expiry. Present means trusted publishing only, even if the secret is still set. A failed lookup or a
 missing secret is a red job; nothing falls back. The first publish passes the same gate and the
 same environment approval as every later one, and a dry run reports which door it would use.
+`helpers/publish-rehearsal.sh <manifest> [--token-present]` runs the same two steps by hand, with
+no credential: `cargo publish --dry-run`, then the door. It publishes nothing.
 
 ## What each nife gate became
 
@@ -82,7 +84,7 @@ same environment approval as every later one, and a dry run reports which door i
 | vendor-verify, vendor-watch | dropped: no vendored code | |
 | toolchain drift and bump | weekly build on newest stable and beta | `weekly / drift` |
 | MSRV build | the manifest's `rust-version` builds and tests | `weekly / msrv` |
-| semver check | cargo-semver-checks against the last release, weekly, as a report | `weekly / semver`; the labeler runs it per pull request (below) |
+| semver check | cargo-semver-checks against the previous release tag (`--baseline-rev`), weekly, as a report | `weekly / semver`; the labeler runs it per pull request (below) |
 | `script/crate-standalone` | the file, license, vocabulary and lint checks run in the repository itself | `check / standalone` |
 | file-length ratchet, 2,000 lines | same limit, no baseline file (a new repository starts under the cap) | `check / standalone` |
 | comment-block ratchet, 40 lines | same rule | `check / standalone` |
@@ -103,7 +105,7 @@ same environment approval as every later one, and a dry run reports which door i
 | CodeQL | same job, advanced setup, `build-mode: none` | `check / supply-chain` |
 | `Co-Authored-By` commit hook | documented in the scaffold's `.githooks`; a crate repository copies nife's hook file | scaffold |
 | empty diff | a merge that changes no file is refused | `check / supply-chain` |
-| architect label | the dependency rule, plus a semver rule (cargo-semver-checks against the last release) | `label / label` |
+| architect label | the dependency rule, plus a semver rule (cargo-semver-checks against the previous release tag) | `label / label` |
 | architect hold | red while `needs-architect` or `held-by-lane` is on, green on `architect-ruled`; a required check | `hold / architect hold` |
 | `script/record-ruling` | a ruling swaps `needs-architect` for `architect-ruled` | `script/record-ruling` |
 | spelled-out words, unit symbols | every name the crate defines spells out the ruled words (`receive`, not `rx`) and its unit (`_MILLISECONDS`, not `_MS`); the words are `helpers/naming_words.toml`, ceiling 0, no baseline. A name kept from a datasheet, a specification or the standard library opens its doc comment with `(<name>, <source>)` and carries `#[doc(alias)]`; a package or program keeps its name by opening the crate root docs with `(<name>, <source>)` | `check / standalone` |
@@ -139,7 +141,7 @@ back and fails on any difference. The weekly `settings-drift` job runs it, so a 
 hand in the web interface is a red run, not a surprise.
 
 The architect rules a crate repository keeps: a dependency new to the crate's graph, and a
-breaking change cargo-semver-checks reports against the last published version. Everything else
+breaking change cargo-semver-checks reports against the previous release tag. Everything else
 nife's labeler watched (the ABI surface, the spawn protocol, the syscall errors, the decisions
 tree) lives in nife and stays there.
 
@@ -236,6 +238,9 @@ never merges: a person reads the checks, and a release that renames a required c
   differently, this section and the ruleset in the settings file are both wrong until they match.
 - The coverage floor here is 85, matching nife's current floor. The roadmap block still says 80
   because it predates the raise.
+- The semver baseline is the newest `v<x>.<y>.<z>` tag before the commit (`helpers/semver_baseline.py`),
+  passed by revision, so a crate not yet on crates.io has one. With no tag the tool falls back to the
+  last published version, and a crate with neither has no baseline, which counts as nothing major.
 - `weekly / semver` and `weekly / stranger` are reports: a semver break between releases is
   deliberate waiting, and the stranger run needs a person, so neither fails a release. The release gate refuses only a record that still reads `none`. The
   per-pull-request semver rule in the labeler is the one that holds a merge.

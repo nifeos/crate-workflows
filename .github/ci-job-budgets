@@ -4,7 +4,7 @@
 falsify 30 Kani install plus the replay of every falsification patch
 drift 30 two channels, stable and beta, each building, testing and linting
 msrv 30 installs the manifest's rust-version and builds and tests at it
-semver 30 cargo-semver-checks builds the crate against its last release
+semver 30 cargo-semver-checks builds the crate against its previous release tag
 miri 60 Miri is an order of magnitude slower than the tests it runs
 mutation 60 cargo-mutants builds one test binary per mutant, two at a time
 fuzz 30 five minutes per fuzz target plus the nightly toolchain
