@@ -35,14 +35,17 @@ Crate repositories follow nife's comment standard (ruled 2026-11-01 UTC), which 
 
 A crate carries no `Name:` provenance block; git holds a name's history, and `standalone.py`
 refuses a block. The naming rules still hold after a crate moves: `check / standalone` runs
-`helpers/spelled_out.py`, `unit_symbols.py`, `british_spelling.py`, `service_model.py`,
+`helpers/spelled_out.py`, `unit_symbols.py`, `register_names.py`, `british_spelling.py`, `service_model.py`,
 `contract_names.py` and `question_shape.py` over every name the crate defines, with the words in
 `helpers/naming_words.toml`, a ceiling of 0 and no baseline. A name that mirrors a
 datasheet, a specification or the standard library keeps its spelling by saying so at the item: its
 doc comment's first paragraph names it and its source as `(<name>, <source>)`, and a
 `#[doc(alias)]` carries the plain-English name. A package or program name, which has no item, is kept
 by opening the crate root docs with `(<name>, <source>)`. `helpers/rust_names.py` holds the form, and
-a kept name that lacks either part fails.
+a kept name that lacks either part fails. `register_names.py` holds the register rules, which take
+no kept form: a register offset ends `_REGISTER`, a mask ends `_MASK`, an integer constant that
+states its own name as its source is renamed with the source spelling in `#[doc(alias)]`; an address
+is virtual or physical, and a size, length or limit carries its unit.
 
 Prose and comments are spell-checked by `helpers/typos_gate.sh` (typos, en-us locale), which
 `check / standalone` runs over the crate with the crate's own `_typos.toml`. The tool version is

@@ -241,3 +241,20 @@ endings = ["our", "ours", "oured", "ouring", "ourful", "ourless", "ourable", "ou
 [british_re]
 stems = ["cent", "met", "lit", "fib", "theat", "calib", "somb", "lust", "meag"]
 endings = ["re", "res"]
+
+# Register, mask, address and size names. Read by helpers/register_names.py, whose header is the
+# manual.
+#
+# A qualifier that makes `address` something other than a location in memory: an address of a
+# network, a bus or a mailbox is not virtual or physical.
+[address_qualifiers]
+words = ["virtual", "physical", "mac", "ip", "ipv4", "ipv6", "i2c", "email", "socket", "network",
+         "ethernet", "peer"]
+
+# The words that give a size, a length or a limit its unit, or say it is not a quantity of memory:
+# `BUFFER_SIZE_BYTES`, `RING_SIZE_ENTRIES`, `PAGE_SIZE_SHIFT`. A name that holds `size`, `len` or
+# `length` and none of these fails.
+[size_units]
+words = ["bytes", "kibibytes", "mebibytes", "gibibytes", "tebibytes", "bits", "words", "sectors",
+         "blocks", "pages", "entries", "elements", "characters", "descriptors", "slots", "lines",
+         "shift", "order"]

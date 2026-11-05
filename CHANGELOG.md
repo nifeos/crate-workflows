@@ -44,6 +44,23 @@ call that sits behind the newest release.
 - The American-spelling name check also refuses the `ise` forms of two more stems
   (`unrecogn` and `plural`). The doubled-`l` forms stay refused, a stricter reading than typos takes.
 
+- `check / standalone` gains the register naming rules (`helpers/register_names.py`), with a
+  selftest and no baseline file. A register offset ends `_REGISTER`. A mask of several bits ends
+  `_MASK`. An integer constant that states its own name as its datasheet source is renamed, with the
+  source spelling in `#[doc(alias)]`. Those three take no kept form. An address is
+  `_VIRTUAL_ADDRESS` or `_PHYSICAL_ADDRESS`, and a size, length or limit carries its unit; those
+  two take the kept form. The word lists are `[address_qualifiers]` and `[size_units]` in
+  `helpers/naming_words.toml`. `rust_names.py` now gives each definition its enclosing modules and,
+  for a `const` or `static`, its type and initializer.
+- The orphan-module check no longer reports files rustc reaches. A child of a file that is not
+  `mod.rs` is read from a directory named for that file. A `src/bin/<name>/main.rs` target is a
+  root. Two `mod` lines on one line, and stacked attributes above a `#[path]` module, are read. A
+  comment or a string never names a module.
+- `scaffold/` and the release workflow's messages no longer name nife, calef or a roadmap fork,
+  since a crate repository stands alone. `script/lint` refuses that vocabulary in `scaffold/`. The
+  release app's secret names (`NIFE_SMELTER_APP_ID`, `NIFE_SMELTER_PRIVATE_KEY`) stay, because the
+  organization secrets carry them.
+
 ## BUGS
 
 - Nothing here is on crates.io yet, so no release row exists. The first release line lands with
