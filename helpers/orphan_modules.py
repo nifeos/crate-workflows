@@ -116,6 +116,35 @@ def selftest():
         (root / 'tests').mkdir()
         (root / 'tests' / 'it.rs').write_text('//! an integration test is its own root\n')
         expect('integration test is a root', 'it.rs' in [p.name for p in declared(root)], True)
+
+    # False orphans: files rustc does reach.
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        src = root / 'src'
+        for d in ('a/b', 'bin/tool', 'm'):
+            (src / d).mkdir(parents=True)
+        (root / 'Cargo.toml').write_text('[package]\nname = "x"\n')
+        files = {
+            # A child of a non-mod.rs file lives in a directory named for the parent.
+            'lib.rs': 'mod a;\nmod m;\nmod one; mod two;\n#[path = "p.rs"] mod p;\n'
+                      '#[path = "q.rs"]\n#[cfg(test)]\nmod q;\n/* mod ghost; */\n',
+            'a.rs': 'pub mod b;\n',
+            'a/b.rs': 'pub(crate) mod c;\n',
+            'a/b/c.rs': '//! grandchild\n',
+            'm/mod.rs': 'mod n;\n',
+            'm/n.rs': '//! beside mod.rs\n',
+            'one.rs': '', 'two.rs': '', 'p.rs': '', 'q.rs': '',
+            'bin/tool/main.rs': 'mod helper;\n',
+            'bin/tool/helper.rs': '//! a bin directory target\n',
+            'bin/flat.rs': 'mod flat_child;\n',
+            'bin/flat_child.rs': '//! beside a crate root, not under bin/flat/\n',
+            'ghost.rs': '//! only a block comment names me\n',
+        }
+        for name, body in files.items():
+            (src / name).write_text(body)
+        reach = declared(root)
+        orphans = sorted(str(p.relative_to(src)) for p in src.rglob('*.rs') if p.resolve() not in reach)
+        expect('only the commented-out module is an orphan', orphans, ['ghost.rs'])
     print('orphan_modules selftest: %s' % ('ok' if ok else 'FAILED'))
     return 0 if ok else 1
 
