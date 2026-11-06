@@ -15,7 +15,7 @@ import sys
 from pathlib import Path
 
 # Which files are reusable at all, and which must open with the lag job.
-LAG_FIRST = ('check.yml', 'proofs.yml', 'weekly.yml')
+LAG_FIRST = ('check.yml', 'proofs.yml', 'weekly.yml', 'fuzz.yml')
 REUSABLE = LAG_FIRST + ('release.yml', 'label.yml', 'hold.yml', 'ruled.yml')
 
 

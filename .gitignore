@@ -6,3 +6,7 @@ sample/mutants.out
 semver-report.json
 semver.err
 findings.txt
+fixtures/*/target
+fixtures/*/fuzz/target
+fixtures/*/fuzz/artifacts
+fixtures/*/fuzz/corpus

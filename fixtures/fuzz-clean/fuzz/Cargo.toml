@@ -1,0 +1,23 @@
+[package]
+name = "fuzz-clean-fuzz"
+version = "0.0.0"
+edition = "2024"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+
+[dependencies.fuzz-clean]
+path = ".."
+
+[[bin]]
+name = "checksum"
+path = "fuzz_targets/checksum.rs"
+test = false
+doc = false
+bench = false
+
+[workspace]

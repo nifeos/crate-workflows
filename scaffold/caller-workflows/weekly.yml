@@ -8,7 +8,5 @@ permissions:
 jobs:
   weekly:
     uses: nifeos/crate-workflows/.github/workflows/weekly.yml@PINS@
-    with:
-      fuzz: false
     secrets:
       SETTINGS_TOKEN: ${{ secrets.SETTINGS_TOKEN }}

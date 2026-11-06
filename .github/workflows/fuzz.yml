@@ -1,0 +1,124 @@
+# The reusable weekly fuzz workflow: cargo fuzz for a bounded time per target, red on a crash, the
+# crashing inputs uploaded as an artifact. It files nothing: no issue, no advisory, no comment. A
+# person reads the run and decides what a crash is.
+#
+# A crate with no fuzz/Cargo.toml passes with a note, so the caller is the same in every crate
+# repository and a crate gains its weekly run the day it gains a fuzz target.
+#
+# Crash inputs are public: the run log and the artifact are readable by any signed-in GitHub user.
+# So the job runs only when the caller opts in with `public-crash-inputs: true` (default false), and
+# an opt-in is refused, with the file and line, when the crate's shipped source contains `unsafe`
+# outside tests (helpers/unsafe_scan.py). A caller that has not opted in passes with a note.
+#
+# The caller's thin workflow carries the schedule (a weekly cron and workflow_dispatch). It must not
+# run on pull_request: fuzzing is heavy work that belongs on the schedule. This workflow runs on a
+# hosted runner only, never a self-hosted one, and its job refuses a pull request from a fork.
+
+name: fuzz
+
+on:
+  workflow_call:
+    inputs:
+      manifest-path:
+        type: string
+        default: Cargo.toml
+      public-crash-inputs:
+        description: >-
+          Opt in. Crash inputs are uploaded and logged where any signed-in GitHub user can read them,
+          so set this only for a crate with no unsafe code, where a crash is a panic or a hang.
+        type: boolean
+        default: false
+      seconds-per-target:
+        description: The most time any one target runs.
+        type: number
+        default: 300
+      total-seconds:
+        description: The most time all targets share, split evenly; a crate with many targets runs each for less.
+        type: number
+        default: 1200
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fuzz-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  MANIFEST: ${{ inputs.manifest-path }}
+
+jobs:
+  lag:
+    name: lag (template release)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: clock
+        run: echo "JOB_STARTED_AT=$(date +%s)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: .crate-workflows
+          persist-credentials: false
+      - run: .crate-workflows/helpers/lag-check.sh
+        env:
+          JOB_WORKFLOW_SHA: ${{ job.workflow_sha }}
+          GH_TOKEN: ${{ github.token }}
+      - name: budget
+        if: always()
+        run: python3 .crate-workflows/helpers/job_budget.py check "${{ github.job }}" "$JOB_STARTED_AT"
+
+  fuzz:
+    name: fuzz
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # A pull request from a fork never fuzzes: its code is untrusted, and the fuzz target is code.
+    if: ${{ !github.event.pull_request.head.repo.fork }}
+    steps:
+      - name: clock
+        run: echo "JOB_STARTED_AT=$(date +%s)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: .crate-workflows
+          persist-credentials: false
+      - name: opt-in
+        if: ${{ !inputs.public-crash-inputs }}
+        run: |
+          echo "not opted in: set public-crash-inputs: true to fuzz; nothing ran"
+          {
+            echo "### fuzz"
+            echo "Not opted in, so nothing ran. Crash inputs are public; a crate with no unsafe code opts in with \`public-crash-inputs: true\`."
+          } >> "$GITHUB_STEP_SUMMARY"
+      - run: echo "CRATE_DIR=$(dirname "$MANIFEST")" >> "$GITHUB_ENV"
+        if: ${{ inputs.public-crash-inputs }}
+      - run: rustup toolchain install nightly --profile minimal
+        if: ${{ inputs.public-crash-inputs }}
+      - run: cargo install --locked cargo-fuzz --version 0.13.2
+        if: ${{ inputs.public-crash-inputs }}
+      # The step's exit is the verdict: 1 when the crate holds unsafe code or a target crashed, and the run is red. The crashing
+      # inputs are uploaded next, whatever the verdict, and nothing else leaves the run.
+      - name: fuzz every target
+        if: ${{ inputs.public-crash-inputs }}
+        run: >-
+          .crate-workflows/helpers/fuzz-weekly.sh "$MANIFEST"
+          "${{ inputs.seconds-per-target }}" "${{ inputs.total-seconds }}"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        if: ${{ always() && inputs.public-crash-inputs }}
+        with:
+          name: fuzz-artifacts
+          path: ${{ env.CRATE_DIR }}/fuzz/artifacts
+          if-no-files-found: ignore
+          retention-days: 14
+      - name: budget
+        if: always()
+        run: python3 .crate-workflows/helpers/job_budget.py check "${{ github.job }}" "$JOB_STARTED_AT"

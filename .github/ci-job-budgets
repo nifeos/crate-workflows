@@ -7,5 +7,5 @@ msrv 30 installs the manifest's rust-version and builds and tests at it
 semver 30 cargo-semver-checks builds the crate against its previous release tag
 miri 60 Miri is an order of magnitude slower than the tests it runs
 mutation 60 cargo-mutants builds one test binary per mutant, two at a time
-fuzz 30 five minutes per fuzz target plus the nightly toolchain
+fuzz 30 twenty minutes of fuzzing shared by every target, plus the nightly toolchain and cargo-fuzz
 publish 30 cargo publish --dry-run, then the crates.io publish itself

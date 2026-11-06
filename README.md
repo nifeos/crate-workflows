@@ -16,7 +16,8 @@ publishing from a `nifeos` workflow. This repository is where all three land.
 |---|---|---|
 | `.github/workflows/check.yml` | every pull request | `lag`, `fmt`, `clippy`, `tests`, `coverage`, `standalone`, `supply-chain` |
 | `.github/workflows/proofs.yml` | every pull request | `lag`, `kani`, `falsify` |
-| `.github/workflows/weekly.yml` | a weekly schedule, no pull request open | `lag`, `drift`, `msrv`, `semver`, `miri`, `mutation`, `fuzz`, `settings-drift`, `stranger` |
+| `.github/workflows/weekly.yml` | a weekly schedule, no pull request open | `lag`, `drift`, `msrv`, `semver`, `miri`, `mutation`, `settings-drift`, `stranger` |
+| `.github/workflows/fuzz.yml` | a weekly schedule, no pull request open | `lag`, `fuzz` |
 | `.github/workflows/release.yml` | a dispatch naming a version | `gate`, `tag`, `publish` |
 | `.github/workflows/label.yml` | every pull request push | `label` |
 | `.github/workflows/hold.yml` | pull request and label events | `hold` |
@@ -26,10 +27,53 @@ Inputs every workflow takes (all optional unless named): `manifest-path` (defaul
 `targets` (space-separated bare-metal targets to build and lint for, default none), `toolchain`
 (default `stable`), `coverage-floor` (default 85). `check.yml` takes `allow-unpublished` for
 fixture crates that carry `publish = false` on purpose. `proofs.yml` takes `kani-args`.
-`weekly.yml` takes `fuzz` (a boolean, default false, since cargo-fuzz needs nightly and only
-parsing crates want it) and `caller-checks` (the settings-drift and stranger jobs, off for this
-template's own selftest). `release.yml` takes `version` (required, e.g. `0.1.0`) and `dry-run`
+`weekly.yml` takes `caller-checks` (the settings-drift and stranger jobs, off for this template's
+own selftest). `fuzz.yml` takes `public-crash-inputs` (the opt-in, default false), `seconds-per-target` (default 300) and `total-seconds` (default
+1,200). `release.yml` takes `version` (required, e.g. `0.1.0`) and `dry-run`
 (default true).
+
+## The weekly fuzz run
+
+Every crate repository carries the `fuzz.yml` caller, and a repository created from the scaffold
+fuzzes nothing until someone opts it in. The caller passes `public-crash-inputs: false`; a repository
+that has not opted in passes with a short note and runs no fuzz step.
+
+What is public: a crash input is written to the run log and uploaded as the `fuzz-artifacts`
+artifact, and both are readable by any signed-in GitHub user.
+
+Why only safe-Rust crates opt in: in a crate with no `unsafe` code, a crash is a panic or a hang, a
+denial of service at worst. In a crate with `unsafe` code, a crash may be a memory-safety flaw, and
+the input that triggers it would be published before anyone could fix it. So an opt-in is refused,
+and the job is red, when the crate's shipped source (`src/**/*.rs`, outside `#[cfg(test)]`) contains
+an `unsafe` block, fn, impl, trait or attribute. The message names the file and line. The check
+(`helpers/unsafe_scan.py`) ignores comments, strings and character literals, and passes a crate whose
+every root carries `#![forbid(unsafe_code)]`. It does not look at fuzz targets or dependencies. It
+is a scan of the standard library rather than `cargo geiger` so that it costs no install and
+`script/lint` can prove it against the fixtures in `fixtures/unsafe-scan`.
+
+A suspected security flaw goes to the private channel in the repository's `SECURITY.md`, never to
+an issue or a comment. A person who suspects one in a run deletes the run and its artifact.
+
+To opt in, set `public-crash-inputs: true` in the repository's `.github/workflows/fuzz.yml`. To opt
+out again, set it back to `false` (or remove the line), and delete earlier runs and artifacts if
+they hold inputs that should not stay public.
+
+A crate with a `fuzz/Cargo.toml` that has opted in runs every target it lists for a bounded time
+each, on a hosted runner, on a Tuesday cron and on dispatch. A crate without one passes with a note.
+Each target runs for the smaller of `seconds-per-target` and an even share of `total-seconds`, and
+never under 10 seconds, so a crate with many targets still ends inside the job's budget.
+
+The run files nothing. It opens no issue, creates no advisory and posts no comment. A crash, a
+timeout, an out-of-memory or a leak turns the run red, and the run uploads `fuzz/artifacts` for 14
+days. A person reads the run and decides what the crash is.
+
+The job never runs on a pull request: the caller has no `pull_request` trigger, the job refuses a
+pull request from a fork, and it never uses a self-hosted runner. `script/lint` holds those rules
+(`helpers/fuzz-ci-selftest.sh`), proves the script red on a seeded crash and green on a clean target
+against a stand-in cargo, and proves the scan on the unsafe fixtures. The selftest workflow proves the rest with cargo-fuzz itself. `fixtures/fuzz-clean` goes through the
+live workflow with the opt-in and must pass. `fixtures/fuzz-crash` goes through it without the
+opt-in and must pass having run nothing, and through the script, where it must fail and leave its
+input behind. A crate with an `unsafe` block must be refused.
 
 ## The lag check
 
@@ -73,7 +117,7 @@ no credential: `cargo publish --dry-run`, then the door. It publishes nothing.
 | cargo-machete | `cargo machete` on the manifest | `check / supply-chain` |
 | host tests | `cargo test` | `check / tests` |
 | coverage, 85% per file | cargo-llvm-cov, per-file floor | `check / coverage` |
-| fuzz (cargo-fuzz) | nightly, weekly, only when the caller asks | `weekly / fuzz` |
+| fuzz (cargo-fuzz) | nightly, weekly, a bounded time per target, only when the caller opts in; see below | `fuzz / fuzz` |
 | Miri, weekly | `cargo +nightly miri test` | `weekly / miri` |
 | mutation, weekly | cargo-mutants; new survivors fail against `mutants-baseline.txt` | `weekly / mutation` |
 | `script/verify` (Kani) | `cargo kani` at the version in `.kani-version`, on every pull request | `proofs / kani` |
