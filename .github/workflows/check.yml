@@ -177,7 +177,7 @@ jobs:
           ref: ${{ job.workflow_sha }}
           path: .crate-workflows
           persist-credentials: false
-      - uses: taiki-e/install-action@5488ac5a951645ce95062214902ac4b6bc1a1037 # v2.87.32
+      - uses: taiki-e/install-action@b80e2bb2635f28eb98b9fce1e2f0887e1535c6b2 # v2.90.0
         with:
           tool: cargo-llvm-cov
       - run: rustup toolchain install "$TOOLCHAIN" --profile minimal --component llvm-tools
@@ -323,7 +323,7 @@ jobs:
       # exact version, which checks the release archive against the checksum its manifest holds at
       # the pinned action commit; a bump is a new version here and a new action pin together.
       # helpers/typos_gate.sh refuses a crate without its own _typos.toml or with another locale.
-      - uses: taiki-e/install-action@5488ac5a951645ce95062214902ac4b6bc1a1037 # v2.87.32
+      - uses: taiki-e/install-action@b80e2bb2635f28eb98b9fce1e2f0887e1535c6b2 # v2.90.0
         with:
           tool: typos@1.51.1
       - name: typos (en-us spelling over the tree)
@@ -378,7 +378,7 @@ jobs:
               | grep -vE 'uses:[[:space:]]+\./' \
               | grep -vE 'uses:[[:space:]]+[^@[:space:]]+@[0-9a-f]{40}([[:space:]]|$)' || true)"
           [ -z "$unpinned" ] || { echo "$unpinned"; exit 1; }
-      - uses: taiki-e/install-action@5488ac5a951645ce95062214902ac4b6bc1a1037 # v2.87.32
+      - uses: taiki-e/install-action@b80e2bb2635f28eb98b9fce1e2f0887e1535c6b2 # v2.90.0
         with:
           tool: cargo-deny@0.20.2
       # nife's policy without its exceptions: no rayon skip, no advisory ignore, no vendored tree.
@@ -402,13 +402,13 @@ jobs:
             echo "the merge changes no file"; exit 1
           fi
       - name: CodeQL (Rust, build-mode none)
-        uses: github/codeql-action/init@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4
+        uses: github/codeql-action/init@1fc58d04a4d4374f921bdac573c3811c240f9c26 # v4
         with:
           languages: rust
           build-mode: none
       # The analyze action uploads its own SARIF; nife's split-job retry exists for its four-language
       # matrix, and one language in one job does not need it.
-      - uses: github/codeql-action/analyze@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4
+      - uses: github/codeql-action/analyze@1fc58d04a4d4374f921bdac573c3811c240f9c26 # v4
       - name: budget
         if: always()
         run: python3 .crate-workflows/helpers/job_budget.py check "${{ github.job }}" "$JOB_STARTED_AT"
