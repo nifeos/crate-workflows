@@ -49,7 +49,7 @@ also refuses unless the check and proof runs for that exact commit are green, so
 job is red never gets made. `tag` creates
 `v<version>` on that commit, refusing a version that does not match the manifest or a tag that
 already exists. `publish` runs last, in the `crates-io` environment (a person approves), gets
-`id-token: write` and nothing else, and exchanges the OIDC token for a temporary crates.io token
+`id-token: write` and nothing else, and exchanges the OpenID Connect (OIDC) token for a temporary crates.io token
 through trusted publishing. `dry-run` defaults to true, so a rehearsal publishes nothing and needs
 no approval.
 
@@ -93,10 +93,12 @@ no credential: `cargo publish --dry-run`, then the door. It publishes nothing.
 | prose ratchet | README and CHANGELOG at nife's caps (3,000 words, median 20, longest 40) | `check / standalone` |
 | passive-voice ratchet | README, CHANGELOG and `docs/*.md` at nife's limit of 2 passives per 1,000 prose words; no baseline | `check / standalone` |
 | history ratchet | README and `docs/*.md` carry no phrase that only a history uses (`supersede`, `renamed from`, `moved from` a document, a Timeline heading); the CHANGELOG is exempt; no baseline | `check / standalone` |
+| acronym gate | every acronym (two or more capitals, `FSInfo` included) is expanded at its first use, as `Extensible Firmware Interface (EFI)` or `EFI (Extensible Firmware Interface)`, or is listed in `helpers/prose_acronyms.toml`. The README, CHANGELOG and each `docs/*.md` are judged per file; Rust doc comments are judged once per crate (the README's expansions and the first use in the crate root count for every source file). A width (`FAT32` once `FAT` is expanded) is covered. Code spans, code blocks, headings, document names, labels such as `SAFETY:` and capitals whose lowercase form the file also uses (`THIS`) are exempt; ceiling 0, no baseline | `check / standalone` |
+| banned-figures gate | the same files carry none of the phrases in `helpers/prose_figures.toml` (`oracle`, `battle-tested`, `under the hood` and similar), and the failure shows each plain replacement; ceiling 0, no baseline | `check / standalone` |
 | function-length ratchet, 100 code lines | the count clippy's `too_many_lines` makes, read from source; no baseline | `check / standalone` |
 | house style, typos | `typos` 1.51.1 with the en-us locale over the tree, through `helpers/typos_gate.sh`; the crate carries its own `_typos.toml` (copied from `scaffold/`), and the gate refuses a missing file or another locale | `check / standalone` |
 | markdown links resolve | every relative link resolves | `check / standalone` |
-| EXAMPLES and BUGS | the README must carry both headings | `check / standalone` |
+| `EXAMPLES` and `BUGS` | the README must carry both headings | `check / standalone` |
 | actions pinned to a SHA | the same grep nife runs, over the caller's workflows | `check / supply-chain` |
 | a swallowed failure says where it goes | the template's own `script/lint`; callers inherit the workflows' behavior | template selftest |
 | shellcheck, `sh -n` | over the caller's `script/` and the template's helpers | `check / standalone` |
@@ -148,7 +150,7 @@ break already on the base branch was ruled in its own pull request, so it does n
 one. A diff that touches no `.rs` file (build scripts included) and no `Cargo.toml` does not run
 the tool. `Cargo.lock` is not in that filter: a dependent resolves its own lockfile, and the tool
 reads only the crate's own items. Everything else
-nife's labeler watched (the ABI surface, the spawn protocol, the syscall errors, the decisions
+nife's labeler watched (the application binary interface (ABI) surface, the spawn protocol, the syscall errors, the decisions
 tree) lives in nife and stays there.
 
 ## Required checks
@@ -212,7 +214,7 @@ other actor. Two organization secrets, visible to every crate repository, feed i
 | secret | holds |
 |---|---|
 | `NIFE_SMELTER_APP_ID` | the nife-smelter app's ID |
-| `NIFE_SMELTER_PRIVATE_KEY` | a private key generated for the app (the whole PEM) |
+| `NIFE_SMELTER_PRIVATE_KEY` | a private key generated for the app (the whole Privacy-Enhanced Mail (PEM) file) |
 
 The caller passes both (`scaffold/caller-workflows/release.yml` does). If either is missing the
 job fails naming it; it never falls back to `github.token`. The app must also be installed on the
@@ -254,7 +256,7 @@ never merges: a person reads the checks, and a release that renames a required c
   Administration read-only. The GITHUB_TOKEN cannot carry that scope: GitHub's parser refuses
   `administration` in any `permissions` block, at the workflow level as well as the job level
   (this repository's first selftest runs are the evidence). The check authenticates as the
-  caller's `SETTINGS_TOKEN` secret instead, a fine-grained PAT with that scope, stored once as an
+  caller's `SETTINGS_TOKEN` secret instead, a fine-grained personal access token (PAT) with that scope, stored once as an
   organization secret. Until it exists, the job is red on its 403 with instructions. The merge
   settings (`allow_merge_commit` and the other five) are returned only to a caller with push
   access, so the PAT also needs Contents read and write; without it each one is an "unreadable"

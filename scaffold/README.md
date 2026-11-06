@@ -24,12 +24,12 @@ github-actions ecosystem opens the bumps afterward; the lag check fails closed i
 | .github/dependabot.yml | cargo and github-actions ecosystems, both weekly |
 | .github/pull_request_template.md | the disclosure line first, then what changed |
 | .github/ISSUE_TEMPLATE/ | bug report and feature request forms, blank issues off |
-| CODEOWNERS | the crate-maintainers team owns every path |
+| `CODEOWNERS` | the crate-maintainers team owns every path |
 | caller `weekly.yml` | forwards the `SETTINGS_TOKEN` secret to the template's weekly workflow |
-| CONTRIBUTING.md | disclosure of agent-written work, and how outside contributions are reviewed |
-| SECURITY.md | what a security report means here, and private reporting |
+| `CONTRIBUTING.md` | disclosure of agent-written work, and how outside contributions are reviewed |
+| `SECURITY.md` | what a security report means here, and private reporting |
 | CHANGELOG.md | one line per release; the release gate reads nothing from it, people do |
-| README-crate.md | the crate README's starting shape, with EXAMPLES and BUGS headings already in it |
+| README-crate.md | the crate README's starting shape, with `EXAMPLES` and `BUGS` headings already in it |
 | deny.toml | the cargo-deny policy: no skipped crate, no ignored advisory |
 | _typos.toml | the en-us locale for the typos step; add a word only with its reason, never to hide a misspelling |
 | rustfmt.toml | the stable subset; the two unstable options are refused |
