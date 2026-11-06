@@ -1,0 +1,53 @@
+# Figurative or vague phrases the prose gate refuses, each with the plain text to write instead.
+# Read by prose_figures.py (its header is the manual). `phrase` is a regular expression matched in
+# any case between word boundaries; `instead` is what the failure message shows. Keep the list
+# small and clear: every entry came from a review that had to explain it, and every entry needs a
+# replacement. The file's name and its keys are provisional.
+
+[[figure]]
+phrase = "stranger'?s stick"
+instead = "what the reader does, for example 'a first attempt by someone who has not seen the code'"
+
+[[figure]]
+phrase = "off a stranger"
+instead = "'from someone who has not seen the code'"
+
+[[figure]]
+phrase = "both ways"
+instead = "the two directions by name, for example 'when reading and when writing'"
+
+[[figure]]
+phrase = "oracle"
+instead = "'an independent implementation that the tests compare against'"
+
+[[figure]]
+phrase = "epic"
+instead = "the size or the count, for example 'a change of 40 files'"
+
+[[figure]]
+phrase = "tale"
+instead = "'account', or state the facts"
+
+[[figure]]
+phrase = "pilot"
+instead = "'trial', or name the first user"
+
+[[figure]]
+phrase = "battle[- ]tested"
+instead = "the tests, fuzzing or use that back the claim"
+
+[[figure]]
+phrase = "under the hood"
+instead = "'inside', then say what the code does"
+
+[[figure]]
+phrase = "out of the box"
+instead = "'by default'"
+
+[[figure]]
+phrase = "bullet[- ]?proof"
+instead = "what the code guards against and how that was checked"
+
+[[figure]]
+phrase = "rock[- ]solid"
+instead = "what the code guards against and how that was checked"
