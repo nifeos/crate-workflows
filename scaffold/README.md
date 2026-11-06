@@ -14,7 +14,7 @@ github-actions ecosystem opens the bumps afterward; the lag check fails closed i
 | caller-workflows/ci.yml | calls check.yml on pull requests and on each push to main; the push run is at the merge commit's SHA, which is what the release gate reads |
 | caller-workflows/proofs.yml | calls proofs.yml on pull requests and on each push to main, same |
 | caller-workflows/weekly.yml | calls weekly.yml on a Monday cron and on dispatch |
-| caller-workflows/fuzz.yml | calls fuzz.yml on a Tuesday cron and on dispatch; a crate without a `fuzz/` directory passes with a note |
+| caller-workflows/fuzz.yml | calls fuzz.yml on a Tuesday cron and on dispatch; fuzzes nothing until the caller sets `public-crash-inputs: true`, which only a crate with no `unsafe` code does (crash inputs are public); see the template README |
 | caller-workflows/release.yml | calls release.yml on dispatch |
 | caller-workflows/label.yml | calls label.yml on pull request pushes |
 | caller-workflows/hold.yml | calls hold.yml on pull request and label events |

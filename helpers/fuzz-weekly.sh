@@ -7,8 +7,12 @@
 # crashing input stays in fuzz/artifacts/<target>/ beside the manifest, where the workflow uploads
 # it, and a person reads the run and decides what to do with it.
 #
-# Exit codes: 0 for a clean run, or for a crate with no fuzz targets; 1 when a target failed;
-# 2 for a mistake in the arguments or a failure of cargo-fuzz itself that names no target.
+# Crash inputs are published where any signed-in GitHub user can read them, so the run first
+# refuses a crate whose shipped source contains `unsafe` (helpers/unsafe_scan.py), and fuzzes nothing.
+#
+# Exit codes: 0 for a clean run, or for a crate with no fuzz targets; 1 when a target failed or the
+# crate holds `unsafe`; 2 for a mistake in the arguments or a failure of cargo-fuzz itself that
+# names no target.
 #
 # The time per target is the smaller of SECONDS_PER_TARGET and TOTAL_SECONDS divided by the number
 # of targets, and never under 10 seconds, so a crate with many targets still ends inside the budget
@@ -36,6 +40,13 @@ done
 summary() {
 	[ -z "${GITHUB_STEP_SUMMARY:-}" ] || printf '%s\n' "$1" >>"$GITHUB_STEP_SUMMARY"
 }
+
+here="$(dirname "$0")"
+if ! python3 -I "$here/unsafe_scan.py" "$(dirname "$manifest")"; then
+	summary "### fuzz"
+	summary "Refused: the crate's shipped source contains \`unsafe\` (or could not be read), and crash inputs are public. See the log for the file and line."
+	exit 1
+fi
 
 cd "$(dirname "$manifest")" || exit 2
 

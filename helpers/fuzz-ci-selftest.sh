@@ -7,7 +7,8 @@
 # issue or an advisory, and an upload of the crashing inputs. The second runs helpers/fuzz-weekly.sh
 # against a stand-in cargo and holds its verdicts: red on a seeded crash, green on a clean target,
 # green with a note on a crate with no fuzz targets, and a time per target that never exceeds the
-# total. The live proof, with the real cargo-fuzz, is the selftest workflow's fuzz jobs.
+# total. The third part runs helpers/unsafe_scan.py on the fixtures in fixtures/unsafe-scan and holds
+# that an opt-in is refused for shipped `unsafe` and passes otherwise. The live proof, with the real cargo-fuzz, is the selftest workflow's fuzz jobs.
 
 set -eu
 
@@ -24,6 +25,13 @@ script=helpers/fuzz-weekly.sh
 
 # The workflow.
 grep -q 'head.repo.fork' "$workflow" || fail "$workflow does not refuse a pull request from a fork"
+grep -q 'public-crash-inputs:' "$workflow" || fail "$workflow has no public-crash-inputs opt-in"
+grep -A8 'public-crash-inputs:' "$workflow" | grep -q 'default: false' || fail "the opt-in does not default to false"
+grep -q 'if: ${{ inputs.public-crash-inputs }}' "$workflow" || fail "$workflow runs a step without the opt-in"
+[ "$(grep -c 'fuzz every target' "$workflow")" -eq 1 ] || fail "$workflow does not have exactly one fuzz step"
+grep -A2 'fuzz every target' "$workflow" | grep -q 'inputs.public-crash-inputs' || fail "the fuzz step runs without the opt-in"
+grep -q 'public-crash-inputs: false' "$caller" || fail "the scaffold caller does not default to not opted in"
+grep -q 'unsafe_scan' helpers/fuzz-weekly.sh || fail "the fuzz script does not refuse unsafe code"
 grep -q 'upload-artifact' "$workflow" || fail "$workflow does not upload the crashing inputs"
 grep -q 'fuzz/artifacts' "$workflow" || fail "$workflow does not upload fuzz/artifacts"
 if grep -nE 'self-hosted|pull_request_target|(issues|security-events|pull-requests|contents|actions|checks):[[:space:]]*write|gh (issue|api|pr|secret)|advisor|--auto-file|curl ' \
@@ -63,7 +71,8 @@ export SHIM_LOG="$work/log"
 
 crate() {
 	rm -rf "$work/crate"
-	mkdir -p "$work/crate/fuzz"
+	mkdir -p "$work/crate/fuzz" "$work/crate/src"
+	: >"$work/crate/src/lib.rs"
 	: >"$work/crate/Cargo.toml"
 	: >"$work/crate/fuzz/Cargo.toml"
 	: >"$SHIM_LOG"
@@ -115,7 +124,31 @@ b
 ' '' 300 5 || fail "the floor run was red"
 [ "$(cut -d' ' -f2 "$SHIM_LOG" | sort -u)" = "-max_total_time=10" ] || fail "the 10-second floor did not hold"
 
+# The opt-in is refused for a crate with shipped unsafe code, and the script fuzzes nothing then.
+crate
+printf 'pub fn f() {\n    unsafe {}\n}\n' >"$work/crate/src/lib.rs"
+if run 'alpha
+' '' 300 1200; then
+	fail "a crate with unsafe code was fuzzed"
+fi
+[ ! -s "$SHIM_LOG" ] || fail "a refused crate ran a target"
+
 if sh "$script" "$work/crate/Cargo.toml" ten 5 >/dev/null 2>&1; then
 	fail "a non-numeric time was accepted"
 fi
+
+# The scan, against the fixtures. Each line is: fixture, expected exit code.
+scan() {
+	code=0
+	python3 -I helpers/unsafe_scan.py "fixtures/unsafe-scan/$1" >"$work/scan.out" 2>&1 || code=$?
+	[ "$code" -eq "$2" ] || fail "the unsafe scan on $1 exited $code, expected $2"
+}
+scan no-unsafe 0
+scan unsafe-block 1
+grep -q 'unsafe-block/src/lib.rs:5:' "$work/scan.out" || fail "the refusal does not name the file and line"
+scan comment-and-string-only 0
+scan forbid 0
+scan unsafe-only-in-tests 0
+scan unsafe-fn-after-test-module 1
+scan forbid-only-in-lib 1
 echo "fuzz-ci-selftest: ok"

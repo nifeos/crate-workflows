@@ -6,12 +6,16 @@ call that sits behind the newest release.
 
 ## Unreleased
 
-- A weekly fuzz workflow, `fuzz.yml`, with a scaffold caller. It runs every cargo-fuzz target for a
-  bounded time on a hosted runner, never on a pull request or a self-hosted runner, uploads the
-  crashing inputs as the `fuzz-artifacts` artifact, and files nothing. A crate without a
-  `fuzz/Cargo.toml` passes with a note. `weekly.yml` loses its opt-in `fuzz` input and job, and the
-  scaffold's weekly caller loses `fuzz: false`. `script/lint` holds the job's safety rules and proves
-  it red on a seeded crash; the selftest workflow proves the same with cargo-fuzz.
+- A weekly fuzz workflow, `fuzz.yml`, with a scaffold caller. Crash inputs are public, since the run
+  log and the artifact are readable by any signed-in GitHub user. So it fuzzes only when the caller
+  sets `public-crash-inputs: true`. The input defaults to false and the scaffold caller leaves it
+  false; without it the run passes with a note.
+- An opt-in is refused, naming the file and line, when the crate's shipped source contains `unsafe`
+  outside tests (`helpers/unsafe_scan.py`). The run covers every cargo-fuzz target for a bounded time
+  on a hosted runner, never on a pull request or a self-hosted runner. It uploads the crashing inputs
+  as the `fuzz-artifacts` artifact and files nothing. `weekly.yml` loses its opt-in `fuzz` input and
+  job, and the scaffold's weekly caller loses `fuzz: false`. `script/lint` holds the job's safety
+  rules and proves the scan and the verdicts; the selftest workflow proves them with cargo-fuzz.
 - First version, from milestone 887 (crate repositories share one CI template). Four reusable
   workflows (`check`, `proofs`, `weekly`, `release`), plus the architect label and hold workflows.
   One settings file, with an apply script and a drift check. The lag check sits in every reusable
