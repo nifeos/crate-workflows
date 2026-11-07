@@ -1,6 +1,5 @@
-# Job budgets, one raise per line with its reason; helpers/job_budget.py refuses a bare raise.
-# The default is 20 minutes. scaffold/ ships this same file to callers, so adopting the template
-# adopts these budgets too; a caller may raise one further, with a reason, in its own copy.
+# Job budgets in minutes, one raise per line with its reason; a raise without a reason is refused.
+# The default is 20 minutes. A repository may raise a budget further, with a reason, in its own copy.
 falsify 30 Kani install plus the replay of every falsification patch
 drift 30 two channels, stable and beta, each building, testing and linting
 msrv 30 installs the manifest's rust-version and builds and tests at it
