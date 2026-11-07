@@ -6,6 +6,9 @@ call that sits behind the newest release.
 
 ## Unreleased
 
+- Compiled Python files (`helpers/__pycache__/*.pyc`, built by one interpreter version) are no longer
+  tracked, and `.gitignore` now ignores `__pycache__/` and `*.pyc`. Nothing read them; the helpers
+  run from their `.py` sources.
 - `weekly / mutation` runs in shards, so a crate with thousands of mutants finishes inside the
   60-minute job timeout. `mutation-plan` counts the mutants and makes ceil(mutants /
   `mutants-per-shard`) shards (a new input, default 200). Each `mutation` job tests one shard, and
