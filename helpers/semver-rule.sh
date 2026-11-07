@@ -165,6 +165,19 @@ selftest() {
 	git commit -qam 'extend the spelling words'
 	expect 'a _typos.toml-only diff does not run the tool' "$released" skipped quiet
 
+	# The labeler checks out with `filter: blob:none`, so the release's files are not on disk and
+	# cargo-semver-checks, which clones the checkout locally, cannot read them unless they are
+	# fetched first. A partial clone of the fixture stands for that checkout.
+	git config uploadpack.allowFilter true
+	git config uploadpack.allowAnySHA1InWant true
+	git clone -q --no-local --filter=blob:none --no-checkout "file://$repo" "$work/partial"
+	cd "$work/partial" || return 1
+	git config user.name selftest
+	git config user.email selftest@example.invalid
+	git config commit.gpgsign false
+	git checkout -q -b breaking_partial origin/breaking
+	expect 'a blobless clone still has the baseline files' "$released" ran fires 'fixture::doomed'
+
 	cd / && rm -rf "$work"
 	if [ "$failed" -ne 0 ]; then
 		echo "semver-rule selftest: FAILED"
