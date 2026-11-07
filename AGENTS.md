@@ -55,6 +55,10 @@ a kept name that lacks either part fails. `register_names.py` holds the register
 no kept form: a register offset ends `_REGISTER`, a mask ends `_MASK`, an integer constant that
 states its own name as its source is renamed with the source spelling in `#[doc(alias)]`; an address
 is virtual or physical, and a size, length or limit carries its unit.
+`helpers/abbreviations.py` runs beside them as a report, never a failure: it lists each component
+of a name that is not an English, technical or accepted word. A word joins
+`helpers/technical_words.txt` when engineers say it whole, and `[accepted]` when nobody says its
+expansion; either change keeps its selftest green.
 
 Prose and comments are spell-checked by `helpers/typos_gate.sh` (typos, en-us locale), which
 `check / standalone` runs over the crate with the crate's own `_typos.toml`. The tool version is

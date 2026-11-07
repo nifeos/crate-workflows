@@ -178,6 +178,30 @@ no credential: `cargo publish --dry-run`, then the door. It publishes nothing.
 | audit and stranger cadence | a stranger builds and proves the crate from its README alone; the job fails when the recorded run is overdue | `weekly / stranger` |
 | kernel and image gates | dropped: a library crate has none | |
 
+## The abbreviations report
+
+A name spells out what it holds. `helpers/spelled_out.py` refuses the abbreviations it lists;
+`helpers/abbreviations.py` finds the ones nobody listed. It reads the same names and splits each
+into components the same way. It reports every component that is not one of these:
+
+- an English word (`helpers/english_words.txt`, from Spell Checker Oriented Word Lists (SCOWL);
+  its source and license are in its header and `helpers/english_words.LICENSE`);
+- a technical word (`helpers/technical_words.txt`);
+- a short word in `[accepted]` in `helpers/naming_words.toml`, each with its reason (`id`, `pci`,
+  `len`);
+- a word in the crate's own `.github/accepted-words`, one per line followed by its reason.
+
+`[abbreviations]` in the same file names dictionary words that a name still spells out (`err`,
+`info`). The check skips a name kept from a datasheet, a specification or the standard library in
+the form `helpers/rust_names.py` describes. Each finding reads
+`file:line: name: component 'val' is not a word (did you mean 'value'?)`, followed by a count per
+file and a total.
+
+The check is report only. `check / standalone` runs it as its own step and writes the findings to
+the job summary; it never fails on a finding. It fails only on a malformed configuration, such as an
+accepted word without a reason. The check reads `.github/abbreviations-ceiling`, one number, and
+compares the total with it; nothing enforces it yet.
+
 ## How Kani moves
 
 `.kani-version` holds the one exact kani-verifier version that `proofs.yml` installs. Every
