@@ -318,6 +318,20 @@ jobs:
           # shellcheck disable=SC2046
           python3 .crate-workflows/helpers/service_model.py --prose \
             $(git ls-files -- "$crate_dir" | grep -v 'Cargo[.]lock$')
+      # Every component of every name the crate defines that is not an English word, a technical
+      # word or an accepted one (helpers/abbreviations.py). REPORT ONLY: the findings go to this
+      # job's summary and its log, and the step never fails on them. It fails only on a malformed
+      # .github/accepted-words or .github/abbreviations-ceiling, which is a broken configuration
+      # rather than a finding. The ceiling is read and reported, not enforced.
+      - name: abbreviations (report only, in the job summary)
+        run: |
+          set -e
+          crate_dir=$(dirname "$MANIFEST")
+          rs=$(git ls-files -- "$crate_dir" | grep '[.]rs$' || true)
+          # One file per argument is the point; shellcheck wants quoting everywhere otherwise.
+          # shellcheck disable=SC2086
+          python3 .crate-workflows/helpers/abbreviations.py --manifest "$MANIFEST" \
+            --summary "$GITHUB_STEP_SUMMARY" $rs
       # House style is American spelling, and typos with the en-us locale is the tool that knows the
       # misspellings and the locale both. The tool is installed by taiki-e/install-action at an
       # exact version, which checks the release archive against the checksum its manifest holds at
