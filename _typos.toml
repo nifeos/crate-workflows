@@ -13,6 +13,9 @@ extend-exclude = [
     "target/",
     "helpers/naming_words.toml",
     "helpers/british_spelling.py",
+    # A dictionary's word list, every word whole; typos reads some rare words (`leafs`, `knifes`) as
+    # misspellings of commoner ones, which is the same category error.
+    "helpers/english_words.txt",
     # Its typos-gate section writes a misspelling and a British spelling to prove the gate refuses
     # them.
     "script/lint",

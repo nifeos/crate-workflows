@@ -10,7 +10,7 @@
 #   not done.
 # - naming checks: the spelled-out words, unit symbols, American spelling, service-model names,
 #   contract crates and question-shaped functions, run over the template's own Rust, so a word list
-#   change that refuses the fixture fails here first.
+#   change that refuses the fixture fails here first; the abbreviations report runs there too.
 # - scaffold: the files a crate repository copies name no other tree (nife, roadmap citations).
 # - SHA pinning: the same grep nife runs. A floating `uses:` is a supply-chain hole in every caller
 #   at once.
@@ -77,7 +77,7 @@ if ! "$py" -c 'import tomllib' 2>/dev/null; then
 fi
 # The helpers that carry their own tests, named here so a helper without a selftest is a visible
 # gap in this list rather than an invisible gap in a grep.
-for f in rust_names spelled_out unit_symbols register_names british_spelling service_model contract_names question_shape standalone prose_caps passive_voice history_phrases prose_text prose_acronyms prose_figures function_length orphan_modules check_links falsify architect-label-rules \
+for f in rust_names spelled_out unit_symbols abbreviations register_names british_spelling service_model contract_names question_shape standalone prose_caps passive_voice history_phrases prose_text prose_acronyms prose_figures function_length orphan_modules check_links falsify architect-label-rules \
 	mutants_gate job_budget workflow_shape kani_bump publish_mode semver_baseline semver_major; do
 	"$py" "helpers/$f.py" --selftest
 done
@@ -105,6 +105,12 @@ for check in register_names british_spelling service_model contract_names questi
 done
 # shellcheck disable=SC2046
 "$py" helpers/service_model.py --prose $(git ls-files sample | grep -v 'Cargo[.]lock$')
+# The abbreviations check reports and never fails on a finding, so its run here proves only that the
+# shipped word lists and tables load and that it reads the fixture; its selftest above holds the rule.
+# shellcheck disable=SC2086
+report="$("$py" helpers/abbreviations.py --manifest sample/Cargo.toml $rs)" ||
+	fail "the abbreviations check could not read its own configuration"
+printf '%s\n' "$report" | tail -1
 echo "ok"
 
 echo "==> typos gate (en-us spelling)"
