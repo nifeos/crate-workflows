@@ -13,6 +13,11 @@ call that sits behind the newest release.
   crate under 200 mutants runs as one shard. A mutant that times out now fails the verdict unless
   exempted, as a survivor does; before, it failed the run only when no mutant survived. One exempt
   line now covers every survivor on that line, not only the first.
+- The scaffold's typos gate now passes on the scaffold itself. The release caller's two secret names
+  (`NIFE_SMELTER_APP_ID`, `NIFE_SMELTER_PRIVATE_KEY`) tripped the spelling check on their first
+  word, so `scaffold/_typos.toml` ignores those two identifiers and nothing else. `script/lint` now
+  runs the gate over `scaffold/`, and the stand-alone vocabulary check became
+  `helpers/scaffold_alone.sh`, which `script/lint` proves with a bad and a good fixture.
 - A weekly fuzz workflow, `fuzz.yml`, with a scaffold caller. Crash inputs are public, since the run
   log and the artifact are readable by any signed-in GitHub user. So it fuzzes only when the caller
   sets `public-crash-inputs: true`. The input defaults to false and the scaffold caller leaves it

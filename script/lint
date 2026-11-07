@@ -129,6 +129,7 @@ for bad in typo british noconfig locale; do
 done
 # The fixtures that caller repositories copy, and this repository's own tree, pass.
 sh helpers/typos_gate.sh sample >/dev/null || fail "typos gate refused sample/"
+sh helpers/typos_gate.sh scaffold >/dev/null || fail "typos gate refused scaffold/, which every crate copies"
 sh helpers/typos_gate.sh . >/dev/null || fail "typos gate refused this repository's tree"
 for f in scaffold/_typos.toml sample/_typos.toml _typos.toml; do
 	grep -Eq '^locale[[:space:]]*=[[:space:]]*"en-us"' "$f" || fail "$f does not set the en-us locale"
@@ -137,10 +138,23 @@ echo "ok"
 
 echo "==> the scaffold stands alone"
 # Everything under scaffold/ is copied into a crate repository, which carries no vocabulary from
-# another tree. The release app's secret names (NIFE_SMELTER_*) are one word and are not matched.
-alone="$(git grep -niE '(^|[^[:alnum:]_])(nife|calef)([^[:alnum:]_]|$)|fork [0-9]|milestone|design/|§[0-9]' -- scaffold || true)"
-[ -z "$alone" ] || fail "the scaffold names another tree's vocabulary:
-$alone"
+# another tree (helpers/scaffold_alone.sh).
+# The helper reads whole words, so a bad fixture proves it refuses each one and a good one passes.
+a="$fixtures/alone"
+mkdir -p "$a/clean" "$a/nife" "$a/calef" "$a/milestone"
+for d in clean nife calef milestone; do
+	printf 'A crate that stands alone.\n' >"$a/$d/README.md"
+done
+printf 'Taken from Nife.\n' >"$a/nife/README.md"
+printf 'Ask calef.\n' >"$a/calef/README.md"
+printf 'See milestone 887.\n' >"$a/milestone/README.md"
+sh helpers/scaffold_alone.sh "$a/clean" >/dev/null || fail "scaffold_alone refused a clean tree"
+for bad in nife calef milestone; do
+	if sh helpers/scaffold_alone.sh "$a/$bad" >/dev/null 2>&1; then
+		fail "scaffold_alone passed the $bad fixture"
+	fi
+done
+sh helpers/scaffold_alone.sh scaffold || fail "the scaffold names another tree's vocabulary"
 echo "ok"
 
 echo "==> actions are pinned to a commit SHA"
