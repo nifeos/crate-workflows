@@ -6,6 +6,13 @@ call that sits behind the newest release.
 
 ## Unreleased
 
+- `helpers/abbreviations.py`, a report-only check. It lists every component of a name the crate
+  defines that is not a word. A word is an English word (Spell Checker Oriented Word Lists (SCOWL),
+  bundled as `helpers/english_words.txt`), a technical word (`helpers/technical_words.txt`), an
+  `[accepted]` word in `helpers/naming_words.toml` or a word in the crate's `.github/accepted-words`.
+  `check / standalone` writes the findings to its job summary and does not fail on them; a malformed
+  configuration fails it. The check reads `.github/abbreviations-ceiling` and reports against it
+  without enforcing it. The scaffold ships an empty `.github/accepted-words`.
 - `label / label` rule 2 no longer dies on `An object with id ... could not be found` when it clones
   the baseline tag. The labeler checks out with `filter: blob:none`, so the release's files were not
   on disk, and cargo-semver-checks clones the checkout locally, where a missing file cannot be
