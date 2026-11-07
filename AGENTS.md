@@ -60,6 +60,13 @@ of a name that is not an English, technical or accepted word. A word joins
 `helpers/technical_words.txt` when engineers say it whole, and `[accepted]` when nobody says its
 expansion; either change keeps its selftest green.
 
+Three README reports run beside it, also never a failure: `helpers/readme_acronyms.py` (an acronym
+used before the README or the crate root's doc comment defines it), `helpers/inflated_wording.py`
+(the phrases in `helpers/inflated_wording.toml`) and `helpers/readme_sections.py` (the section order
+its header states). A change to the order changes
+`scaffold/README-crate.md` and `sample/README.md` with it; `script/lint` fails when the sample has a
+finding.
+
 Prose and comments are spell-checked by `helpers/typos_gate.sh` (typos, en-us locale), which
 `check / standalone` runs over the crate with the crate's own `_typos.toml`. The tool version is
 pinned in `check.yml` and `selftest.yml` together; a bump changes both. The template's own
