@@ -10,3 +10,7 @@ fixtures/*/target
 fixtures/*/fuzz/target
 fixtures/*/fuzz/artifacts
 fixtures/*/fuzz/corpus
+
+# Python bytecode
+__pycache__/
+*.pyc
