@@ -72,6 +72,10 @@ jobs:
     with:
       manifest-path: sample/Cargo.toml
       caller-checks: false
+      # The fixture has seven mutants and three exempted survivors. Three a shard splits it into
+      # three shards and puts one survivor in each, so mutation-verdict has to merge every shard
+      # before all of its exemptions match.
+      mutants-per-shard: 3
 
   # The labeler's semver rule against a throwaway crate repository: no break passes, a new break
   # fires, a break already on the base does not hold a later pull request, and a `_typos.toml`-only

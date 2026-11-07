@@ -6,6 +6,13 @@ call that sits behind the newest release.
 
 ## Unreleased
 
+- `weekly / mutation` runs in shards, so a crate with thousands of mutants finishes inside the
+  60-minute job timeout. `mutation-plan` counts the mutants and makes ceil(mutants /
+  `mutants-per-shard`) shards (a new input, default 200). Each `mutation` job tests one shard, and
+  `mutation-verdict`, named `mutation`, judges them together against `.github/mutants-exempts`. A
+  crate under 200 mutants runs as one shard. A mutant that times out now fails the verdict unless
+  exempted, as a survivor does; before, it failed the run only when no mutant survived. One exempt
+  line now covers every survivor on that line, not only the first.
 - The scaffold's typos gate now passes on the scaffold itself. The release caller's two secret names
   (`NIFE_SMELTER_APP_ID`, `NIFE_SMELTER_PRIVATE_KEY`) tripped the spelling check on their first
   word, so `scaffold/_typos.toml` ignores those two identifiers and nothing else. `script/lint` now
