@@ -168,8 +168,8 @@ no credential: `cargo publish --dry-run`, then the door. It publishes nothing.
 | architect label | the dependency rule, plus a semver rule: a major break against the previous release tag that the merge base did not already carry, run only when the diff touches a `.rs` file or a `Cargo.toml` (`helpers/semver-rule.sh`) | `label / label` |
 | architect hold | red while `needs-architect` or `held-by-lane` is on, green on `architect-ruled`; a required check | `hold / architect hold` |
 | `script/record-ruling` | a ruling swaps `needs-architect` for `architect-ruled` | `script/record-ruling` |
-| spelled-out words, unit symbols | every name the crate defines spells out the ruled words (`receive`, not `rx`) and its unit (`_MILLISECONDS`, not `_MS`); the words are `helpers/naming_words.toml`, ceiling 0, no baseline. A name kept from a datasheet, a specification or the standard library opens its doc comment with `(<name>, <source>)` and carries `#[doc(alias)]`; a package or program keeps its name by opening the crate root docs with `(<name>, <source>)` | `check / standalone` |
-| register names | a register offset ends `_REGISTER`; a mask of several bits ends `_MASK`; a register, field or bit constant is spelled out, with the source's spelling in `#[doc(alias)]`; an address is `_VIRTUAL_ADDRESS` or `_PHYSICAL_ADDRESS`; a size, length or limit carries its unit (`helpers/register_names.py`); ceiling 0, no baseline | `check / standalone` |
+| spelled-out words, unit symbols | every name the crate defines spells out the ruled words (`receive`, not `rx`) and its unit (`_MILLISECONDS`, not `_MS`); the words are `helpers/naming_words.toml`, ceiling 0, no baseline. A name kept from a datasheet, a specification or the standard library opens its doc comment with `(<name>, <source>)` and carries `#[doc(alias)]`; an integer constant (a register, bit, field or command) is never kept and takes the spelled-out name, with the source spelling as its alias; a package or program keeps its name by opening the crate root docs with `(<name>, <source>)` | `check / standalone` |
+| register names | a register offset ends `_REGISTER`, in an inline `mod registers` or a file such as `src/registers.rs`; a mask of several bits ends `_MASK`; a register, field or bit constant is spelled out, with the source's spelling in `#[doc(alias)]`; an address in memory is `_VIRTUAL_ADDRESS` or `_PHYSICAL_ADDRESS` (a relative, logical or block address is not one); a size, length or limit carries its unit (`helpers/register_names.py`); ceiling 0, no baseline | `check / standalone` |
 | American spelling | no name the crate defines holds a British form (an `our` ending for `or`, an `ise` ending for `ize`, a doubled `l` before `ed`); the forms are `[british]` and the three stem families in `helpers/naming_words.toml`; ceiling 0 | `check / standalone` |
 | no Unix service model | no name holds `daemon` or ends in a lone `d` component; a crate or program name of four or more characters does not end in `d`; the word `daemon` appears in no tracked text; ceiling 0 | `check / standalone` |
 | contract crates | a package or program name does not end in `proto` or `protocol` (spell it `_contract`) nor glue `contract` on (`fscontract`); ceiling 0 | `check / standalone` |
@@ -193,7 +193,7 @@ into components the same way. It reports every component that is not one of thes
 
 `[abbreviations]` in the same file names dictionary words that a name still spells out (`err`,
 `info`). The check skips a name kept from a datasheet, a specification or the standard library in
-the form `helpers/rust_names.py` describes. Each finding reads
+the form `helpers/rust_names.py` describes; it never skips an integer constant, which is never kept. Each finding reads
 `file:line: name: component 'val' is not a word (did you mean 'value'?)`, followed by a count per
 file and a total.
 
