@@ -202,6 +202,21 @@ the job summary; it never fails on a finding. It fails only on a malformed confi
 accepted word without a reason. The check reads `.github/abbreviations-ceiling`, one number, and
 compares the total with it; nothing enforces it yet.
 
+## The README reports
+
+Three checks read a crate's two front pages, the README and the crate root's `//!` doc comment
+(`helpers/readme_documents.py`). Each writes its findings to the job summary and never fails on one:
+
+- `helpers/readme_acronyms.py`: an acronym used before the page defines it, in parentheses, in the
+  same sentence or in Title Case earlier, unless an accepted word allows it. It reads headings and
+  forms the acronym gate skips (`exFAT`).
+- `helpers/inflated_wording.py`: the phrases in `helpers/inflated_wording.toml`, each with its plain
+  replacement. An entry no crate uses any more can move to `helpers/prose_figures.toml`, which fails.
+- `helpers/readme_sections.py`: the README's sections in the one order its header states, which
+  `scaffold/README-crate.md` and `sample/README.md` follow.
+
+Each reports against its own ceiling file under `.github/`, named in its header.
+
 ## How Kani moves
 
 `.kani-version` holds the one exact kani-verifier version that `proofs.yml` installs. Every

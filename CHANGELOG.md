@@ -6,6 +6,15 @@ call that sits behind the newest release.
 
 ## Unreleased
 
+- Three report-only README checks in `check / standalone`, which write their findings to the job
+  summary and fail only on a malformed configuration. `helpers/readme_acronyms.py` lists an acronym
+  that the README or the crate root's doc comment uses before the text defines it.
+  `helpers/inflated_wording.py` lists the rhetorical or inflated phrases in
+  `helpers/inflated_wording.toml`, each with its plain replacement. `helpers/readme_sections.py`
+  lists a README whose sections leave the shared order: title and summary, `What it does`,
+  `EXAMPLES`, `What is proven`, the crate's own sections, `BUGS`, `How it differs from`,
+  `Minimum Rust version`, `License`. Each reads its own ceiling file under `.github/` and reports
+  against it without enforcing it. `scaffold/README-crate.md` and `sample/README.md` follow the order.
 - `helpers/abbreviations.py`, a report-only check. It lists every component of a name the crate
   defines that is not a word. A word is an English word (Spell Checker Oriented Word Lists (SCOWL),
   bundled as `helpers/english_words.txt`), a technical word (`helpers/technical_words.txt`), an

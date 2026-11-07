@@ -332,6 +332,21 @@ jobs:
           # shellcheck disable=SC2086
           python3 .crate-workflows/helpers/abbreviations.py --manifest "$MANIFEST" \
             --summary "$GITHUB_STEP_SUMMARY" $rs
+      # Three README checks, over the README and the crate root's doc comment: an acronym used before
+      # the text defines it (helpers/readme_acronyms.py), rhetorical or inflated wording from
+      # helpers/inflated_wording.toml (helpers/inflated_wording.py), and the README's sections in
+      # the one order every crate shares (helpers/readme_sections.py). REPORT ONLY, as the
+      # abbreviations step: findings go to the job summary and the log, and the step fails only on a
+      # malformed configuration. Each reads its own ceiling file under .github/ and reports against
+      # it without enforcing it.
+      - name: README acronyms, wording and section order (report only, in the job summary)
+        run: |
+          set -e
+          crate_dir=$(dirname "$MANIFEST")
+          for check in readme_acronyms inflated_wording readme_sections; do
+            python3 ".crate-workflows/helpers/$check.py" --crate-dir "$crate_dir" \
+              --summary "$GITHUB_STEP_SUMMARY"
+          done
       # House style is American spelling, and typos with the en-us locale is the tool that knows the
       # misspellings and the locale both. The tool is installed by taiki-e/install-action at an
       # exact version, which checks the release archive against the checksum its manifest holds at
