@@ -15,7 +15,8 @@ parameters, locals, constants, test and proof harness names, file names, and the
 `--manifest`), split into components at `_`, at digits and at CamelCase boundaries, in lowercase.
 Comments, strings and `#[doc(alias)]` strings are never read. A name kept from its source in the
 form rust_names.py describes (`(<name>, <source>)` in its doc comment, plus `#[doc(alias)]`) is
-skipped whole.
+skipped whole; an integer constant is never kept, so a register, bit or command constant is always
+read.
 
 **What counts as a word.** A component passes when it is one of these:
 
@@ -305,9 +306,12 @@ pub fn kani_proof(id: u32, pci_len: usize) { let val = 0; let cnt = 1; let idx =
 pub fn walk() { for item in iter_slots() { let lba_first = 0; let mutexes = 1; } }
 /// The number of generations a slot has seen.
 pub const GENS_SEEN: u32 = 0;
-/// **Receive Descriptor Tail** (RDT, Intel 82574 datasheet, section 10.2.5.9).
+/// **Receive Descriptor Tail** (Rdt, Intel 82574 datasheet, section 10.2.5.9).
 #[doc(alias = "receive descriptor tail")]
-pub const RDT: u32 = 0x2818;
+pub struct Rdt;
+/// **ACMD41, SD send operation conditions** (SD_SEND_OP_COND, the SD specification).
+#[doc(alias = "SD send operation conditions")]
+pub const SD_SEND_OP_COND: u8 = 41;
 // let tmp = 1; is a comment
 pub fn quoted() { let s = "ctx"; let i = 0; let x2 = 0; }
 '''
@@ -317,7 +321,8 @@ pub fn quoted() { let s = "ctx"; let i = 0; let x2 = 0; }
         got = [(name, part, hint) for _, _, name, part, hint in
                findings('x.rs', found, vocabulary, crate_words)]
         want = [('gens', 'gens', 'generations'), ('val', 'val', 'value'), ('cnt', 'cnt', 'count'),
-                ('idx', 'idx', 'index'), ('GENS_SEEN', 'gens', 'generations')]
+                ('idx', 'idx', 'index'), ('GENS_SEEN', 'gens', 'generations'),
+                ('SD_SEND_OP_COND', 'op', 'operation'), ('SD_SEND_OP_COND', 'cond', None)]
         if got != want:
             failed.append(f'findings {got}, wanted {want}')
         for word in ('slot', 'kani', 'generation', 'id', 'pci', 'len', 'iter', 'lba', 'mutexes'):

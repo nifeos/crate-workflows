@@ -6,6 +6,27 @@ call that sits behind the newest release.
 
 ## Unreleased
 
+- An integer constant is never kept from its source. `helpers/rust_names.py` no longer exempts a
+  `const` or `static` of an integer type whose doc comment opens with `(<name>, <source>)` and that
+  carries `#[doc(alias)]`. `helpers/spelled_out.py`, `unit_symbols.py` and `abbreviations.py` now
+  judge it. A register, bit or command constant takes the spelled-out name: `SD_SEND_OP_COND` fails,
+  and `SD_SEND_OPERATION_CONDITIONS` carries the source spelling as its alias.
+- `helpers/register_names.py` reads a file named for registers (`src/registers.rs`,
+  `src/registers/mod.rs`, a file under `src/registers/`) as a register module, as it already read an
+  inline `mod registers`. A constant there with a plain integer value ends `_REGISTER`; a bit is
+  written as a shift (`1 << 0`).
+- The address rule reads fewer things that are not memory locations: `relative`, `block` and
+  `logical` join `[address_qualifiers]`, a qualifier other than `virtual` or `physical` may stand
+  one word back (`RELATIVE_CARD_ADDRESS`), and `address` as a verb (`can_address_blocks`,
+  `address_and_select`) is not read. The new tables are `[address_verb_before]` and
+  `[address_verb_after]` in `helpers/naming_words.toml`.
+- Rule 5's source citation needs a source after the comma: a word from the new `[source_words]`
+  table (`OpenBSD`, `databook`, `specification`), a file name or a section number. "(`FBE`, `DU` or
+  `CES`)" no longer reads as one.
+- Two literal readings no longer fail a correct name. `INTERRUPT_MASK_REGISTER`, a register named
+  for the mask it holds, passes the mask rule. An integer constant whose first word is in the new
+  `[command_verbs]` table (`SET_BLOCK_LENGTH`, a command) is not read by the size rule.
+
 - Three report-only README checks in `check / standalone`, which write their findings to the job
   summary and fail only on a malformed configuration. `helpers/readme_acronyms.py` lists an acronym
   that the README or the crate root's doc comment uses before the text defines it.
