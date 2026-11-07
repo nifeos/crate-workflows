@@ -6,6 +6,11 @@ call that sits behind the newest release.
 
 ## Unreleased
 
+- `label / label` rule 2 no longer dies on `An object with id ... could not be found` when it clones
+  the baseline tag. The labeler checks out with `filter: blob:none`, so the release's files were not
+  on disk, and cargo-semver-checks clones the checkout locally, where a missing file cannot be
+  fetched. `helpers/semver-run.sh` now reads the baseline tag's files first, which fetches them in
+  one batch. The semver selftest covers a blobless clone. The rule is not weakened.
 - Compiled Python files (`helpers/__pycache__/*.pyc`, built by one interpreter version) are no longer
   tracked, and `.gitignore` now ignores `__pycache__/` and `*.pyc`. Nothing read them; the helpers
   run from their `.py` sources.

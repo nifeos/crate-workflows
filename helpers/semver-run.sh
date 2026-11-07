@@ -14,7 +14,9 @@
 # also copied to semver.err for the callers' failure paths; the exit status of the tool is swallowed here on purpose,
 # because a finding is the caller's to judge (helpers/semver_major.py), and this script says so on
 # stderr. The baseline chosen goes to stdout as `baseline: <tag>`, or `baseline: last published`.
-# Needs full history with tags (checkout fetch-depth 0).
+# Needs full history with tags (checkout fetch-depth 0). A blobless checkout (`filter: blob:none`)
+# is fine: the baseline's files are fetched here first, because cargo-semver-checks clones the
+# checkout locally and a local clone cannot fetch a file the checkout lacks.
 
 set -u
 
@@ -26,6 +28,12 @@ here="$(dirname "$0")"
 tag=""
 if tag="$(python3 "$here/semver_baseline.py" --ref "$ref")"; then
 	echo "baseline: $tag"
+	# Reading every file of the tag fetches the missing ones in one batch; a full clone has them.
+	top="$(git -C "$(dirname "$manifest")" rev-parse --show-toplevel)" || exit 1
+	git -C "$top" archive "$tag" >/dev/null || {
+		echo "semver-run: could not read the files of $tag" >&2
+		exit 1
+	}
 	cargo semver-checks --manifest-path "$manifest" --baseline-rev "$tag" --color never >"$report" 2>&1
 else
 	rc=$?
