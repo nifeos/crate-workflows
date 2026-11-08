@@ -19,7 +19,7 @@ blank line, then the summary. Markdown joins the lines into one row.
 | `check` | the caller of `check.yml`, its Actions badge on `main` | that workflow's runs on `main` | required |
 | `proofs` | the caller of `proofs.yml`, the same | the same | required |
 | `license` | `img.shields.io/badge/license-<license>-blue.svg` | the README's `## License` | required |
-| `minimum Rust version` | `img.shields.io/badge/rust-<rust-version>%2B-blue.svg` | `## Minimum Rust version` | required |
+| `minimum Rust version` | `img.shields.io/badge/rust-<rust-version>%2B-blue.svg` | the crate's `Cargo.toml` on `main` | required |
 
 **What it reads.** The README at the crate root; the crate's `Cargo.toml` (`name`, `license`,
 `rust-version`); and the workflows under `--workflows-dir`, to find which file calls the shared
@@ -86,7 +86,7 @@ def callers(workflows_dir, reusable):
                   if p.is_file() and call.search(p.read_text(encoding='utf-8', errors='replace')))
 
 
-def expected(repository, name, license_, rust_version, check_files, proofs_files):
+def expected(repository, name, license_, rust_version, check_files, proofs_files, manifest_path='Cargo.toml'):
     """{alt: [(image, link)]}: every form this repository's row may take for each badge."""
     site = f'https://github.com/{repository}'
     out = {
@@ -95,7 +95,7 @@ def expected(repository, name, license_, rust_version, check_files, proofs_files
         'license': [(f'https://img.shields.io/badge/license-{shields(license_ or "")}-blue.svg',
                      f'{site}#license')],
         'minimum Rust version': [(f'https://img.shields.io/badge/rust-{shields(rust_version or "")}%2B-blue.svg',
-                                  f'{site}#minimum-rust-version')],
+                                  f'{site}/blob/main/{manifest_path}')],
     }
     for alt, files in (('check', check_files), ('proofs', proofs_files)):
         out[alt] = [(f'{site}/actions/workflows/{f}/badge.svg?branch=main',
@@ -125,7 +125,8 @@ def row_of(text):
     return title, row, outside
 
 
-def findings(text, manifest, repository, check_files, proofs_files, published='unknown', published_only=False):
+def findings(text, manifest, repository, check_files, proofs_files, published='unknown', published_only=False,
+             manifest_path='Cargo.toml'):
     """[(line, message)] for one README; `manifest` is the parsed `[package]` table."""
     name = manifest.get('name')
     license_ = manifest.get('license')
@@ -153,7 +154,7 @@ def findings(text, manifest, repository, check_files, proofs_files, published='u
             out.append((title + 1, 'the crate is on crates.io: add the crates.io and docs.rs badges '
                                    '(readme_badges.py --add-published)'))
         return sorted(out)
-    forms = expected(repository or '', name or '', license_, rust_version, check_files, proofs_files)
+    forms = expected(repository or '', name or '', license_, rust_version, check_files, proofs_files, manifest_path)
     seen, last = {}, -1
     for line, alt, image, link in row:
         if published_only and alt not in PUBLISHED:
@@ -225,6 +226,13 @@ def read_manifest(crate_dir):
         raise Unreadable(f'{path}: {error}') from error
 
 
+def manifest_link(crate_dir):
+    """The manifest's path in the repository, from the checkout root; a crate directory outside the
+    checkout (a fixture) is linked as a manifest at the root."""
+    path = Path(os.path.relpath(Path(crate_dir, 'Cargo.toml'))).as_posix()
+    return 'Cargo.toml' if path.startswith('../') else path
+
+
 def repository_of(given, manifest):
     if given:
         return given
@@ -277,7 +285,7 @@ def run(argv, lookup=None):
             return 2
     found = findings(text, manifest, repository_of(args.repository, manifest),
                      callers(args.workflows_dir, 'check.yml'), callers(args.workflows_dir, 'proofs.yml'),
-                     published, args.published_only)
+                     published, args.published_only, manifest_link(args.crate_dir))
     lines = [f'{readme}:{n}: {message}' for n, message in found]
     mode = ' (report only)' if args.report_only else ''
     lines.append(f'{LABEL}: {len(found)} badge-row findings{mode}; crates.io: {published}')
@@ -296,7 +304,7 @@ MANIFEST = {'name': 'example', 'license': 'MIT OR Apache-2.0', 'rust-version': '
 ROW = f'''[![check]({SITE}/actions/workflows/ci.yml/badge.svg?branch=main)]({SITE}/actions/workflows/ci.yml?query=branch%3Amain)
 [![proofs]({SITE}/actions/workflows/proofs.yml/badge.svg?branch=main)]({SITE}/actions/workflows/proofs.yml?query=branch%3Amain)
 [![license](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)]({SITE}#license)
-[![minimum Rust version](https://img.shields.io/badge/rust-1.88%2B-blue.svg)]({SITE}#minimum-rust-version)
+[![minimum Rust version](https://img.shields.io/badge/rust-1.88%2B-blue.svg)]({SITE}/blob/main/Cargo.toml)
 '''
 PAIR = '''[![crates.io](https://img.shields.io/crates/v/example.svg)](https://crates.io/crates/example)
 [![docs.rs](https://img.shields.io/docsrs/example)](https://docs.rs/example)
@@ -343,6 +351,9 @@ def selftest():
     expect('published-only, no row', GOOD.replace(ROW, ''), ['the crate is on crates.io'], published='yes', only=True)
     expect('no rust-version', GOOD, ['Cargo.toml has no `rust-version`', 'the minimum Rust version badge says'],
            manifest={k: v for k, v in MANIFEST.items() if k != 'rust-version'})
+    if [m for _, m in findings(GOOD.replace('main/Cargo.toml', 'main/sub/Cargo.toml'), MANIFEST, REPO, ['ci.yml'],
+                               ['proofs.yml'], manifest_path='sub/Cargo.toml')]:
+        failed.append('a crate below the root does not link its own manifest')
     if add_published(GOOD, 'example') != GOOD.replace(ROW, PAIR + ROW):
         failed.append('add_published does not put the pair at the head of the row')
     if add_published(GOOD.replace(ROW, PAIR + ROW), 'example') != GOOD.replace(ROW, PAIR + ROW):
