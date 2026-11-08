@@ -325,7 +325,8 @@ pub fn quoted() { let s = "ctx"; let i = 0; let x2 = 0; }
                 ('SD_SEND_OP_COND', 'op', 'operation'), ('SD_SEND_OP_COND', 'cond', None)]
         if got != want:
             failed.append(f'findings {got}, wanted {want}')
-        for word in ('slot', 'kani', 'generation', 'id', 'pci', 'len', 'iter', 'lba', 'mutexes'):
+        for word in ('slot', 'kani', 'generation', 'id', 'pci', 'crc', 'len', 'iter', 'lba',
+                     'mutexes'):
             if not vocabulary.is_word(word):
                 failed.append(f'{word} is reported, and it is a word')
         if vocabulary.is_word('err') or vocabulary.suggest('err', set()) != 'error':

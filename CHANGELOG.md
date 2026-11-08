@@ -6,6 +6,9 @@ call that sits behind the newest release.
 
 ## Unreleased
 
+- `crc` is an accepted word in `helpers/naming_words.toml`: nobody says cyclic redundancy check
+  (CRC) in a name, so `abbreviations.py` passes `has_crc` and `CRC_BYTES`. Prose still expands CRC
+  at its first use.
 - An integer constant is never kept from its source. `helpers/rust_names.py` no longer exempts a
   `const` or `static` of an integer type whose doc comment opens with `(<name>, <source>)` and that
   carries `#[doc(alias)]`. `helpers/spelled_out.py`, `unit_symbols.py` and `abbreviations.py` now
