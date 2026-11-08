@@ -1,0 +1,18 @@
+{
+  "why": "A green unchanged run at the released commit, pointing at a green full run of the same fingerprint.",
+  "sha_runs": [
+    {
+      "id": 901,
+      "record": "unchanged aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa since run 800"
+    }
+  ],
+  "sources": [
+    {
+      "id": 800,
+      "conclusion": "success",
+      "path": ".github/workflows/mutation.yml",
+      "record": "full aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  ],
+  "expect": true
+}

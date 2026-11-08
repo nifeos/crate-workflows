@@ -1,0 +1,10 @@
+{
+  "why": "A repeat tested nothing: refused.",
+  "sha_runs": [
+    {
+      "id": 903,
+      "record": "repeat since run 900"
+    }
+  ],
+  "expect": false
+}

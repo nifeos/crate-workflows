@@ -1,0 +1,18 @@
+{
+  "why": "The run it points at tested another fingerprint: refused.",
+  "sha_runs": [
+    {
+      "id": 901,
+      "record": "unchanged aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa since run 800"
+    }
+  ],
+  "sources": [
+    {
+      "id": 800,
+      "conclusion": "success",
+      "path": ".github/workflows/mutation.yml",
+      "record": "full bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    }
+  ],
+  "expect": false
+}

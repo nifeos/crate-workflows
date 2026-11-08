@@ -6,6 +6,7 @@
     python3 mutation_plan.py fingerprint --crate-dir DIR --template-dir DIR
     python3 mutation_plan.py compare --event E --repository OWNER/NAME --workflow-ref REF
         --branch B --run-id N --now ISO-8601 --fingerprint HEX [--skip-unchanged B]
+    python3 mutation_plan.py verify OWNER/NAME SHA [--workflow mutation.yml]
     python3 mutation_plan.py --selftest
 
 THE WEEKDAY. Each repository runs on its own weekday, derived from its name alone (the part after
@@ -43,6 +44,11 @@ skipped past: the next run tests everything again until a green one exists. On a
 earlier scheduled run the same UTC day that recorded `full` or `unchanged` makes this one a
 `repeat`, so the later tries of the day cost seconds even after a red run. Only the branch's
 newest 30 runs are read, so an unchanged tree is tested again about every ten weeks.
+
+THE RELEASE GATE. `verify` passes when a green run of the mutation workflow at exactly the released
+commit recorded `full`, or recorded `unchanged <fingerprint> since run N` where run N is a green
+run of the same workflow whose record is `full` with that same fingerprint. A `deferred` or
+`repeat` run tested nothing and never counts, and neither does a red run, whatever it recorded.
 """
 
 import argparse
@@ -223,6 +229,30 @@ def history(repository, workflow_ref, branch):
             for run in listing.get('workflow_runs', [])]
 
 
+def verify(sha_runs, fetch_run, workflow_path):
+    """(ok, message). `sha_runs` are the workflow's green runs at the released commit, each with
+    `id` and `record`; `fetch_run(n)` returns run n as {id, conclusion, path, record}, or None."""
+    for run in sha_runs:
+        text = run['record']() if callable(run.get('record')) else run.get('record')
+        record = parse_record(text)
+        if not record:
+            continue
+        if record[0] == 'full':
+            return True, 'run %d tested every mutant at this commit and was green' % run['id']
+        if record[0] != 'unchanged':
+            continue
+        source = fetch_run(record[2])
+        if not source:
+            continue
+        src = parse_record(source.get('record'))
+        if (source.get('conclusion') == 'success' and source.get('path') == workflow_path
+                and src and src[0] == 'full' and src[1] == record[1]):
+            return True, ('run %d found this commit unchanged since run %d, a green full run of '
+                          'the same fingerprint' % (run['id'], source['id']))
+    return False, ('no green full mutation run at this commit, and no green unchanged run pointing '
+                   'at a green full run of the same fingerprint')
+
+
 def emit(outputs, message, notice=True):
     """Write step outputs to GITHUB_OUTPUT (or stdout) and the message to the log and summary."""
     target = os.environ.get('GITHUB_OUTPUT')
@@ -266,7 +296,13 @@ def main(argv):
     c.add_argument('--run-id', required=True, type=int)
     c.add_argument('--now', required=True, type=parse_now)
     c.add_argument('--skip-unchanged', type=flag, default=True)
+    v = sub.add_parser('verify')
+    v.add_argument('repository')
+    v.add_argument('sha')
+    v.add_argument('--workflow', default='mutation.yml')
     a = p.parse_args(argv[1:])
+    if a.command == 'verify':
+        return verify_live(a.repository, a.sha, a.workflow)
     if a.command == 'schedule':
         print(cron_line(a.repository))
         return 0
@@ -288,6 +324,30 @@ def main(argv):
     mode, record, message = compare(a.event, a.now, a.fingerprint, runs, a.run_id, a.skip_unchanged)
     emit({'mode': mode, 'record': record}, message, notice=mode != 'full')
     return 0
+
+
+def verify_live(repository, sha, workflow):
+    try:
+        listing = gh_json('repos/%s/actions/workflows/%s/runs?head_sha=%s&status=success&per_page=100'
+                          % (repository, workflow, sha))
+    except subprocess.CalledProcessError as e:
+        print('release-gate: %s: the runs could not be read (%s); the repository needs the caller '
+              '.github/workflows/%s' % (workflow, (e.stderr or '').strip(), workflow), file=sys.stderr)
+        return 1
+    sha_runs = [{'id': r['id'], 'record': (lambda rid=r['id']: run_record(repository, rid))}
+                for r in listing.get('workflow_runs', []) if r.get('conclusion') == 'success']
+
+    def fetch_run(n):
+        try:
+            run = gh_json('repos/%s/actions/runs/%d' % (repository, n))
+        except subprocess.CalledProcessError:
+            return None
+        return {'id': n, 'conclusion': run.get('conclusion'), 'path': run.get('path'),
+                'record': run_record(repository, n)}
+
+    ok, message = verify(sha_runs, fetch_run, '.github/workflows/%s' % workflow)
+    print('release-gate: %s: %s' % (workflow, message), file=sys.stdout if ok else sys.stderr)
+    return 0 if ok else 1
 
 
 def selftest():
@@ -317,6 +377,15 @@ def selftest():
             record = 'deferred' if mode == 'deferred' else None
         expect('%s: mode' % path.stem, mode, case['expect']['mode'])
         expect('%s: record' % path.stem, record, case['expect'].get('record'))
+
+    # The release gate's cases: the green runs at the released commit, the runs they point at.
+    releases = sorted((fixtures / 'release').glob('*.json'))
+    expect('release cases', len(releases) >= 5, True)
+    for path in releases:
+        case = json.loads(path.read_text())
+        sources = {r['id']: r for r in case.get('sources', [])}
+        ok_, _ = verify(case['sha_runs'], sources.get, '.github/workflows/mutation.yml')
+        expect('release %s' % path.stem, ok_, case['expect'])
 
     expect('cron line', cron_line('nifeos/example_thing'), '9 8,10,12 * * 0')
     expect('name only, any case', cron_line('Example_Thing'), cron_line('other/example_thing'))

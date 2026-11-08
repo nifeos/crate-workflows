@@ -1,0 +1,10 @@
+{
+  "why": "A deferred run tested nothing: refused.",
+  "sha_runs": [
+    {
+      "id": 902,
+      "record": "deferred"
+    }
+  ],
+  "expect": false
+}

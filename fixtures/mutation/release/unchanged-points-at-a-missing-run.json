@@ -1,0 +1,11 @@
+{
+  "why": "The run it points at no longer exists: refused.",
+  "sha_runs": [
+    {
+      "id": 901,
+      "record": "unchanged aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa since run 800"
+    }
+  ],
+  "sources": [],
+  "expect": false
+}

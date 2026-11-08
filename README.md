@@ -105,7 +105,8 @@ repository may pin.
 `release.yml` runs on a dispatch naming a version. `gate` refuses while `docs/stranger-test.md`
 reads `Last run: none`, because a stranger-test run must be on record before the first release. It
 also refuses unless the check and proof runs for that exact commit are green, so a tag whose proof
-job is red never gets made. `tag` creates
+job is red never gets made, and unless a green `mutation.yml` run there tested every mutant or found
+the tree unchanged since a green full run. `tag` creates
 `v<version>` on that commit, refusing a version that does not match the manifest or a tag that
 already exists. `publish` runs last, in the `crates-io` environment (a person approves), gets
 `id-token: write` and nothing else, and exchanges the OpenID Connect (OIDC) token for a temporary crates.io token
