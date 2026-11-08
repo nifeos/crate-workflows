@@ -63,6 +63,11 @@ of a name that is not an English, technical or accepted word. A word joins
 `helpers/technical_words.txt` when engineers say it whole, and `[accepted]` when nobody says its
 expansion; either change keeps its selftest green.
 
+The README's badge row is held by `helpers/readme_badges.py` in `check / standalone` (report only
+until every crate repository carries the row, then a failure) and by `weekly / crates.io badges`
+for the crates.io and docs.rs pair. A change to the row changes `scaffold/README-crate.md`,
+`sample/README.md` and the helper's header together.
+
 Three README reports run beside it, also never a failure: `helpers/readme_acronyms.py` (an acronym
 used before the README or the crate root's doc comment defines it), `helpers/inflated_wording.py`
 (the phrases in `helpers/inflated_wording.toml`) and `helpers/readme_sections.py` (the section order
