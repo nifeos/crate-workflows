@@ -6,6 +6,16 @@ call that sits behind the newest release.
 
 ## Unreleased
 
+- A crate README opens with a badge row under its title: check and proofs status, license and
+  minimum Rust version. `scaffold/README-crate.md` carries it. The new `helpers/readme_badges.py`
+  holds the row in `check / standalone`, report only for now. Each badge takes its one form, with
+  images only from the repository's own Actions badges and img.shields.io and links only into the
+  repository. The minimum-Rust-version badge equals `rust-version`. The new `weekly / crates.io
+  badges` job fails when a published crate lacks the crates.io and docs.rs badges, or an
+  unpublished one carries them. `readme_badges.py --add-published` writes the pair after the first
+  publish.
+- The prose and README checks read a line of nothing but badges as no prose, so a badge's alt text
+  is not an acronym, an inflated phrase or the summary paragraph.
 - `crc` is an accepted word in `helpers/naming_words.toml`: nobody says cyclic redundancy check
   (CRC) in a name, so `abbreviations.py` passes `has_crc` and `CRC_BYTES`. Prose still expands CRC
   at its first use.
