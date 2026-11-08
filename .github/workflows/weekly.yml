@@ -218,6 +218,33 @@ jobs:
         if: always()
         run: python3 .crate-workflows/helpers/job_budget.py check "${{ github.job }}" "$JOB_STARTED_AT"
 
+  # crates.io and docs.rs answer "not found" for a crate that was never published, so their two
+  # badges wait for the first publish (helpers/readme_badges.py --add-published writes them). This
+  # job asks crates.io whether the crate exists and fails when the README's badge row disagrees:
+  # published without the pair, or the pair without a publish. A failed lookup is a red job, not a
+  # guess. It runs here rather than in check because it needs the network.
+  crates-io-badges:
+    name: crates.io badges
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: clock
+        run: echo "JOB_STARTED_AT=$(date +%s)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: .crate-workflows
+          persist-credentials: false
+      - run: |
+          python3 .crate-workflows/helpers/readme_badges.py --crate-dir "$(dirname "$MANIFEST")" \
+            --repository "$GITHUB_REPOSITORY" --published lookup --published-only \
+            --summary "$GITHUB_STEP_SUMMARY"
+      - name: budget
+        if: always()
+        run: python3 .crate-workflows/helpers/job_budget.py check "${{ github.job }}" "$JOB_STARTED_AT"
+
   # The release's whole claim is that a stranger can build and prove the crate from its README
   # alone. The run itself needs a person; this job fails when one is overdue, measured from the
   # last recorded run in docs/stranger-test.md.

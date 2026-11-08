@@ -15,6 +15,21 @@ call that sits behind the newest release.
 - `helpers/mutants_gate.py --diff` judges a run over changed lines (`cargo mutants --in-diff`): an
   exemption that names no survivor in it is out of the run's reach, not stale, so the stale check
   is skipped. A survivor or timeout that is not exempted still fails.
+- A crate README opens with a badge row under its title: check and proofs status, license and
+  minimum Rust version. `scaffold/README-crate.md` carries it. The new `helpers/readme_badges.py`
+  holds the row in `check / standalone`, report only for now. Each badge takes its one form, with
+  images only from the repository's own Actions badges and img.shields.io and links only into the
+  repository. The minimum-Rust-version badge equals `rust-version`. The new `weekly / crates.io
+  badges` job fails when a published crate lacks the crates.io and docs.rs badges, or an
+  unpublished one carries them. `readme_badges.py --add-published` writes the pair after the first
+  publish.
+- The prose and README checks read a line of nothing but badges as no prose, so a badge's alt text
+  is not an acronym, an inflated phrase or the summary paragraph.
+- `helpers/falsify.py` asks Kani for a harness inside an inline module by its full path. A
+  `#[kani::proof]` in `#[cfg(kani)] mod verification { ... }` is `verification::<name>` after the
+  file's own module path, so the replay no longer reports "no Kani verdict line" for it. Braces,
+  comments, strings and `mod x;` declarations are read so that only an enclosing `mod name {` counts.
+  Which records pass or fail is otherwise unchanged.
 - `crc` is an accepted word in `helpers/naming_words.toml`: nobody says cyclic redundancy check
   (CRC) in a name, so `abbreviations.py` passes `has_crc` and `CRC_BYTES`. Prose still expands CRC
   at its first use.
