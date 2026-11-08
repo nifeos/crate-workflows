@@ -8,7 +8,7 @@ call that sits behind the newest release.
 
 - A crate README opens with a badge row under its title: check and proofs status, license and
   minimum Rust version. `scaffold/README-crate.md` carries it. The new `helpers/readme_badges.py`
-  holds the row in `check / standalone`, report only for now. Each badge takes its one form, with
+  holds the row in `check / standalone`, and a finding fails it. Each badge takes its one form, with
   images only from the repository's own Actions badges and img.shields.io and links only into the
   repository. The minimum-Rust-version badge equals `rust-version`. The new `weekly / crates.io
   badges` job fails when a published crate lacks the crates.io and docs.rs badges, or an
