@@ -7,9 +7,9 @@
 #
 # The release workflow calls this before it tags anything. A crate must have a stranger-test run on
 # record before its first release (ruled 2026-11-01 UTC), and a new repository starts at
-# 'Last run: none', which script/stranger-due, the weekly cadence check, does not complain about
-# until a date exists to age. This script only asks that a dated line exists; how old it is stays
-# the weekly job's question, so a new repository is not red for being new. A missing file or a
+# 'Last run: none'. script/stranger-due, the weekly cadence check, also fails closed on 'none', so
+# a new repository's weekly run is red until its first stranger run is recorded. This script only
+# asks that a dated line exists; how old it is stays the weekly job's question. A missing file or a
 # line that is not 'Last run: YYYY-MM-DD' fails closed.
 
 set -eu
