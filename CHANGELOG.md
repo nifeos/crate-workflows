@@ -6,6 +6,9 @@ call that sits behind the newest release.
 
 ## Unreleased
 
+- `bus` joins `[address_qualifiers]`, so a bus address (`SYSTEM_MANAGEMENT_BUS_ADDRESS`) passes the
+  address rule of `register_names.py`. Its selftest checks that such a name passes and fails when
+  the word is removed.
 - A crate README opens with a badge row under its title: check and proofs status, license and
   minimum Rust version. `scaffold/README-crate.md` carries it. The new `helpers/readme_badges.py`
   holds the row in `check / standalone`, and a finding fails it. Each badge takes its one form, with
