@@ -6,6 +6,11 @@ call that sits behind the newest release.
 
 ## Unreleased
 
+- `helpers/falsify.py` asks Kani for a harness inside an inline module by its full path. A
+  `#[kani::proof]` in `#[cfg(kani)] mod verification { ... }` is `verification::<name>` after the
+  file's own module path, so the replay no longer reports "no Kani verdict line" for it. Braces,
+  comments, strings and `mod x;` declarations are read so that only an enclosing `mod name {` counts.
+  Which records pass or fail is otherwise unchanged.
 - `crc` is an accepted word in `helpers/naming_words.toml`: nobody says cyclic redundancy check
   (CRC) in a name, so `abbreviations.py` passes `has_crc` and `CRC_BYTES`. Prose still expands CRC
   at its first use.
