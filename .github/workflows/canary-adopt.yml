@@ -1,7 +1,7 @@
 # The canary's release ritual, opened by machine: after each template release, one pull request on
 # nifeos/crate-workflows-test moves every caller to the release's commit, copied from that
 # release's scaffold/caller-workflows with the pin filled in, so the canary runs exactly what a
-# crate would adopt. A person still reads the nine required checks and merges; nothing here merges.
+# crate would adopt. A person still reads the ten required checks and merges; nothing here merges.
 #
 # Provisional name, for calef's naming pass, like the rest of this repository.
 
@@ -116,7 +116,7 @@ jobs:
             "" \
             "Release notes: $RELEASE_URL" \
             "" \
-            "Merge when the nine required checks are green. A release whose notes rename a required check also needs \`script/apply-settings\` from that release before this can merge.")"
+            "Merge when the ten required checks are green. A release whose notes rename a required check also needs \`script/apply-settings\` from that release before this can merge.")"
           git config user.name 'nife-smelter[bot]'
           git config user.email 'nife-smelter[bot]@users.noreply.github.com'
           git switch -C "$branch"

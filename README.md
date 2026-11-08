@@ -105,8 +105,8 @@ repository may pin.
 `release.yml` runs on a dispatch naming a version. `gate` refuses while `docs/stranger-test.md`
 reads `Last run: none`, because a stranger-test run must be on record before the first release. It
 also refuses unless the check and proof runs for that exact commit are green, so a tag whose proof
-job is red never gets made, and unless a green `mutation.yml` run there tested every mutant or found
-the tree unchanged since a green full run. `tag` creates
+job is red never gets made. A green `mutation.yml` run there must have tested every mutant, or
+found the tree unchanged since a green full run. `tag` creates
 `v<version>` on that commit, refusing a version that does not match the manifest or a tag that
 already exists. `publish` runs last, in the `crates-io` environment (a person approves), gets
 `id-token: write` and nothing else, and exchanges the OpenID Connect (OIDC) token for a temporary crates.io token
@@ -253,14 +253,14 @@ tree) lives in nife and stays there.
 
 ## Required checks
 
-The ruleset on `main` requires nine checks, with branches up to date: the six `check /` jobs (fmt,
-clippy, tests, coverage, standalone, supply-chain), the two `proofs /` jobs (kani, falsify), and
+The ruleset on `main` requires ten checks, with branches up to date: the seven `check /` jobs (fmt,
+clippy, tests, coverage, standalone, supply-chain, mutation-diff), the two `proofs /` jobs (kani, falsify), and
 the hold. The names are the caller's job id, a slash, and the reusable workflow's job name;
 `scaffold/` fixes the caller job ids so the two ends cannot drift.
 
 ```
 check / fmt, check / clippy, check / tests, check / coverage, check / standalone, check / supply-chain,
-proofs / kani, proofs / falsify, hold / architect hold
+check / mutation-diff, proofs / kani, proofs / falsify, hold / architect hold
 ```
 
 ## Adopting it for a crate
@@ -322,7 +322,7 @@ repository, with contents write.
 
 The canary repository `nifeos/crate-workflows-test` adopts every release before anything depends
 on one. The ritual after cutting a tag: open a pull request there that moves every caller's pin
-to the new release's commit, expect the nine required checks green, and merge it. A release is
+to the new release's commit, expect the ten required checks green, and merge it. A release is
 not depended on until the canary has adopted it, and a canary pin behind the newest release is
 the lag check's red, by design. The canary is also the configured repository `apply-settings` and
 `check-settings` run against, so the drift check always has a real repository to read.

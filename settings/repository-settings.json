@@ -110,6 +110,7 @@
             { "context": "check / coverage" },
             { "context": "check / standalone" },
             { "context": "check / supply-chain" },
+            { "context": "check / mutation-diff" },
             { "context": "proofs / kani" },
             { "context": "proofs / falsify" },
             { "context": "hold / architect hold" }
