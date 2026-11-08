@@ -1,0 +1,38 @@
+{
+  "why": "An unchanged run is never the source: the record names the green full run behind it.",
+  "repository": "nifeos/example_thing",
+  "event": "schedule",
+  "now": "2026-11-22T08:12:00Z",
+  "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "run_id": 1000,
+  "runs": [
+    {
+      "id": 900,
+      "status": "completed",
+      "conclusion": "success",
+      "event": "schedule",
+      "created_at": "2026-11-15T08:12:00Z",
+      "record": "unchanged aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa since run 800"
+    },
+    {
+      "id": 850,
+      "status": "completed",
+      "conclusion": "success",
+      "event": "schedule",
+      "created_at": "2026-11-12T19:00:00Z",
+      "record": "deferred"
+    },
+    {
+      "id": 800,
+      "status": "completed",
+      "conclusion": "success",
+      "event": "schedule",
+      "created_at": "2026-11-08T08:11:00Z",
+      "record": "full aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  ],
+  "expect": {
+    "mode": "unchanged",
+    "record": "unchanged aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa since run 800"
+  }
+}

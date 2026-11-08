@@ -1,0 +1,13 @@
+{
+  "why": "07:59 is outside the window too.",
+  "repository": "nifeos/example_thing",
+  "event": "schedule",
+  "now": "2026-11-15T07:59:00Z",
+  "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "run_id": 900,
+  "runs": [],
+  "expect": {
+    "mode": "deferred",
+    "record": "deferred"
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "why": "A deferred try earlier today tested nothing, so this try runs.",
+  "repository": "nifeos/example_thing",
+  "event": "schedule",
+  "now": "2026-11-15T10:12:00Z",
+  "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "run_id": 901,
+  "runs": [
+    {
+      "id": 900,
+      "status": "completed",
+      "conclusion": "success",
+      "event": "schedule",
+      "created_at": "2026-11-15T08:12:00Z",
+      "record": "deferred"
+    }
+  ],
+  "expect": {
+    "mode": "full",
+    "record": "full aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  }
+}
