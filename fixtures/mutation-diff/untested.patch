@@ -1,0 +1,12 @@
+diff --git a/sample/src/lib.rs b/sample/src/lib.rs
+--- a/sample/src/lib.rs
++++ b/sample/src/lib.rs
+@@ -36,3 +36,8 @@
+         assert_eq!(saturating_add_percent(0, 0), 0);
+     }
+ }
++
++/// Doubles a percentage, wrapping; no test pins it.
++pub fn double_percent(a: u8) -> u8 {
++    a.wrapping_mul(2)
++}
