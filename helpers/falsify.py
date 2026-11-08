@@ -66,11 +66,96 @@ def git_apply(root, patch_rel, mode):
     return subprocess.run(args, capture_output=True, text=True)
 
 
+def blank_non_code(text):
+    """text with comments, string literals and char literals blanked to spaces, newlines kept, so
+    offsets and line numbers still match and a brace or `mod` inside them is never read."""
+    out = list(text)
+    i, n = 0, len(text)
+
+    def blank(a, b):
+        for k in range(a, min(b, n)):
+            if out[k] != '\n':
+                out[k] = ' '
+
+    while i < n:
+        c = text[i]
+        if text.startswith('//', i):
+            j = text.find('\n', i)
+            j = n if j < 0 else j
+            blank(i, j)
+            i = j
+        elif text.startswith('/*', i):
+            depth, j = 1, i + 2
+            while j < n and depth:
+                if text.startswith('/*', j):
+                    depth, j = depth + 1, j + 2
+                elif text.startswith('*/', j):
+                    depth, j = depth - 1, j + 2
+                else:
+                    j += 1
+            blank(i, j)
+            i = j
+        elif c == 'r' and (i == 0 or not (text[i - 1].isalnum() or text[i - 1] == '_')) \
+                and re.match(r'r#*"', text[i:i + 40]):
+            hashes = len(re.match(r'r(#*)"', text[i:i + 40]).group(1))
+            end = text.find('"' + '#' * hashes, i + 2 + hashes)
+            j = n if end < 0 else end + 1 + hashes
+            blank(i, j)
+            i = j
+        elif c == '"':
+            j = i + 1
+            while j < n and text[j] != '"':
+                j += 2 if text[j] == '\\' else 1
+            blank(i, j + 1)
+            i = j + 1
+        elif c == "'":
+            m = re.match(r"'(?:\\[^']*|[^\\'])'", text[i:i + 12])
+            if m:
+                blank(i, i + m.end())
+                i += m.end()
+            else:
+                i += 1  # a lifetime
+        else:
+            i += 1
+    return ''.join(out)
+
+
+MOD_OPEN = re.compile(r'(?:^|[^\w])mod\s+(\w+)\s*$')
+
+
+def inline_modules(text):
+    """[(line index, [enclosing inline module names])] for every line of text, outermost first.
+
+    A `mod name {` pushes its name; any other `{` pushes nothing but is still matched by its `}`;
+    `mod name;` never opens a block and so is never pushed. The names in force at the start of
+    each line are what the harness on it sits inside.
+    """
+    code = blank_non_code(text)
+    stack, per_line, line = [], [], 0
+    per_line.append(list(n for n in stack if n))
+    for i, c in enumerate(code):
+        if c == '{':
+            m = MOD_OPEN.search(code[max(0, i - 200):i])
+            stack.append(m.group(1) if m else None)
+        elif c == '}':
+            if stack:
+                stack.pop()
+        elif c == '\n':
+            per_line.append([n for n in stack if n])
+    return per_line
+
+
 def records(root):
-    """[(file, line, fn, state, path, reason)] for every Kani harness under root."""
+    """[(file, line, fn, state, path, reason)] for every Kani harness under root.
+
+    fn is the harness name inside its file: the enclosing inline modules, then the function
+    (`verification::h`). The file's own module path is added in front when Kani is asked for it.
+    """
     out = []
     for f in sorted((root / 'src').rglob('*.rs')):
-        lines = f.read_text().splitlines()
+        source = f.read_text()
+        lines = source.splitlines()
+        nested = inline_modules(source)
         for n, raw in enumerate(lines):
             if ATTR not in raw:
                 continue
@@ -80,6 +165,8 @@ def records(root):
                 if m:
                     name = m.group(1)
                     break
+            if name is not None and n < len(nested) and nested[n]:
+                name = '::'.join(nested[n] + [name])
             if name is None:
                 out.append((f, n + 1, None, '', '', 'no fn follows the harness attribute'))
                 continue
@@ -274,6 +361,40 @@ fn check_add() {
             '/// Falsification: unfalsifiable, too short\n#[kani::proof]\nfn h() {}\n')
         recs = records(root)
         expect('short reason refused', check(root, recs), True)
+
+        def qualified(rel, text):
+            path = root / 'src' / rel
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(text)
+            rec = [r for r in records(root) if r[0] == path]
+            return [module_prefix(r[0], root) + r[2] for r in rec]
+
+        for stale in (root / 'src').rglob('*.rs'):
+            stale.unlink()
+        proof = '#[kani::proof]\nfn h() {}\n'
+        expect('root harness unchanged', qualified('lib.rs', proof), ['h'])
+        expect('inline module',
+               qualified('lib.rs', '#[cfg(kani)]\nmod verification {\n' + proof + '}\n'),
+               ['verification::h'])
+        expect('nested inline modules',
+               qualified('lib.rs', 'mod a {\n    pub mod b {\n' + proof + '    }\n}\n'),
+               ['a::b::h'])
+        expect('file module plus inline',
+               qualified('a/b.rs', 'mod verification {\n' + proof + '}\n'),
+               ['a::b::verification::h'])
+        expect('mod.rs file plus inline',
+               qualified('a/mod.rs', 'mod verification {\n' + proof + '}\n'),
+               ['a::verification::h'])
+        expect('closed module and declaration not read',
+               qualified('lib.rs', 'mod x;\nmod done {\n    fn f() { if true { } }\n}\n' + proof),
+               ['h'])
+        expect('mod in comment and string not read',
+               qualified('lib.rs', '// mod fake {\nconst S: &str = "mod fake2 { {";\n'
+                         "const C: char = '{';\n/* mod fake3 { */\n" + proof),
+               ['h'])
+        expect('sibling after inline module',
+               qualified('lib.rs', 'mod v {\n' + proof + '}\n' + proof.replace('h', 'g')),
+               ['v::h', 'g'])
     print('falsify selftest: %s' % ('ok' if ok else 'FAILED'))
     return 0 if ok else 1
 
