@@ -273,7 +273,7 @@ fails `mutation / mutation`.
 
 Before the first release, run the stranger test and record its date as `Last run: YYYY-MM-DD` in
 `docs/stranger-test.md` (ruled 2026-11-01 UTC). The scaffold starts at `Last run: none`, and
-`release / gate` fails on it with a message saying so; the weekly `stranger` job stays as it is.
+`release / gate` and the weekly `stranger cadence` job both fail on it.
 
 ## EXAMPLES
 
