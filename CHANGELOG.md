@@ -6,6 +6,15 @@ call that sits behind the newest release.
 
 ## Unreleased
 
+- The full mutation run moves out of `weekly.yml` into its own reusable workflow,
+  `.github/workflows/mutation.yml`, with the `mutants-per-shard` input. `mutation-plan`, the
+  `mutation` shards and `mutation-verdict` (named `mutation`) are unchanged, except that at most two
+  shards run at once (`max-parallel: 2`); the workflow opens with the `lag` job like the others.
+  `weekly.yml` loses the three jobs and the input. A caller reads `mutation / mutation` where it read
+  `weekly / mutation`.
+- `helpers/mutants_gate.py --diff` judges a run over changed lines (`cargo mutants --in-diff`): an
+  exemption that names no survivor in it is out of the run's reach, not stale, so the stale check
+  is skipped. A survivor or timeout that is not exempted still fails.
 - `crc` is an accepted word in `helpers/naming_words.toml`: nobody says cyclic redundancy check
   (CRC) in a name, so `abbreviations.py` passes `has_crc` and `CRC_BYTES`. Prose still expands CRC
   at its first use.
