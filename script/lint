@@ -77,7 +77,7 @@ if ! "$py" -c 'import tomllib' 2>/dev/null; then
 fi
 # The helpers that carry their own tests, named here so a helper without a selftest is a visible
 # gap in this list rather than an invisible gap in a grep.
-for f in rust_names spelled_out unit_symbols abbreviations register_names british_spelling service_model contract_names question_shape standalone prose_caps passive_voice history_phrases prose_text prose_acronyms prose_figures readme_documents readme_acronyms inflated_wording readme_sections function_length orphan_modules check_links falsify architect-label-rules \
+for f in rust_names spelled_out unit_symbols abbreviations register_names british_spelling service_model contract_names question_shape standalone prose_caps passive_voice history_phrases prose_text prose_acronyms prose_figures readme_documents readme_acronyms inflated_wording readme_sections readme_badges function_length orphan_modules check_links falsify architect-label-rules \
 	mutants_gate job_budget workflow_shape kani_bump publish_mode semver_baseline semver_major; do
 	"$py" "helpers/$f.py" --selftest
 done
@@ -124,6 +124,47 @@ mkdir -p "$fixtures/scaffold-readme"
 cp scaffold/README-crate.md "$fixtures/scaffold-readme/README.md"
 "$py" helpers/readme_sections.py --crate-dir "$fixtures/scaffold-readme" --ceiling /dev/null/none |
 	tail -1 | grep -q ': 0 ' || fail "scaffold/README-crate.md leaves the shared section order"
+echo "ok"
+
+echo "==> the badge row gate (README badges)"
+# The sample's row points at this repository's selftest workflow, which is what calls check.yml
+# and proofs.yml on it. The scaffold's row, with its placeholders filled the way a new repository
+# fills them, passes against the scaffold's own caller workflows, so a new repository starts green.
+"$py" helpers/readme_badges.py --crate-dir sample --repository nifeos/crate-workflows >/dev/null ||
+	fail "the sample's badge row has a finding"
+b="$fixtures/badges"
+mkdir -p "$b/good"
+sed -e 's/<crate>/example_crate/g' -e 's/<rust-version>/1.88/g' scaffold/README-crate.md >"$b/good/README.md"
+printf '[package]\nname = "example_crate"\nlicense = "MIT OR Apache-2.0"\nrust-version = "1.88"\n' >"$b/good/Cargo.toml"
+badges() {
+	dir="$b/$1"
+	shift
+	"$py" helpers/readme_badges.py --crate-dir "$dir" --repository nifeos/example_crate \
+		--workflows-dir scaffold/caller-workflows "$@" >/dev/null 2>&1
+}
+badges good || fail "the scaffold's badge row, filled in, has a finding"
+grep -q '^\[!\[' scaffold/README-crate.md || fail "scaffold/README-crate.md has no badge row"
+# Three ways to go red: no row, a link into another repository, a stale minimum Rust version.
+for bad in no-row other-repository stale-rust; do
+	mkdir -p "$b/$bad"
+	cp "$b/good/Cargo.toml" "$b/$bad/"
+done
+grep -v '^\[!\[' "$b/good/README.md" >"$b/no-row/README.md"
+sed 's#nifeos/example_crate/actions/workflows/ci.yml?#other/repository/actions/workflows/ci.yml?#' \
+	"$b/good/README.md" >"$b/other-repository/README.md"
+sed 's#rust-1.88%2B#rust-1.85%2B#' "$b/good/README.md" >"$b/stale-rust/README.md"
+for bad in no-row other-repository stale-rust; do
+	badges "$bad" && fail "the badge row gate passed the $bad fixture"
+	badges "$bad" --report-only || fail "the badge row gate failed the $bad fixture under --report-only"
+done
+# The weekly half: the crates.io and docs.rs pair, judged by whether the crate is published.
+badges good --published no --published-only || fail "an unpublished crate without the pair fails"
+badges good --published yes --published-only && fail "a published crate without the pair passes"
+mkdir -p "$b/published"
+cp "$b/good/README.md" "$b/good/Cargo.toml" "$b/published/"
+badges published --add-published || fail "--add-published failed"
+badges published --published yes || fail "--add-published does not satisfy a published crate"
+badges published --published no --published-only && fail "an unpublished crate with the pair passes"
 echo "ok"
 
 echo "==> typos gate (en-us spelling)"

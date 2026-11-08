@@ -30,7 +30,7 @@ github-actions ecosystem opens the bumps afterward; the lag check fails closed i
 | `CONTRIBUTING.md` | disclosure of agent-written work, and how outside contributions are reviewed |
 | `SECURITY.md` | what a security report means here, and private reporting |
 | CHANGELOG.md | one line per release; the release gate reads nothing from it, people do |
-| README-crate.md | the crate README's starting shape: its sections in the order every crate shares |
+| README-crate.md | the crate README's starting shape: the badge row under the title (fill in `<crate>` and `<rust-version>`), then its sections in the order every crate shares |
 | deny.toml | the cargo-deny policy: no skipped crate, no ignored advisory |
 | _typos.toml | the en-us locale for the typos step; add a word only with its reason, never to hide a misspelling |
 | rustfmt.toml | the stable subset; the two unstable options are refused |
@@ -41,3 +41,11 @@ The caller workflow files fix the job ids (`check`, `proofs`, `weekly`, `release
 which is what makes the required-check names in the settings file stable: GitHub shows a called
 reusable workflow's jobs as `<caller job id> / <job name>`, so `check / fmt` and friends resolve
 exactly when the caller ids are these.
+
+The README starts with a badge row under its title: check and proofs status on `main`, the license
+and the minimum Rust version. `check / standalone` holds the row (`helpers/readme_badges.py` in the
+template), and fails on a badge that links another repository or a minimum Rust version that
+disagrees with `rust-version`. The crates.io and docs.rs badges come after the first publish, since
+both answer "not found" before it: run `python3 <template checkout>/helpers/readme_badges.py
+--add-published` in the crate's root and commit the two lines it adds. `weekly / crates.io badges`
+is red until they are there, and red if they arrive before the publish.
