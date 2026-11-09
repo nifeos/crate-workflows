@@ -1,0 +1,22 @@
+{
+  "why": "Last week's scheduled run was a green full run of this same tree, so this week's records unchanged and tests nothing.",
+  "repository": "nifeos/example_thing",
+  "event": "schedule",
+  "now": "2026-11-15T08:12:00Z",
+  "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "run_id": 900,
+  "runs": [
+    {
+      "id": 800,
+      "status": "completed",
+      "conclusion": "success",
+      "event": "schedule",
+      "created_at": "2026-11-08T08:11:00Z",
+      "record": "full aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  ],
+  "expect": {
+    "mode": "unchanged",
+    "record": "unchanged aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa since run 800"
+  }
+}

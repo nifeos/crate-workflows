@@ -6,6 +6,17 @@ call that sits behind the newest release.
 
 ## Unreleased
 
+- The full mutation run runs weekly on each repository's own weekday and tests nothing when nothing
+  changed. `helpers/mutation_plan.py` derives the weekday and minute from the repository's name, and
+  the new caller `scaffold/caller-workflows/mutation.yml` tries at 08, 10 and 12 UTC (its
+  `@MUTATION_CRON@` line comes from `mutation_plan.py schedule <name>`). A scheduled run that starts
+  outside 08:00-13:00 UTC is deferred, and one on another weekday fails naming the right line. A
+  later try the same day is a repeat. A tree whose fingerprint (tracked files outside `.github/` and
+  `docs/`, the exemptions, the resolved toolchain, cargo-mutants and the template's mutation files)
+  matches the newest full run, when that run was green, records `unchanged since run N`. Each of
+  these passes in seconds with a notice. Every run names a `mutation-record` job with its record,
+  which the next run reads with the default token. The `skip-unchanged` and `stagger` inputs (both
+  on) turn the rules off for the template's selftest. Fixtures are in `fixtures/mutation/`.
 - The full mutation run moves out of `weekly.yml` into its own reusable workflow,
   `.github/workflows/mutation.yml`, with the `mutants-per-shard` input. `mutation-plan`, the
   `mutation` shards and `mutation-verdict` (named `mutation`) are unchanged, except that at most two

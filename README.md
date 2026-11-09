@@ -29,7 +29,7 @@ Inputs every workflow takes (all optional unless named): `manifest-path` (defaul
 (default `stable`), `coverage-floor` (default 85). `check.yml` takes `allow-unpublished` for
 fixture crates that carry `publish = false` on purpose. `proofs.yml` takes `kani-args`.
 `weekly.yml` takes `caller-checks` (the settings-drift and stranger jobs, off for this template's
-own selftest). `mutation.yml` takes `mutants-per-shard` (default 200; see below). `fuzz.yml` takes `public-crash-inputs` (the opt-in, default false), `seconds-per-target` (default 300) and `total-seconds` (default
+own selftest). `mutation.yml` takes `mutants-per-shard` (default 200), `skip-unchanged` and `stagger` (both on). `fuzz.yml` takes `public-crash-inputs` (the opt-in, default false), `seconds-per-target` (default 300) and `total-seconds` (default
 1,200). `release.yml` takes `version` (required, e.g. `0.1.0`) and `dry-run`
 (default true).
 
@@ -39,14 +39,13 @@ own selftest). `mutation.yml` takes `mutants-per-shard` (default 200; see below)
 mutants inside its 60-minute timeout. `mutation-plan` counts the mutants with `cargo mutants --list`
 and makes ceil(mutants / `mutants-per-shard`) shards, at least one. Each `mutation` job tests one
 shard (`--shard k/n --sharding round-robin`) and uploads its `mutants.out` as `mutants-shard-k`.
-`mutation-verdict` judges every shard's outcomes together against `.github/mutants-exempts`, and
-carries the name `mutation`, so `mutation / mutation` is the one status to read. At most two shards
-run at once.
+`mutation-verdict`, named `mutation`, judges every shard's outcomes together against
+`.github/mutants-exempts`. At most two shards run at once.
 
-The default of 200 mutants a shard fits a crate whose mutants take about 15 seconds each, two at a
-time: 25 minutes a shard. A crate under 200 mutants runs as one shard. A crate with slower tests
-lowers `mutants-per-shard` in its caller; the plan refuses a count over 256 shards, the most a
-matrix holds.
+A shard holds at most `mutants-per-shard` mutants (200 is about 25 minutes), in at most 256 shards.
+The plan first decides whether to test at all: a scheduled run outside 08:00-13:00 UTC is deferred,
+and an unchanged tree after a green full run is skipped. `helpers/mutation_plan.py` states the
+rules and prints a caller's weekday cron line.
 
 ## The weekly fuzz run
 
@@ -233,11 +232,10 @@ write here) and fails naming the secret when one is missing.
 ## Repository configuration
 
 `settings/repository-settings.json` is the one description of what a crate repository is
-configured to be. It covers the features (issues on with forms, everything else off) and the merge
-behavior (merge commits, strict up-to-date branches, auto-merge, delete on merge). It covers the
-two rulesets, the `crates-io` environment with a person as required reviewer, and the security
-features. It covers the Actions permissions, the team and app access, the metadata, and the label
-set. `script/apply-settings` applies it to a repository with `gh api`; a setting the API refuses
+configured to be. It covers features (issues on with forms, everything else off) and merge behavior
+(merge commits, strict up-to-date branches, auto-merge, delete on merge). It also covers the two
+rulesets, the `crates-io` environment with a person as required reviewer, security features, Actions
+permissions, team and app access, metadata and labels. `script/apply-settings` applies it to a repository with `gh api`; a setting the API refuses
 is reported and failed, never skipped silently. `script/check-settings` reads the live settings
 back and fails on any difference. The weekly `settings-drift` job runs it, so a setting changed by
 hand in the web interface is a red run, not a surprise.

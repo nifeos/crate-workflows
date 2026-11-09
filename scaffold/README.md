@@ -6,7 +6,9 @@ file set, and the pins. Copy this directory's contents into the new repository's
     cp -R ../crate-workflows/scaffold/. .
 
 then replace `@PINS@` in every caller workflow file with the commit SHA of the template release you are
-adopting (`git rev-parse v1^{commit}` in the template checkout), and commit. Dependabot's
+adopting (`git rev-parse v1^{commit}` in the template checkout), replace `@MUTATION_CRON@` in
+`mutation.yml` with the line `python3 helpers/mutation_plan.py schedule <repository name>` prints
+there, and commit. Dependabot's
 github-actions ecosystem opens the bumps afterward; the lag check fails closed in the meantime.
 
 | file | what it is |
@@ -14,13 +16,14 @@ github-actions ecosystem opens the bumps afterward; the lag check fails closed i
 | caller-workflows/ci.yml | calls check.yml on pull requests and on each push to main; the push run is at the merge commit's SHA, which is what the release gate reads |
 | caller-workflows/proofs.yml | calls proofs.yml on pull requests and on each push to main, same |
 | caller-workflows/weekly.yml | calls weekly.yml on a Monday cron and on dispatch |
+| caller-workflows/mutation.yml | calls mutation.yml on the repository's own weekday, three tries inside 08:00-13:00 UTC, and on dispatch |
 | caller-workflows/fuzz.yml | calls fuzz.yml on a Tuesday cron and on dispatch; fuzzes nothing until the caller sets `public-crash-inputs: true`, which only a crate with no `unsafe` code does (crash inputs are public); see the template README |
 | caller-workflows/release.yml | calls release.yml on dispatch |
 | caller-workflows/label.yml | calls label.yml on pull request pushes |
 | caller-workflows/hold.yml | calls hold.yml on pull request and label events |
 | caller-workflows/ruled.yml | calls ruled.yml on label events |
 | .github/ci-job-budgets | the template's budgets, with reasons; raise one with a reason of your own |
-| .github/mutants-exempts | empty; a survivor goes here with a reason, or the weekly run goes red |
+| .github/mutants-exempts | empty; a survivor goes here with a reason, or the full mutation run goes red |
 | .github/coverage-exemptions | empty; a file that cannot run on the host goes here with a reason |
 | .github/dependabot.yml | cargo and github-actions ecosystems, both weekly |
 | .github/pull_request_template.md | the disclosure line first, then what changed |
@@ -37,7 +40,7 @@ github-actions ecosystem opens the bumps afterward; the lag check fails closed i
 | .githooks/commit-msg | the Co-Authored-By trailer, required of every agent's commit |
 | docs/stranger-test.md | the stranger cadence record; starts at `Last run: none`, which the release gate refuses |
 
-The caller workflow files fix the job ids (`check`, `proofs`, `weekly`, `release`, `label`, `hold`),
+The caller workflow files fix the job ids (`check`, `proofs`, `weekly`, `mutation`, `release`, `label`, `hold`),
 which is what makes the required-check names in the settings file stable: GitHub shows a called
 reusable workflow's jobs as `<caller job id> / <job name>`, so `check / fmt` and friends resolve
 exactly when the caller ids are these.

@@ -1,0 +1,22 @@
+{
+  "why": "The 08:12 try ran (and was red); the 10:12 try the same day tests nothing.",
+  "repository": "nifeos/example_thing",
+  "event": "schedule",
+  "now": "2026-11-15T10:12:00Z",
+  "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "run_id": 901,
+  "runs": [
+    {
+      "id": 900,
+      "status": "completed",
+      "conclusion": "failure",
+      "event": "schedule",
+      "created_at": "2026-11-15T08:12:00Z",
+      "record": "full aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  ],
+  "expect": {
+    "mode": "repeat",
+    "record": "repeat since run 900"
+  }
+}

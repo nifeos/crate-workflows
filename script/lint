@@ -78,7 +78,7 @@ fi
 # The helpers that carry their own tests, named here so a helper without a selftest is a visible
 # gap in this list rather than an invisible gap in a grep.
 for f in rust_names spelled_out unit_symbols abbreviations register_names british_spelling service_model contract_names question_shape standalone prose_caps passive_voice history_phrases prose_text prose_acronyms prose_figures readme_documents readme_acronyms inflated_wording readme_sections readme_badges function_length orphan_modules check_links falsify architect-label-rules \
-	mutants_gate job_budget workflow_shape kani_bump publish_mode semver_baseline semver_major; do
+	mutants_gate mutation_plan job_budget workflow_shape kani_bump publish_mode semver_baseline semver_major; do
 	"$py" "helpers/$f.py" --selftest
 done
 "$py" script/check-settings --selftest

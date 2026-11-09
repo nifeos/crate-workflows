@@ -86,6 +86,41 @@ jobs:
       # three shards and puts one survivor in each, so mutation-verdict has to merge every shard
       # before all of its exemptions match.
       mutants-per-shard: 3
+      # Every run tests every mutant here: the fixture's tree is the same on most pull requests, and a
+      # skipped run would prove nothing about the shards. The skip rules are mutation_plan.py's
+      # selftest, over fixtures/mutation/.
+      skip-unchanged: false
+      stagger: false
+
+  # The plan's one network step, the read of earlier runs and their record jobs, with the token a
+  # caller's plan job has (contents: read). The all-zero fingerprint matches no run, so the answer
+  # must be a full run; what this proves is that the reads work and parse.
+  mutation-history:
+    name: selftest (mutation plan reads earlier runs)
+    needs: lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: clock
+        run: echo "JOB_STARTED_AT=$(date +%s)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          out=$(GITHUB_OUTPUT= python3 helpers/mutation_plan.py compare --event workflow_dispatch \
+            --repository "$GITHUB_REPOSITORY" --workflow-ref "$GITHUB_WORKFLOW_REF" --branch main \
+            --run-id "$GITHUB_RUN_ID" --now "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --fingerprint "$(printf '0%.0s' $(seq 64))")
+          printf '%s\n' "$out"
+          printf '%s\n' "$out" | grep -qx 'mode=full' || { echo "the plan did not decide a full run"; exit 1; }
+      - name: budget
+        if: always()
+        run: python3 helpers/job_budget.py check "${{ github.job }}" "$JOB_STARTED_AT"
 
   # The labeler's semver rule against a throwaway crate repository: no break passes, a new break
   # fires, a break already on the base does not hold a later pull request, and a `_typos.toml`-only

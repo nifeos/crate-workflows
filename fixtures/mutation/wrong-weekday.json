@@ -1,0 +1,12 @@
+{
+  "why": "example_thing's day is Sunday; a scheduled run on a Monday means the caller's cron is wrong, and the run fails saying so.",
+  "repository": "nifeos/example_thing",
+  "event": "schedule",
+  "now": "2026-11-16T08:12:00Z",
+  "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "run_id": 900,
+  "runs": [],
+  "expect": {
+    "mode": "error"
+  }
+}

@@ -1,8 +1,10 @@
 # The reusable full mutation run: cargo-mutants over the whole crate, in shards, judged against the
 # caller's .github/mutants-exempts.
 
-# The caller's thin workflow carries the schedule and workflow_dispatch. A pull request's changed
-# lines are mutated by check.yml instead; this workflow is the pass over every mutant.
+# The caller's thin workflow carries the schedule (its own weekday, three tries inside 08:00-13:00
+# UTC: `python3 helpers/mutation_plan.py schedule <repository>` prints the line) and
+# workflow_dispatch. Every run records what it did in the name of its `mutation-record` job, which
+# the next run and the release gate read.
 
 name: mutation
 
@@ -19,6 +21,16 @@ on:
           mutation job's 60; a crate whose tests are slower lowers it.
         type: number
         default: 200
+      skip-unchanged:
+        description: Test nothing when the newest full run on this branch was green for the same
+          fingerprint (helpers/mutation_plan.py). Off for the template's own selftest.
+        type: boolean
+        default: true
+      stagger:
+        description: Defer a scheduled run that starts outside 08:00-13:00 UTC, and fail one on
+          another weekday than the repository's own. Off for the template's own selftest.
+        type: boolean
+        default: true
 
 permissions:
   contents: read
@@ -62,16 +74,26 @@ jobs:
   # `mutation`, so `mutation / mutation` is the one status a caller reads (the caller's job id is
   # `mutation`). The shard job keeps the id `mutation`, so a caller's existing budget line for it
   # still applies.
+  #
+  # Before counting, the plan decides whether to test at all (helpers/mutation_plan.py has the
+  # rules): a scheduled run outside 08:00-13:00 UTC is deferred, a later try the same day is a
+  # repeat, and a tree whose fingerprint matches the newest full run, when that run was green, is
+  # unchanged. Each of those exits green in seconds with a notice, and the shards are skipped.
   mutation-plan:
-    name: mutation plan (count the mutants)
+    name: mutation plan (decide, then count the mutants)
     runs-on: ubuntu-latest
     timeout-minutes: 10
     outputs:
-      shards: ${{ steps.plan.outputs.shards }}
-      count: ${{ steps.plan.outputs.count }}
+      mode: ${{ steps.window.outputs.mode == 'deferred' && 'deferred' || steps.compare.outputs.mode }}
+      record: ${{ steps.window.outputs.mode == 'deferred' && 'deferred' || steps.compare.outputs.record }}
+      shards: ${{ steps.plan.outputs.shards || '[0]' }}
+      count: ${{ steps.plan.outputs.count || '1' }}
     steps:
+      # The run window is judged on this step's clock, the moment the plan job started.
       - name: clock
-        run: echo "JOB_STARTED_AT=$(date +%s)" >> "$GITHUB_ENV"
+        run: |
+          echo "JOB_STARTED_AT=$(date +%s)" >> "$GITHUB_ENV"
+          echo "RUN_CLOCK=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_ENV"
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
@@ -79,12 +101,39 @@ jobs:
           ref: ${{ job.workflow_sha }}
           path: .crate-workflows
           persist-credentials: false
+      - name: the run window and this repository's weekday
+        id: window
+        env:
+          EVENT: ${{ github.event_name }}
+          STAGGER: ${{ inputs.stagger }}
+        run: |
+          python3 .crate-workflows/helpers/mutation_plan.py window --event "$EVENT" \
+            --repository "$GITHUB_REPOSITORY" --now "$RUN_CLOCK" --stagger "$STAGGER"
       - uses: taiki-e/install-action@b80e2bb2635f28eb98b9fce1e2f0887e1535c6b2 # v2.90.0
+        if: steps.window.outputs.mode == 'run'
         with:
           tool: cargo-mutants@27.1.0
+      - name: fingerprint, and the newest full run's
+        id: compare
+        if: steps.window.outputs.mode == 'run'
+        env:
+          EVENT: ${{ github.event_name }}
+          WORKFLOW_REF: ${{ github.workflow_ref }}
+          SKIP_UNCHANGED: ${{ inputs.skip-unchanged }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -e
+          fp=$(python3 .crate-workflows/helpers/mutation_plan.py fingerprint \
+            --crate-dir "$(dirname "$MANIFEST")" --template-dir .crate-workflows)
+          echo "==> fingerprint $fp"
+          python3 .crate-workflows/helpers/mutation_plan.py compare --event "$EVENT" \
+            --repository "$GITHUB_REPOSITORY" --workflow-ref "$WORKFLOW_REF" \
+            --branch "$GITHUB_REF_NAME" --run-id "$GITHUB_RUN_ID" --now "$RUN_CLOCK" \
+            --fingerprint "$fp" --skip-unchanged "$SKIP_UNCHANGED"
       # The shard count is ceil(mutants / mutants-per-shard), at least one. A matrix holds at most
       # 256 jobs, so a count above that is refused with the input that fixes it.
       - id: plan
+        if: steps.compare.outputs.mode == 'full'
         env:
           PER_SHARD: ${{ inputs.mutants-per-shard }}
         run: |
@@ -111,6 +160,7 @@ jobs:
   mutation:
     name: mutation shard ${{ matrix.shard }} of ${{ needs.mutation-plan.outputs.count }}
     needs: mutation-plan
+    if: needs.mutation-plan.outputs.mode == 'full'
     runs-on: ubuntu-latest
     timeout-minutes: 60
     # At most two shards at once: a large crate's run takes longer, and it never holds more than
@@ -161,6 +211,9 @@ jobs:
   # .github/mutants-exempts lists it, one mutant per line with its reason. It runs on always(), so
   # a failed plan or shard makes this job red rather than skipped, since a skipped job would
   # satisfy a required status.
+  #
+  # When the plan decided to test nothing (deferred, repeat, unchanged), the shards are skipped and
+  # this job passes at once, repeating the plan's notice; a plan that failed is red here.
   mutation-verdict:
     name: mutation
     needs: [mutation-plan, mutation]
@@ -178,21 +231,36 @@ jobs:
           path: .crate-workflows
           persist-credentials: false
       - name: every shard ran
+        id: ran
         env:
           PLAN: ${{ needs.mutation-plan.result }}
+          MODE: ${{ needs.mutation-plan.outputs.mode }}
+          RECORD: ${{ needs.mutation-plan.outputs.record }}
           SHARDS: ${{ needs.mutation.result }}
         run: |
+          if [ "$PLAN" = success ] && [ "$MODE" != full ]; then
+            case "$MODE" in
+              deferred | repeat | unchanged) ;;
+              *) echo "::error::mutation plan passed with no decision ('$MODE')"; exit 1 ;;
+            esac
+            echo "::notice::mutation: nothing tested in this run ($RECORD)"
+            echo "judge=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
           if [ "$PLAN" != success ] || [ "$SHARDS" != success ]; then
             echo "::error::mutation plan was $PLAN and the shards were $SHARDS; the failing job's log says why"
             exit 1
           fi
+          echo "judge=true" >> "$GITHUB_OUTPUT"
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        if: steps.ran.outputs.judge == 'true'
         with:
           pattern: mutants-shard-*
           path: ${{ runner.temp }}/mutants-shards
       # Named, with an annotation of its own, so a refusal reads as the gate's and not as the
       # download step above it, whose echoed inputs include the words `digest-mismatch: error`.
       - name: judge the survivors against the exemptions
+        if: steps.ran.outputs.judge == 'true'
         env:
           SHARDS: ${{ needs.mutation-plan.outputs.count }}
           OUT: ${{ runner.temp }}/mutants-shards
@@ -211,3 +279,21 @@ jobs:
         if: always()
         run: python3 .crate-workflows/helpers/job_budget.py check "${{ github.job }}" "$JOB_STARTED_AT"
 
+  # The run's record, in this job's name, which is where the fingerprint is kept: the jobs API
+  # returns it to any token that can read this repository's Actions runs, and it lasts as long as
+  # the run, past the expiry of logs and artifacts. The next run and the release gate read it
+  # (helpers/mutation_plan.py lists the four forms). It runs on always() so a red run is on record
+  # too; whether a run counts is read from the run's own conclusion, never from this job.
+  mutation-record:
+    name: 'mutation record: ${{ needs.mutation-plan.outputs.record }}'
+    needs: [mutation-plan, mutation-verdict]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - env:
+          RECORD: ${{ needs.mutation-plan.outputs.record }}
+          VERDICT: ${{ needs.mutation-verdict.result }}
+        run: |
+          echo "==> record: ${RECORD:-none (the plan did not decide)}; verdict: $VERDICT"
+          printf '### Mutation record\n\n`%s` (verdict: %s)\n' "${RECORD:-none}" "$VERDICT" >> "$GITHUB_STEP_SUMMARY"
