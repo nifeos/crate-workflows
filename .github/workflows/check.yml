@@ -1,4 +1,5 @@
-# The reusable check workflow: what runs on every pull request to a crate repository.
+# The reusable check workflow: what runs on every pull request to a crate repository, including a
+# mutation run over the lines the pull request changed.
 
 # Every third-party action is pinned to a full commit SHA (the comment carries the tag), the same
 # rule nife's supply-chain gate enforces on its own workflows. A caller adopting a release pins
@@ -448,6 +449,50 @@ jobs:
       # The analyze action uploads its own SARIF; nife's split-job retry exists for its four-language
       # matrix, and one language in one job does not need it.
       - uses: github/codeql-action/analyze@1fc58d04a4d4374f921bdac573c3811c240f9c26 # v4
+      - name: budget
+        if: always()
+        run: python3 .crate-workflows/helpers/job_budget.py check "${{ github.job }}" "$JOB_STARTED_AT"
+
+  # The pull request's changed lines, mutated (helpers/mutation-diff.sh): a survivor or a timeout
+  # on a line this pull request changed fails unless .github/mutants-exempts lists it with a
+  # reason. The cargo-mutants run has a 20-minute cap, and reaching it fails. The full run over
+  # every mutant is mutation.yml's. On a push there is no pull request diff, so the job is skipped.
+  mutation-diff:
+    name: mutation-diff
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      RUSTUP_TOOLCHAIN: ${{ inputs.toolchain }}
+    steps:
+      - name: clock
+        run: echo "JOB_STARTED_AT=$(date +%s)" >> "$GITHUB_ENV"
+      # Full history: the diff's base is the merge ref's first parent.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: .crate-workflows
+          persist-credentials: false
+      - run: rustup toolchain install "$TOOLCHAIN" --profile minimal
+      - uses: taiki-e/install-action@b80e2bb2635f28eb98b9fce1e2f0887e1535c6b2 # v2.90.0
+        with:
+          tool: cargo-mutants@27.1.0
+      # A pull request's checkout is the merge of its head into its base, so the first parent is
+      # the base the pull request is read against. A checkout with one parent cannot say what
+      # changed, and fails rather than guesses.
+      - name: mutate the changed lines (20-minute cap)
+        run: |
+          set -e
+          parents=$(( $(git rev-list --parents -n 1 HEAD | wc -w) - 1 ))
+          if [ "$parents" -ne 2 ]; then
+            echo "::error::the checkout has $parents parent(s), not a pull request's merge; no diff to mutate"
+            exit 1
+          fi
+          .crate-workflows/helpers/mutation-diff.sh "$MANIFEST" HEAD^1 "$GITHUB_WORKSPACE/.github/mutants-exempts" 20
       - name: budget
         if: always()
         run: python3 .crate-workflows/helpers/job_budget.py check "${{ github.job }}" "$JOB_STARTED_AT"

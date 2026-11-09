@@ -14,7 +14,7 @@ publishing from a `nifeos` workflow. This repository is where all three land.
 
 | workflow | called on | jobs |
 |---|---|---|
-| `.github/workflows/check.yml` | every pull request | `lag`, `fmt`, `clippy`, `tests`, `coverage`, `standalone`, `supply-chain` |
+| `.github/workflows/check.yml` | every pull request | `lag`, `fmt`, `clippy`, `tests`, `coverage`, `standalone`, `supply-chain`, `mutation-diff` |
 | `.github/workflows/proofs.yml` | every pull request | `lag`, `kani`, `falsify` |
 | `.github/workflows/weekly.yml` | a weekly schedule, no pull request open | `lag`, `drift`, `msrv`, `semver`, `miri`, `settings-drift`, `stranger` |
 | `.github/workflows/mutation.yml` | a schedule and a dispatch, no pull request open | `lag`, `mutation-plan`, `mutation` (one per shard), `mutation-verdict` (named `mutation`) |
@@ -134,7 +134,7 @@ no credential: `cargo publish --dry-run`, then the door. It publishes nothing.
 | coverage, 85% per file | cargo-llvm-cov, per-file floor | `check / coverage` |
 | fuzz (cargo-fuzz) | nightly, weekly, a bounded time per target, only when the caller opts in; see below | `fuzz / fuzz` |
 | Miri, weekly | `cargo +nightly miri test` | `weekly / miri` |
-| mutation, full run | cargo-mutants in shards; a survivor or a timeout fails unless `.github/mutants-exempts` lists it with a reason | `mutation / mutation` |
+| mutation | cargo-mutants on a pull request's changed lines (20-minute cap), and weekly over every mutant in shards; a survivor or a timeout fails unless `.github/mutants-exempts` lists it with a reason | `check / mutation-diff`, `mutation / mutation` |
 | `script/verify` (Kani) | `cargo kani` at the version in `.kani-version`, on every pull request | `proofs / kani` |
 | falsification sweep | every patch applied with `-p1` must turn its harness red at its own assertion; the form check (every harness carries a patch or a reason) runs beside it | `proofs / falsify` |
 | kani-reach | dropped: a dispatch-only measurement of nife's reach | |

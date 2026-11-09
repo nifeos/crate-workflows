@@ -92,6 +92,30 @@ jobs:
       skip-unchanged: false
       stagger: false
 
+  # check.yml's mutation-diff job sees this repository's own pull request diffs, which rarely touch
+  # the fixture's Rust. So its script runs here on three fixed diffs (fixtures/mutation-diff/): an
+  # exempted survivor passes, an untested function fails, and a diff with no Rust passes.
+  mutation-diff:
+    name: selftest (mutation of changed lines)
+    needs: lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: clock
+        run: echo "JOB_STARTED_AT=$(date +%s)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: taiki-e/install-action@b80e2bb2635f28eb98b9fce1e2f0887e1535c6b2 # v2.90.0
+        with:
+          tool: cargo-mutants@27.1.0
+      - run: sh helpers/mutation-diff-selftest.sh
+      - name: budget
+        if: always()
+        run: python3 helpers/job_budget.py check "${{ github.job }}" "$JOB_STARTED_AT"
+
   # The plan's one network step, the read of earlier runs and their record jobs, with the token a
   # caller's plan job has (contents: read). The all-zero fingerprint matches no run, so the answer
   # must be a full run; what this proves is that the reads work and parse.

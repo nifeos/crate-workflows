@@ -6,6 +6,12 @@ call that sits behind the newest release.
 
 ## Unreleased
 
+- `check / mutation-diff` mutates each pull request's changed lines (`cargo mutants --in-diff`, the
+  diff against the merge's first parent) through `helpers/mutation-diff.sh`. A survivor or timeout
+  that `.github/mutants-exempts` does not list fails, through `mutants_gate.py --diff`. The run has
+  a 20-minute cap, and reaching it fails. A diff with no Rust passes, saying so. Its budget is 30
+  minutes in both budget files. `helpers/mutation-diff-selftest.sh` runs it on the three diffs in
+  `fixtures/mutation-diff/`.
 - The full mutation run runs weekly on each repository's own weekday and tests nothing when nothing
   changed. `helpers/mutation_plan.py` derives the weekday and minute from the repository's name, and
   the new caller `scaffold/caller-workflows/mutation.yml` tries at 08, 10 and 12 UTC (its
