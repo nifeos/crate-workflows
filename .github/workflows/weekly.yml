@@ -324,7 +324,10 @@ jobs:
         with:
           pattern: mutants-shard-*
           path: ${{ runner.temp }}/mutants-shards
-      - env:
+      # Named, with an annotation of its own, so a refusal reads as the gate's and not as the
+      # download step above it, whose echoed inputs include the words `digest-mismatch: error`.
+      - name: judge the survivors against the exemptions
+        env:
           SHARDS: ${{ needs.mutation-plan.outputs.count }}
           OUT: ${{ runner.temp }}/mutants-shards
         run: |
@@ -334,7 +337,10 @@ jobs:
             echo "::error::$found of $SHARDS shards left an outcomes.json"
             exit 1
           fi
-          python3 .crate-workflows/helpers/mutants_gate.py "$OUT" "$GITHUB_WORKSPACE/.github/mutants-exempts"
+          if ! python3 .crate-workflows/helpers/mutants_gate.py "$OUT" "$GITHUB_WORKSPACE/.github/mutants-exempts"; then
+            echo "::error::the mutation gate refused this run: each SURVIVOR, TIMEOUT or stale exemption it names is above"
+            exit 1
+          fi
       - name: budget
         if: always()
         run: python3 .crate-workflows/helpers/job_budget.py check "${{ github.job }}" "$JOB_STARTED_AT"

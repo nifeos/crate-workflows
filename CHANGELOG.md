@@ -6,6 +6,9 @@ call that sits behind the newest release.
 
 ## Unreleased
 
+- The step of `weekly / mutation` that runs `mutants_gate.py` is named "judge the survivors against
+  the exemptions" and, when the gate refuses, adds an error annotation saying so. A refusal no
+  longer shows as an exit code on an unnamed step under the artifact download.
 - `bus` joins `[address_qualifiers]`, so a bus address (`SYSTEM_MANAGEMENT_BUS_ADDRESS`) passes the
   address rule of `register_names.py`. Its selftest checks that such a name passes and fails when
   the word is removed.
