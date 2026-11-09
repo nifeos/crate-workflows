@@ -336,13 +336,12 @@ jobs:
       # proofs status of this repository's own caller workflows on main, the license and the
       # minimum Rust version, each in the one form the helper's header states, so a badge that
       # links another repository or a minimum Rust version that disagrees with `rust-version` is a
-      # finding. REPORT ONLY while the crate repositories adopt the row: the flag goes once every
-      # one carries it, and then a finding fails this job, a required check. Offline: the crates.io
-      # and docs.rs pair is judged by weekly / crates.io badges, which may use the network.
-      - name: README badge row (report only while the crate repositories adopt it)
+      # finding, and a finding fails this job, a required check. Offline: the crates.io and docs.rs
+      # pair is judged by weekly / crates.io badges, which may use the network.
+      - name: README badge row
         run: |
           python3 .crate-workflows/helpers/readme_badges.py --crate-dir "$(dirname "$MANIFEST")" \
-            --repository "$GITHUB_REPOSITORY" --report-only --summary "$GITHUB_STEP_SUMMARY"
+            --repository "$GITHUB_REPOSITORY" --summary "$GITHUB_STEP_SUMMARY"
       # Three README checks, over the README and the crate root's doc comment: an acronym used before
       # the text defines it (helpers/readme_acronyms.py), rhetorical or inflated wording from
       # helpers/inflated_wording.toml (helpers/inflated_wording.py), and the README's sections in
