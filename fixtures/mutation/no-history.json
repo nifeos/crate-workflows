@@ -1,0 +1,13 @@
+{
+  "why": "No full run on record: the first run tests every mutant.",
+  "repository": "nifeos/example_thing",
+  "event": "workflow_dispatch",
+  "now": "2026-11-15T08:12:00Z",
+  "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "run_id": 900,
+  "runs": [],
+  "expect": {
+    "mode": "full",
+    "record": "full aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  }
+}

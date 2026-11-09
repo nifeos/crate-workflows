@@ -83,8 +83,13 @@ jobs:
           set -e
           sha="$(git -C template rev-parse "$TAG^{commit}")"
           echo "sha=$sha" >> "$GITHUB_OUTPUT"
+          # The mutation caller's cron is the canary's own weekday, which the release's helper prints.
+          cron=''
+          if [ -f template/helpers/mutation_plan.py ]; then
+            cron="$(python3 template/helpers/mutation_plan.py schedule "$CANARY")"
+          fi
           for f in template/scaffold/caller-workflows/*.yml; do
-            sed "s/@PINS@/@$sha/" "$f" > "canary/.github/workflows/$(basename "$f")"
+            sed -e "s/@PINS@/@$sha/" -e "s/@MUTATION_CRON@/$cron/" "$f" > "canary/.github/workflows/$(basename "$f")"
           done
           if git -C canary diff --quiet; then
             echo "changed=false" >> "$GITHUB_OUTPUT"

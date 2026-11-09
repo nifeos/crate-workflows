@@ -1,0 +1,38 @@
+{
+ "outcomes": [
+  {
+   "scenario": "Baseline",
+   "summary": "Success"
+  },
+  {
+   "scenario": {
+    "Mutant": {
+     "name": "src/lib.rs:4:5: replace x with 0",
+     "file": "src/lib.rs",
+     "span": {
+      "start": {
+       "line": 4,
+       "column": 5
+      }
+     }
+    }
+   },
+   "summary": "CaughtMutant"
+  },
+  {
+   "scenario": {
+    "Mutant": {
+     "name": "src/lib.rs:9:12: replace > with >=",
+     "file": "src/lib.rs",
+     "span": {
+      "start": {
+       "line": 9,
+       "column": 5
+      }
+     }
+    }
+   },
+   "summary": "MissedMutant"
+  }
+ ]
+}

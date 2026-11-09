@@ -1,0 +1,13 @@
+{
+  "why": "A dispatch is a person asking; the window holds scheduled runs only.",
+  "repository": "nifeos/example_thing",
+  "event": "workflow_dispatch",
+  "now": "2026-11-17T19:00:00Z",
+  "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "run_id": 900,
+  "runs": [],
+  "expect": {
+    "mode": "full",
+    "record": "full aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  }
+}

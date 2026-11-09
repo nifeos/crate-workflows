@@ -1,0 +1,13 @@
+{
+  "why": "The scheduler started this run at 15:40 UTC, outside the window: it exits green and tests nothing.",
+  "repository": "nifeos/example_thing",
+  "event": "schedule",
+  "now": "2026-11-15T15:40:00Z",
+  "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "run_id": 900,
+  "runs": [],
+  "expect": {
+    "mode": "deferred",
+    "record": "deferred"
+  }
+}

@@ -196,6 +196,13 @@ def selftest():
         exempt.write_text(every + 'no reason here\n')
         expect('--diff still refuses a bad line', run(['gate', '--diff', str(shards), str(exempt)]), 1)
         expect('--diff with no outcomes fails', run(['gate', '--diff', str(Path(tmp) / 'nothing')]), 1)
+
+    # fixtures/mutation/pass and fail: two shards each, the one survivor in pass exempted, and a
+    # second, unexempted survivor in fail's other shard.
+    fixtures = Path(__file__).resolve().parent.parent / 'fixtures' / 'mutation'
+    for case, want in (('pass', 0), ('fail', 1)):
+        expect('fixture %s' % case,
+               run(['gate', str(fixtures / case), str(fixtures / case / 'mutants-exempts')]), want)
     print('mutants_gate selftest: %s' % ('ok' if ok else 'FAILED'))
     return 0 if ok else 1
 
