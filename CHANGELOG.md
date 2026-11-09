@@ -6,6 +6,12 @@ call that sits behind the newest release.
 
 ## Unreleased
 
+- `actionlint` 1.7.12 is a required gate of `script/lint` and so of the selftest's lint job, no
+  longer an optional one: a missing or different binary fails with the install command. It lints
+  `.github/workflows/` and `scaffold/caller-workflows/` (placeholders filled in a scratch copy).
+  The version and its SHA-256 are pinned in `helpers/install_actionlint.sh`, which the selftest
+  runs. Two findings fixed (`selftest.yml` empty assignment, `mutation.yml` literal backticks); the
+  stale ignore for the `administration` permission scope is gone.
 - The `mutation` verdict reads a one-shard run. `actions/download-artifact` extracts a lone artifact
   into the download directory itself, not a subdirectory, so the verdict's `find -mindepth 2` found
   no `outcomes.json` and failed every one-shard repository. `mutants_gate.py --shards N` now counts

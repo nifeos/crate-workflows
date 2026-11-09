@@ -39,6 +39,11 @@ jobs:
       - uses: taiki-e/install-action@b80e2bb2635f28eb98b9fce1e2f0887e1535c6b2 # v2.90.0
         with:
           tool: typos@1.51.1
+      # script/lint's actionlint gate needs the binary; the pin and its checksum live in the helper.
+      - name: install actionlint
+        run: |
+          helpers/install_actionlint.sh "$RUNNER_TEMP/actionlint-bin"
+          echo "$RUNNER_TEMP/actionlint-bin" >> "$GITHUB_PATH"
       - run: script/lint
       - name: budget
         if: always()
@@ -136,7 +141,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -e
-          out=$(GITHUB_OUTPUT= python3 helpers/mutation_plan.py compare --event workflow_dispatch \
+          out=$(GITHUB_OUTPUT='' python3 helpers/mutation_plan.py compare --event workflow_dispatch \
             --repository "$GITHUB_REPOSITORY" --workflow-ref "$GITHUB_WORKFLOW_REF" --branch main \
             --run-id "$GITHUB_RUN_ID" --now "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
             --fingerprint "$(printf '0%.0s' $(seq 64))")
