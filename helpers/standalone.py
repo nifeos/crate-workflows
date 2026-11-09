@@ -11,7 +11,11 @@ What each check is, and where it came from:
 
 - files: a README, `LICENSE-MIT` and `LICENSE-APACHE` at the crate root, and
   `license = "MIT OR Apache-2.0"`. Both files, because GitHub's license detection reads nife
-  itself as Apache-2.0 although the tree carries both (calef, 2026-10-11 UTC).
+  itself as Apache-2.0 although the tree carries both (calef, 2026-10-11 UTC). A crate that follows
+  permissive source (BSD or ISC) carries that source's notice, and its field says so by adding
+  `AND <id>` for each such license after the pair in parentheses, as in
+  `(MIT OR Apache-2.0) AND BSD-3-Clause`. The ids allowed are `BSD-2-Clause`, `BSD-3-Clause` and
+  `ISC`; any other field is a finding.
 - manifest: no workspace inheritance left (`lints.workspace = true` dies here), a `rust-version`
   so `weekly / msrv` has something to build, and `[lints]` carrying `unsafe_op_in_unsafe_fn` and
   `missing_docs` themselves, which is the workspace-lints row of nife's table inlined where a
@@ -37,6 +41,7 @@ import tomllib
 from pathlib import Path
 
 LICENSE = 'MIT OR Apache-2.0'
+NOTICE_LICENSES = ('BSD-2-Clause', 'BSD-3-Clause', 'ISC')
 LICENSE_FILES = ('LICENSE-MIT', 'LICENSE-APACHE')
 TEXT = ('.rs', '.toml', '.md', '.patch', '.txt')
 
@@ -119,14 +124,25 @@ def text_files(root):
     return out
 
 
+def license_ok(field):
+    """True for the pair alone, or the pair in parentheses followed by `AND <notice license>` terms."""
+    if field == LICENSE:
+        return True
+    if not isinstance(field, str) or not field.startswith(f'({LICENSE}) AND '):
+        return False
+    terms = field[len(f'({LICENSE}) AND '):].split(' AND ')
+    return all(term in NOTICE_LICENSES for term in terms) and len(set(terms)) == len(terms)
+
+
 def file_findings(root_names, manifest):
     found = []
     if not any(n.upper().startswith('README') for n in root_names):
         found.append('no README')
     found += [f'no {f}' for f in LICENSE_FILES if f not in root_names]
     pkg = manifest.get('package', {})
-    if pkg.get('license') != LICENSE:
-        found.append(f'license field is {pkg.get("license")!r}, not {LICENSE!r}')
+    if not license_ok(pkg.get('license')):
+        found.append(f'license field is {pkg.get("license")!r}, not {LICENSE!r}'
+                     f' (optionally followed by AND and one of {", ".join(NOTICE_LICENSES)})')
     return found
 
 
@@ -222,6 +238,11 @@ unexpected_cfgs = { level = "warn", check-cfg = ['cfg(kani)'] }
         (root / 'LICENSE-MIT').write_text('MIT\n')
         (root / 'LICENSE-APACHE').write_text('Apache\n')
         expect('clean crate', findings(root, allow_unpublished=False), [])
+        for field, want in ((f'({LICENSE}) AND BSD-3-Clause AND BSD-2-Clause', True),
+                            (f'({LICENSE}) AND ISC', True), (f'({LICENSE}) AND GPL-2.0-only', False),
+                            (f'({LICENSE}) AND ISC AND ISC', False), (f'{LICENSE} AND ISC', False),
+                            ('MIT', False), (None, False)):
+            expect(f'license {field!r}', license_ok(field), want)
 
         (root / 'Cargo.toml').write_text(manifest + '\n[package.publish]\nfalse = true\n')
         # A malformed publish table is still "not false": tomllib reads the table, not a bool.

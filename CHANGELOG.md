@@ -26,9 +26,12 @@ call that sits behind the newest release.
 - `helpers/mutants_gate.py --diff` judges a run over changed lines (`cargo mutants --in-diff`): an
   exemption that names no survivor in it is out of the run's reach, not stale, so the stale check
   is skipped. A survivor or timeout that is not exempted still fails.
+- `bus` joins `[address_qualifiers]`, so a bus address (`SYSTEM_MANAGEMENT_BUS_ADDRESS`) passes the
+  address rule of `register_names.py`. Its selftest checks that such a name passes and fails when
+  the word is removed.
 - A crate README opens with a badge row under its title: check and proofs status, license and
   minimum Rust version. `scaffold/README-crate.md` carries it. The new `helpers/readme_badges.py`
-  holds the row in `check / standalone`, report only for now. Each badge takes its one form, with
+  holds the row in `check / standalone`, and a finding fails it. Each badge takes its one form, with
   images only from the repository's own Actions badges and img.shields.io and links only into the
   repository. The minimum-Rust-version badge equals `rust-version`. The new `weekly / crates.io
   badges` job fails when a published crate lacks the crates.io and docs.rs badges, or an
