@@ -263,3 +263,18 @@ jobs:
             exit 1
           fi
           echo "==> the release gate refused an unchecked commit"
+      # The mutation half of the gate, alone, with the default token. This repository has no
+      # mutation caller, so the read goes to this selftest workflow, whose only run at this commit
+      # is this one, still in flight: no green run, so the verify step must refuse, for that
+      # reason. Its accept and refuse rules are mutation_plan.py's selftest, over
+      # fixtures/mutation/release/.
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if python3 helpers/mutation_plan.py verify "$GITHUB_REPOSITORY" "$GITHUB_SHA" --workflow selftest.yml 2>err; then
+            echo "the mutation gate passed a commit with no green run; the refusal is broken"
+            exit 1
+          fi
+          cat err
+          grep -q 'no green full mutation run at this commit' err || { echo "refused, but not for the reason under test"; exit 1; }
+          echo "==> the mutation gate refused a commit with no green run"

@@ -2,7 +2,7 @@
 # shellcheck shell=sh
 #
 # helpers/release-gate.sh: refuse a release whose check or proof runs are not green on the commit
-# being released.
+# being released, or that has no green full mutation run there.
 #
 #     helpers/release-gate.sh <owner/repo> <sha>
 #
@@ -12,8 +12,13 @@
 # on a run that may yet fail has decided nothing. On a dry run this is still enforced: a rehearsal
 # of a commit nobody checked is not a rehearsal of anything.
 #
-# The workflow filenames are the scaffold's (ci.yml, proofs.yml). A caller that renames them
-# raises the release gate's red rather than silently passing, which is the right direction.
+# The mutation run counts when a green run of mutation.yml at the released commit tested every
+# mutant, or found the tree unchanged since a green full run of the same fingerprint
+# (helpers/mutation_plan.py verify, which reads each run's record job). A deferred or repeat run
+# tested nothing and does not count. A release commit whose tree changed needs a full run there.
+#
+# The workflow filenames are the scaffold's (ci.yml, proofs.yml, mutation.yml). A caller that renames
+# them raises the release gate's red rather than silently passing, which is the right direction.
 
 set -eu
 
@@ -37,4 +42,8 @@ for workflow in ci.yml proofs.yml; do
 		exit 1
 	fi
 done
-echo "release-gate: $sha is green on both gates"
+if ! python3 "$(dirname "$0")/mutation_plan.py" verify "$repo" "$sha" --workflow mutation.yml; then
+	echo "release-gate: dispatch mutation.yml on main at this commit and let it finish green; an unchanged tree finishes in seconds, a changed one runs every mutant." >&2
+	exit 1
+fi
+echo "release-gate: $sha is green on checks, proofs and mutation"

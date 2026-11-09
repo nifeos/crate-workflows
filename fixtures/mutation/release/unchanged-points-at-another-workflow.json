@@ -1,0 +1,18 @@
+{
+  "why": "The run it points at belongs to another workflow file: refused.",
+  "sha_runs": [
+    {
+      "id": 901,
+      "record": "unchanged aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa since run 800"
+    }
+  ],
+  "sources": [
+    {
+      "id": 800,
+      "conclusion": "success",
+      "path": ".github/workflows/other.yml",
+      "record": "full aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  ],
+  "expect": false
+}

@@ -1,0 +1,10 @@
+{
+  "why": "A green run without a record job (a template before this one): refused.",
+  "sha_runs": [
+    {
+      "id": 904,
+      "record": ""
+    }
+  ],
+  "expect": false
+}

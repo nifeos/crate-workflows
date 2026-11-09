@@ -72,7 +72,7 @@ jobs:
       # new repository's weekly run is red until its first stranger run is recorded.
       - name: a stranger-test run is on record
         run: .crate-workflows/script/stranger-recorded docs/stranger-test.md
-      - name: check and proofs are green on this commit
+      - name: check, proofs and a full mutation run are green on this commit
         run: .crate-workflows/helpers/release-gate.sh "$GITHUB_REPOSITORY" "$GITHUB_SHA"
         env:
           GH_TOKEN: ${{ github.token }}

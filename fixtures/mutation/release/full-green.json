@@ -1,0 +1,10 @@
+{
+  "why": "A green full run at the released commit.",
+  "sha_runs": [
+    {
+      "id": 900,
+      "record": "full aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    }
+  ],
+  "expect": true
+}

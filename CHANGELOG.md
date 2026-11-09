@@ -6,6 +6,11 @@ call that sits behind the newest release.
 
 ## Unreleased
 
+- `release / gate` also needs a green full mutation run at the released commit:
+  `helpers/release-gate.sh` calls `mutation_plan.py verify`. A green `mutation.yml` run there counts
+  when it recorded `full`, or `unchanged <fingerprint> since run N` where run N is a green full run
+  of the same workflow and fingerprint. A deferred or repeat run never counts. The cases are in
+  `fixtures/mutation/release/`. Dispatch `mutation.yml` on main before a release.
 - `check / mutation-diff` mutates each pull request's changed lines (`cargo mutants --in-diff`, the
   diff against the merge's first parent) through `helpers/mutation-diff.sh`. A survivor or timeout
   that `.github/mutants-exempts` does not list fails, through `mutants_gate.py --diff`. The run has
