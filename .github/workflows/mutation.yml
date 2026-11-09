@@ -1,0 +1,207 @@
+# The reusable full mutation run: cargo-mutants over the whole crate, in shards, judged against the
+# caller's .github/mutants-exempts.
+
+# The caller's thin workflow carries the schedule and workflow_dispatch. A pull request's changed
+# lines are mutated by check.yml instead; this workflow is the pass over every mutant.
+
+name: mutation
+
+on:
+  workflow_call:
+    inputs:
+      manifest-path:
+        type: string
+        default: Cargo.toml
+      mutants-per-shard:
+        description: The most mutants one mutation shard tests. The run is split into
+          ceil(mutants / this) shards, so a crate under the figure runs as one shard.
+          At about 15 seconds a mutant, two at a time, 200 mutants take 25 minutes against the
+          mutation job's 60; a crate whose tests are slower lowers it.
+        type: number
+        default: 200
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mutation-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  MANIFEST: ${{ inputs.manifest-path }}
+
+jobs:
+  lag:
+    name: lag (template release)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: clock
+        run: echo "JOB_STARTED_AT=$(date +%s)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: .crate-workflows
+          persist-credentials: false
+      - run: .crate-workflows/helpers/lag-check.sh
+        env:
+          JOB_WORKFLOW_SHA: ${{ job.workflow_sha }}
+          GH_TOKEN: ${{ github.token }}
+      - name: budget
+        if: always()
+        run: python3 .crate-workflows/helpers/job_budget.py check "${{ github.job }}" "$JOB_STARTED_AT"
+
+  # Mutation testing in shards. A large crate has thousands of mutants, which one hosted job cannot
+  # test inside its timeout, so mutation-plan counts them, `mutation` tests one shard each, and
+  # mutation-verdict judges every shard's outcomes together. The verdict job carries the name
+  # `mutation`, so `mutation / mutation` is the one status a caller reads (the caller's job id is
+  # `mutation`). The shard job keeps the id `mutation`, so a caller's existing budget line for it
+  # still applies.
+  mutation-plan:
+    name: mutation plan (count the mutants)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      shards: ${{ steps.plan.outputs.shards }}
+      count: ${{ steps.plan.outputs.count }}
+    steps:
+      - name: clock
+        run: echo "JOB_STARTED_AT=$(date +%s)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: .crate-workflows
+          persist-credentials: false
+      - uses: taiki-e/install-action@b80e2bb2635f28eb98b9fce1e2f0887e1535c6b2 # v2.90.0
+        with:
+          tool: cargo-mutants@27.1.0
+      # The shard count is ceil(mutants / mutants-per-shard), at least one. A matrix holds at most
+      # 256 jobs, so a count above that is refused with the input that fixes it.
+      - id: plan
+        env:
+          PER_SHARD: ${{ inputs.mutants-per-shard }}
+        run: |
+          set -e
+          case "$PER_SHARD" in '' | *[!0-9]* | 0)
+            echo "::error::mutants-per-shard must be a whole number above zero, got '$PER_SHARD'"
+            exit 1
+          esac
+          cd "$(dirname "$MANIFEST")"
+          mutants=$(cargo mutants --list --json | jq length)
+          shards=$(( (mutants + PER_SHARD - 1) / PER_SHARD ))
+          [ "$shards" -ge 1 ] || shards=1
+          if [ "$shards" -gt 256 ]; then
+            echo "::error::$mutants mutants at $PER_SHARD a shard is $shards shards, over the 256 a matrix holds; raise mutants-per-shard"
+            exit 1
+          fi
+          echo "==> $mutants mutants in $shards shard(s) of at most $PER_SHARD"
+          echo "count=$shards" >> "$GITHUB_OUTPUT"
+          echo "shards=$(jq -cn --argjson n "$shards" '[range($n)]')" >> "$GITHUB_OUTPUT"
+      - name: budget
+        if: always()
+        run: python3 .crate-workflows/helpers/job_budget.py check "${{ github.job }}" "$JOB_STARTED_AT"
+
+  mutation:
+    name: mutation shard ${{ matrix.shard }} of ${{ needs.mutation-plan.outputs.count }}
+    needs: mutation-plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    # At most two shards at once: a large crate's run takes longer, and it never holds more than
+    # two of the organization's hosted runners while other repositories' pull requests wait.
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        shard: ${{ fromJSON(needs.mutation-plan.outputs.shards) }}
+    steps:
+      - name: clock
+        run: echo "JOB_STARTED_AT=$(date +%s)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: .crate-workflows
+          persist-credentials: false
+      - uses: taiki-e/install-action@b80e2bb2635f28eb98b9fce1e2f0887e1535c6b2 # v2.90.0
+        with:
+          tool: cargo-mutants@27.1.0
+      # cargo-mutants exits 2 when a mutant survives and 3 when one times out. Both are verdicts
+      # for mutation-verdict to judge against the exemptions once every shard is in, so this step
+      # swallows exactly those two codes and no other. Round-robin spreads each file's mutants
+      # over every shard, so one slow file does not land on one shard.
+      - env:
+          SHARD: ${{ matrix.shard }}
+          SHARDS: ${{ needs.mutation-plan.outputs.count }}
+        run: |
+          cd "$(dirname "$MANIFEST")"
+          echo "MUTANTS_OUT=$(pwd)/mutants.out" >> "$GITHUB_ENV"
+          cargo mutants --jobs 2 --timeout 300 --shard "$SHARD/$SHARDS" --sharding round-robin || rc=$?
+          case "${rc:-0}" in
+            0 | 2 | 3) ;;
+            *) exit "$rc" ;;
+          esac
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        if: always()
+        with:
+          name: mutants-shard-${{ matrix.shard }}
+          path: ${{ env.MUTANTS_OUT }}
+      - name: budget
+        if: always()
+        run: python3 .crate-workflows/helpers/job_budget.py check "${{ github.job }}" "$JOB_STARTED_AT"
+
+  # A report with a tooth: a survivor or a timeout in any shard fails the run unless the caller's
+  # .github/mutants-exempts lists it, one mutant per line with its reason. It runs on always(), so
+  # a failed plan or shard makes this job red rather than skipped, since a skipped job would
+  # satisfy a required status.
+  mutation-verdict:
+    name: mutation
+    needs: [mutation-plan, mutation]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: clock
+        run: echo "JOB_STARTED_AT=$(date +%s)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: .crate-workflows
+          persist-credentials: false
+      - name: every shard ran
+        env:
+          PLAN: ${{ needs.mutation-plan.result }}
+          SHARDS: ${{ needs.mutation.result }}
+        run: |
+          if [ "$PLAN" != success ] || [ "$SHARDS" != success ]; then
+            echo "::error::mutation plan was $PLAN and the shards were $SHARDS; the failing job's log says why"
+            exit 1
+          fi
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        with:
+          pattern: mutants-shard-*
+          path: ${{ runner.temp }}/mutants-shards
+      - env:
+          SHARDS: ${{ needs.mutation-plan.outputs.count }}
+          OUT: ${{ runner.temp }}/mutants-shards
+        run: |
+          set -e
+          found=$(find "$OUT" -mindepth 2 -maxdepth 2 -name outcomes.json | wc -l)
+          if [ "$found" -ne "$SHARDS" ]; then
+            echo "::error::$found of $SHARDS shards left an outcomes.json"
+            exit 1
+          fi
+          python3 .crate-workflows/helpers/mutants_gate.py "$OUT" "$GITHUB_WORKSPACE/.github/mutants-exempts"
+      - name: budget
+        if: always()
+        run: python3 .crate-workflows/helpers/job_budget.py check "${{ github.job }}" "$JOB_STARTED_AT"
+

@@ -16,7 +16,8 @@ publishing from a `nifeos` workflow. This repository is where all three land.
 |---|---|---|
 | `.github/workflows/check.yml` | every pull request | `lag`, `fmt`, `clippy`, `tests`, `coverage`, `standalone`, `supply-chain` |
 | `.github/workflows/proofs.yml` | every pull request | `lag`, `kani`, `falsify` |
-| `.github/workflows/weekly.yml` | a weekly schedule, no pull request open | `lag`, `drift`, `msrv`, `semver`, `miri`, `mutation-plan`, `mutation` (one per shard), `mutation-verdict` (named `mutation`), `settings-drift`, `stranger` |
+| `.github/workflows/weekly.yml` | a weekly schedule, no pull request open | `lag`, `drift`, `msrv`, `semver`, `miri`, `settings-drift`, `stranger` |
+| `.github/workflows/mutation.yml` | a schedule and a dispatch, no pull request open | `lag`, `mutation-plan`, `mutation` (one per shard), `mutation-verdict` (named `mutation`) |
 | `.github/workflows/fuzz.yml` | a weekly schedule, no pull request open | `lag`, `fuzz` |
 | `.github/workflows/release.yml` | a dispatch naming a version | `gate`, `tag`, `publish` |
 | `.github/workflows/label.yml` | every pull request push | `label` |
@@ -28,18 +29,19 @@ Inputs every workflow takes (all optional unless named): `manifest-path` (defaul
 (default `stable`), `coverage-floor` (default 85). `check.yml` takes `allow-unpublished` for
 fixture crates that carry `publish = false` on purpose. `proofs.yml` takes `kani-args`.
 `weekly.yml` takes `caller-checks` (the settings-drift and stranger jobs, off for this template's
-own selftest) and `mutants-per-shard` (default 200; see below). `fuzz.yml` takes `public-crash-inputs` (the opt-in, default false), `seconds-per-target` (default 300) and `total-seconds` (default
+own selftest). `mutation.yml` takes `mutants-per-shard` (default 200; see below). `fuzz.yml` takes `public-crash-inputs` (the opt-in, default false), `seconds-per-target` (default 300) and `total-seconds` (default
 1,200). `release.yml` takes `version` (required, e.g. `0.1.0`) and `dry-run`
 (default true).
 
-## The weekly mutation run
+## The full mutation run
 
-`weekly.yml` splits cargo-mutants over a matrix, since one hosted job cannot test a large crate's
+`mutation.yml` splits cargo-mutants over a matrix, since one hosted job cannot test a large crate's
 mutants inside its 60-minute timeout. `mutation-plan` counts the mutants with `cargo mutants --list`
 and makes ceil(mutants / `mutants-per-shard`) shards, at least one. Each `mutation` job tests one
 shard (`--shard k/n --sharding round-robin`) and uploads its `mutants.out` as `mutants-shard-k`.
 `mutation-verdict` judges every shard's outcomes together against `.github/mutants-exempts`, and
-carries the name `mutation`, so `weekly / mutation` stays the one status to read or require.
+carries the name `mutation`, so `mutation / mutation` is the one status to read. At most two shards
+run at once.
 
 The default of 200 mutants a shard fits a crate whose mutants take about 15 seconds each, two at a
 time: 25 minutes a shard. A crate under 200 mutants runs as one shard. A crate with slower tests
@@ -133,7 +135,7 @@ no credential: `cargo publish --dry-run`, then the door. It publishes nothing.
 | coverage, 85% per file | cargo-llvm-cov, per-file floor | `check / coverage` |
 | fuzz (cargo-fuzz) | nightly, weekly, a bounded time per target, only when the caller opts in; see below | `fuzz / fuzz` |
 | Miri, weekly | `cargo +nightly miri test` | `weekly / miri` |
-| mutation, weekly | cargo-mutants in shards; a survivor or a timeout fails unless `.github/mutants-exempts` lists it with a reason | `weekly / mutation` |
+| mutation, full run | cargo-mutants in shards; a survivor or a timeout fails unless `.github/mutants-exempts` lists it with a reason | `mutation / mutation` |
 | `script/verify` (Kani) | `cargo kani` at the version in `.kani-version`, on every pull request | `proofs / kani` |
 | falsification sweep | every patch applied with `-p1` must turn its harness red at its own assertion; the form check (every harness carries a patch or a reason) runs beside it | `proofs / falsify` |
 | kani-reach | dropped: a dispatch-only measurement of nife's reach | |
@@ -269,7 +271,7 @@ pin is the commit SHA of the release you are adopting: run `git rev-parse v1^{co
 checkout of this repository. Then run `script/apply-settings <owner/name>` once, from a checkout,
 as somebody with repository administration rights. `.github/ci-job-budgets` is optional; without
 it every heavy job assumes 20 minutes. `.github/mutants-exempts` is optional; without it one survivor
-fails `weekly / mutation`.
+fails `mutation / mutation`.
 
 Before the first release, run the stranger test and record its date as `Last run: YYYY-MM-DD` in
 `docs/stranger-test.md` (ruled 2026-11-01 UTC). The scaffold starts at `Last run: none`, and
