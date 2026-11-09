@@ -253,14 +253,14 @@ tree) lives in nife and stays there.
 
 ## Required checks
 
-The ruleset on `main` requires nine checks, with branches up to date: the six `check /` jobs (fmt,
-clippy, tests, coverage, standalone, supply-chain), the two `proofs /` jobs (kani, falsify), and
+The ruleset on `main` requires ten checks, with branches up to date: the seven `check /` jobs (fmt,
+clippy, tests, coverage, standalone, supply-chain, mutation-diff), the two `proofs /` jobs (kani, falsify), and
 the hold. The names are the caller's job id, a slash, and the reusable workflow's job name;
 `scaffold/` fixes the caller job ids so the two ends cannot drift.
 
 ```
 check / fmt, check / clippy, check / tests, check / coverage, check / standalone, check / supply-chain,
-proofs / kani, proofs / falsify, hold / architect hold
+check / mutation-diff, proofs / kani, proofs / falsify, hold / architect hold
 ```
 
 ## Adopting it for a crate
@@ -322,7 +322,7 @@ repository, with contents write.
 
 The canary repository `nifeos/crate-workflows-test` adopts every release before anything depends
 on one. The ritual after cutting a tag: open a pull request there that moves every caller's pin
-to the new release's commit, expect the nine required checks green, and merge it. A release is
+to the new release's commit, expect the ten required checks green, and merge it. A release is
 not depended on until the canary has adopted it, and a canary pin behind the newest release is
 the lag check's red, by design. The canary is also the configured repository `apply-settings` and
 `check-settings` run against, so the drift check always has a real repository to read.

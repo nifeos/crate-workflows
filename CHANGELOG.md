@@ -6,6 +6,9 @@ call that sits behind the newest release.
 
 ## Unreleased
 
+- `check / mutation-diff` is a required check in `settings/repository-settings.json`, ten in all.
+  A repository runs `script/apply-settings` from this release after its pin bump brings the job,
+  since a required check that never reports holds every pull request.
 - `release / gate` also needs a green full mutation run at the released commit:
   `helpers/release-gate.sh` calls `mutation_plan.py verify`. A green `mutation.yml` run there counts
   when it recorded `full`, or `unchanged <fingerprint> since run N` where run N is a green full run
