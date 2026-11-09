@@ -71,8 +71,12 @@ class Unreadable(Exception):
 
 
 def shields(text):
-    """A static shields.io badge's text: `-` and `_` doubled, spaces as `%20`."""
-    return text.replace('-', '--').replace('_', '__').replace(' ', '%20')
+    """A static shields.io badge's text: `-` and `_` doubled, spaces as `%20`, parentheses as `%28` and `%29`.
+
+    A parenthesis stays out of the URL because it would end the Markdown link early.
+    """
+    return (text.replace('-', '--').replace('_', '__').replace(' ', '%20')
+            .replace('(', '%28').replace(')', '%29'))
 
 
 def callers(workflows_dir, reusable):
@@ -324,6 +328,10 @@ def selftest():
             failed.append(f'{label}: gave {got}, wanted {want}')
 
     expect('the row', GOOD, [])
+    dual = '(MIT OR Apache-2.0) AND BSD-3-Clause'
+    expect('a license with parentheses', GOOD.replace('MIT%20OR%20Apache--2.0',
+                                                      shields(dual)), [],
+           manifest={**MANIFEST, 'license': dual})
     expect('the row with the published pair', GOOD.replace(ROW, PAIR + ROW), [])
     expect('no row', GOOD.replace(ROW, ''), ['no badge row directly under the title'])
     expect('a paragraph before the row', GOOD.replace(ROW, 'Text.\n\n' + ROW),
