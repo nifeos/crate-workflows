@@ -293,4 +293,6 @@ jobs:
           VERDICT: ${{ needs.mutation-verdict.result }}
         run: |
           echo "==> record: ${RECORD:-none (the plan did not decide)}; verdict: $VERDICT"
+          # The backticks are literal markdown, not command substitution.
+          # shellcheck disable=SC2016
           printf '### Mutation record\n\n`%s` (verdict: %s)\n' "${RECORD:-none}" "$VERDICT" >> "$GITHUB_STEP_SUMMARY"

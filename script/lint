@@ -1,7 +1,7 @@
 #!/bin/sh
 #
 # script/lint: this repository's own gates. Runs offline (selftests, greps, shell checks) and is
-# called by the selftest workflow's lint job, which installs actionlint first when it is missing.
+# called by the selftest workflow's lint job, which installs the pinned actionlint first.
 #
 # What each section is for:
 # - shell checks: every script here runs inside a caller's CI; a shell bug is nine repositories'
@@ -19,9 +19,9 @@
 #   (helpers/job_budget.py lint).
 # - prose: em-dashes and the banned words nife's style refuses; a template that teaches by example
 #   keeps the style.
-# - actionlint: the one check this script runs only when the binary exists. Its absence is printed
-#   loudly: the workflow files' YAML is otherwise unlinted until CI, which is an exception, marked
-#   here rather than hidden.
+# - actionlint: lints every file in .github/workflows and the caller templates in
+#   scaffold/caller-workflows (placeholders filled). Required, like typos; the pinned version is in
+#   helpers/install_actionlint.sh.
 
 set -eu
 
@@ -263,28 +263,36 @@ echo "==> prose caps (this repository's README and CHANGELOG)"
 echo "ok"
 
 echo "==> actionlint (the workflow YAML's own linter)"
-if command -v actionlint >/dev/null 2>&1; then
-	# EXCEPTION, marked: actionlint 1.7.12's job-context model predates GitHub's
-	# job.workflow_sha / job.workflow_repository, which the contexts reference documents and which
-	# the lag check and helper checkout depend on. The two -ignore patterns name exactly those
-	# properties and nothing else; the selftest's own runs are the proof the properties resolve on
-	# github.com. A newer actionlint that knows them makes the ignores dead and harmless.
-	# EXCEPTION, marked: actionlint 1.7.12 also does not know the "administration" permission
-	# scope, which GitHub documents and the settings-drift job needs to read rulesets back. The
-	# ignore names that scope only; the selftest's settings-drift run is the proof it works.
-	# EXCEPTION, marked: CRATES_IO_FIRST_PUBLISH_TOKEN is an environment secret of the caller's
-	# crates-io environment, read by release.yml's publish job (which names that environment). It
-	# cannot be a declared workflow_call secret: a caller job has no environment to pass it from.
-	# The ignore names that one secret only.
-	actionlint \
-		-ignore 'property "crates_io_first_publish_token" is not defined' \
-		-ignore 'property "workflow_sha" is not defined' \
-		-ignore 'property "workflow_repository" is not defined' \
-		-ignore 'unknown permission scope "administration"'
-	echo "ok"
-else
-	echo "EXCEPTION: actionlint is not installed, so the workflow YAML is unlinted here and only" >&2
-	echo "checked when CI runs it. This is marked rather than hidden; install actionlint locally." >&2
-fi
+# Required, like typos: without it the workflow YAML would be unchecked until CI. The pin lives in
+# helpers/install_actionlint.sh, which the selftest workflow also runs.
+pinned="$(sh helpers/install_actionlint.sh --version)"
+command -v actionlint >/dev/null 2>&1 ||
+	fail "actionlint is not installed; run: sh helpers/install_actionlint.sh \"\$HOME/.local/bin\" (linux amd64, pins actionlint $pinned) and put that directory on PATH"
+[ "$(actionlint -version | head -1)" = "$pinned" ] ||
+	fail "actionlint $(actionlint -version | head -1) is installed but the ignores below are written for $pinned; run: sh helpers/install_actionlint.sh \"\$HOME/.local/bin\""
+# Callers' templates carry placeholders (the pin, the mutation cron) that are not valid YAML for
+# actionlint; fill them as canary-adopt.yml does, in a scratch tree, so the files a crate
+# repository receives are linted too. The workflows of this repository come first.
+tpl="$fixtures/callers"
+mkdir -p "$tpl/.github/workflows"
+for f in scaffold/caller-workflows/*.yml; do
+	sed -e 's/@PINS@/@0000000000000000000000000000000000000000/' -e 's/@MUTATION_CRON@/20 8 * * 1/' "$f" >"$tpl/.github/workflows/$(basename "$f")"
+done
+# EXCEPTION, marked: actionlint 1.7.12's job-context model predates GitHub's
+# job.workflow_sha / job.workflow_repository, which the contexts reference documents and which
+# the lag check and helper checkout depend on. The two -ignore patterns name exactly those
+# properties and nothing else; the selftest's own runs are the proof the properties resolve on
+# github.com. A newer actionlint that knows them makes the ignores dead and harmless.
+# EXCEPTION, marked: CRATES_IO_FIRST_PUBLISH_TOKEN is an environment secret of the caller's
+# crates-io environment, read by release.yml's publish job (which names that environment). It
+# cannot be a declared workflow_call secret: a caller job has no environment to pass it from.
+# The ignore names that one secret only.
+set -- \
+	-ignore 'property "crates_io_first_publish_token" is not defined' \
+	-ignore 'property "workflow_sha" is not defined' \
+	-ignore 'property "workflow_repository" is not defined'
+actionlint "$@"
+actionlint "$@" "$tpl"/.github/workflows/*.yml
+echo "ok"
 
 echo "==> lint: ok"

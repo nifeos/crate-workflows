@@ -75,6 +75,10 @@ its header states). A change to the order changes
 `scaffold/README-crate.md` and `sample/README.md` with it; `script/lint` fails when the sample has a
 finding.
 
+The workflow YAML is linted by `actionlint`, required in `script/lint`. Its version and checksum
+are pinned in `helpers/install_actionlint.sh`; a bump re-checks the `-ignore` patterns in
+`script/lint`, each of which names one property and says why.
+
 Prose and comments are spell-checked by `helpers/typos_gate.sh` (typos, en-us locale), which
 `check / standalone` runs over the crate with the crate's own `_typos.toml`. The tool version is
 pinned in `check.yml` and `selftest.yml` together; a bump changes both. The template's own
