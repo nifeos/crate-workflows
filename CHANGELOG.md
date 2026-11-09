@@ -26,6 +26,9 @@ call that sits behind the newest release.
 - `helpers/mutants_gate.py --diff` judges a run over changed lines (`cargo mutants --in-diff`): an
   exemption that names no survivor in it is out of the run's reach, not stale, so the stale check
   is skipped. A survivor or timeout that is not exempted still fails.
+- The step of `mutation / mutation` that runs `mutants_gate.py` is named "judge the survivors
+  against the exemptions" and, when the gate refuses, adds an error annotation saying so. A refusal
+  no longer shows as an exit code on an unnamed step under the artifact download.
 - `bus` joins `[address_qualifiers]`, so a bus address (`SYSTEM_MANAGEMENT_BUS_ADDRESS`) passes the
   address rule of `register_names.py`. Its selftest checks that such a name passes and fails when
   the word is removed.
