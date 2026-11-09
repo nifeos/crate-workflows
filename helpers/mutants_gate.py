@@ -1,12 +1,17 @@
 #!/usr/bin/env python3
 """A mutation survivor fails the run unless the caller exempted it with a reason.
 
-    python3 mutants_gate.py [--diff] <mutants.out-dir> [<exempts-file>]
+    python3 mutants_gate.py [--diff] [--shards N] <mutants.out-dir> [<exempts-file>]
 
 cargo-mutants writes `outcomes.json` in its `mutants.out` directory. The directory given here is
 either one such directory, or a directory whose subdirectories each hold one: the shards of one
 run (`cargo mutants --shard k/n`), judged together, since an exemption that names no survivor can
-only be called stale once every shard has reported.
+only be called stale once every shard has reported. A run of one shard downloads as the first
+form (actions/download-artifact extracts a lone artifact into the download directory itself) and
+a run of several as the second; both are read here.
+
+`--shards N` refuses the run unless exactly N `outcomes.json` files are found, so a shard that
+left nothing cannot pass as a smaller run, and zero files is always an error.
 
 A mutant whose tests did not catch it is a survivor: either the tests do not cover the mutation,
 or the mutation is genuinely equivalent behavior, and only the second is worth keeping. A mutant
@@ -85,6 +90,15 @@ def main(argv):
         return selftest()
     diff_only = '--diff' in argv[1:]
     args = [a for a in argv[1:] if a != '--diff']
+    want_shards = None
+    if '--shards' in args:
+        i = args.index('--shards')
+        try:
+            want_shards = int(args[i + 1])
+        except (IndexError, ValueError):
+            print('mutants_gate: --shards wants a number', file=sys.stderr)
+            return 2
+        del args[i:i + 2]
     if not args:
         print(__doc__, file=sys.stderr)
         return 2
@@ -103,6 +117,12 @@ def main(argv):
         print(f'mutants_gate: {e}', file=sys.stderr)
         return 1
     bad = bool(problems)
+    if want_shards is not None:
+        found = len(outcome_files(out_dir))
+        if found != want_shards:
+            print(f'mutants_gate: {found} of {want_shards} shards left an outcomes.json',
+                  file=sys.stderr)
+            return 1
     used = set()
     for f, line, desc, verdict in live:
         key = f'{f}:{line}'
@@ -184,6 +204,32 @@ def selftest():
         exempt.write_text(every + 'src/c.rs:1 # gone\n')
         expect('a stale exemption fails across shards', run(['gate', str(shards), str(exempt)]), 1)
         expect('no outcomes fails', run(['gate', str(Path(tmp) / 'nothing')]), 1)
+
+        # A one-shard run downloads with outcomes.json at the root of the download directory, and
+        # a many-shard run with one subdirectory per shard. --shards counts both the same way, and
+        # a count that does not match, or no files at all, is an error.
+        lone = Path(tmp) / 'lone'
+        lone.mkdir()
+        (lone / 'outcomes.json').write_text(json.dumps({'outcomes': [
+            mutant('src/a.rs', 3, 'src/a.rs:3:5: replace + with -', 'MissedMutant')]}))
+        lone_exempt = Path(tmp) / 'lone-exempts'
+        lone_exempt.write_text('')
+        expect('lone shard: survivor fails', run(['gate', '--shards', '1', str(lone), str(lone_exempt)]), 1)
+        lone_exempt.write_text('src/a.rs:3 # equivalent\n')
+        expect('lone shard: exempted passes', run(['gate', '--shards', '1', str(lone), str(lone_exempt)]), 0)
+        expect('lone shard: wrong count fails', run(['gate', '--shards', '2', str(lone), str(lone_exempt)]), 1)
+        (lone / 'outcomes.json').write_text(json.dumps({'outcomes': [
+            mutant('src/a.rs', 3, 'src/a.rs:3:5: replace + with -', 'CaughtMutant')]}))
+        expect('lone shard: clean passes', run(['gate', '--shards', '1', str(lone)]), 0)
+        every3 = Path(tmp) / 'every3'
+        every3.write_text(every)
+        expect('many shards: counted', run(['gate', '--shards', '3', str(shards), str(every3)]), 0)
+        expect('many shards: a missing shard fails', run(['gate', '--shards', '4', str(shards), str(every3)]), 1)
+        empty = Path(tmp) / 'empty'
+        empty.mkdir()
+        expect('zero files fails', run(['gate', '--shards', '1', str(empty)]), 1)
+        expect('zero files fails without a count', run(['gate', str(empty)]), 1)
+        expect('bad count refused', run(['gate', '--shards', 'x', str(lone)]), 2)
 
         # --diff: a changed-lines run reaches only some mutants, so an exemption it does not reach
         # is not stale there; an unexempted survivor or timeout still fails, and a bad line is
