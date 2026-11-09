@@ -9,8 +9,9 @@ on:
     branches: [main]
   pull_request:
   schedule:
-    # Mondays 06:20 UTC: a canary pass of the whole weekly workflow against the fixture, so a
-    # tool that rots under the template finds out here and not in nine crate repositories.
+    # Mondays 06:20 UTC: a canary pass of the whole weekly and mutation workflows against the
+    # fixture, so a tool that rots under the template finds out here and not in nine crate
+    # repositories.
     - cron: '20 6 * * 1'
   workflow_dispatch:
 
@@ -72,6 +73,15 @@ jobs:
     with:
       manifest-path: sample/Cargo.toml
       caller-checks: false
+
+  mutation:
+    name: selftest (mutation)
+    needs: lint
+    permissions:
+      contents: read
+    uses: ./.github/workflows/mutation.yml
+    with:
+      manifest-path: sample/Cargo.toml
       # The fixture has seven mutants and three exempted survivors. Three a shard splits it into
       # three shards and puts one survivor in each, so mutation-verdict has to merge every shard
       # before all of its exemptions match.

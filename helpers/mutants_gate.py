@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """A mutation survivor fails the run unless the caller exempted it with a reason.
 
-    python3 mutants_gate.py <mutants.out-dir> [<exempts-file>]
+    python3 mutants_gate.py [--diff] <mutants.out-dir> [<exempts-file>]
 
 cargo-mutants writes `outcomes.json` in its `mutants.out` directory. The directory given here is
 either one such directory, or a directory whose subdirectories each hold one: the shards of one
@@ -16,8 +16,13 @@ words on the same line after a `#`. One line covers every mutant on that source 
 line without a reason is refused, and a mutant listed in the file that no longer exists is refused
 too, so the list can only shrink by a diff that says why.
 
-nife's mutation gate reports into a weekly census with triage labels; a standalone crate cannot
-afford that machinery, so this is the one-line version: survive, exempt with a reason, or fail.
+`--diff` judges a run over a pull request's changed lines (`cargo mutants --in-diff`). Such a run
+generates the mutants of the changed lines only, so an exemption that names no survivor in it is
+not stale, only out of reach, and the stale-exemption check is skipped. A survivor or a timeout
+that is not exempted fails the same way. The full mutation run, without `--diff`, is the one that
+calls an exemption stale.
+
+There is no triage ledger or census here: survive, exempt with a reason, or fail.
 """
 
 import json
@@ -78,10 +83,12 @@ def parse_exempts(text):
 def main(argv):
     if '--selftest' in argv[1:]:
         return selftest()
-    if not argv[1:]:
+    diff_only = '--diff' in argv[1:]
+    args = [a for a in argv[1:] if a != '--diff']
+    if not args:
         print(__doc__, file=sys.stderr)
         return 2
-    out_dir, exempt_path = argv[1], (argv[2] if len(argv) > 2 else None)
+    out_dir, exempt_path = args[0], (args[1] if len(args) > 1 else None)
     exempts, problems = {}, []
     if exempt_path:
         try:
@@ -105,7 +112,7 @@ def main(argv):
         else:
             print(f'mutants_gate: {verdict} {key}: {desc}', file=sys.stderr)
             bad = True
-    for key in sorted(set(exempts) - used):
+    for key in ([] if diff_only else sorted(set(exempts) - used)):
         print(f'mutants_gate: {exempt_path}: {key} is exempted but no such survivor exists now',
               file=sys.stderr)
         bad = True
@@ -177,6 +184,18 @@ def selftest():
         exempt.write_text(every + 'src/c.rs:1 # gone\n')
         expect('a stale exemption fails across shards', run(['gate', str(shards), str(exempt)]), 1)
         expect('no outcomes fails', run(['gate', str(Path(tmp) / 'nothing')]), 1)
+
+        # --diff: a changed-lines run reaches only some mutants, so an exemption it does not reach
+        # is not stale there; an unexempted survivor or timeout still fails, and a bad line is
+        # still refused.
+        exempt.write_text(every + 'src/c.rs:1 # out of this diff\'s reach\n')
+        expect('--diff skips the stale check', run(['gate', '--diff', str(shards), str(exempt)]), 0)
+        expect('--diff in any position', run(['gate', str(shards), str(exempt), '--diff']), 0)
+        exempt.write_text('src/a.rs:3 # equivalent\nsrc/a.rs:7 # equivalent\n')
+        expect('--diff still fails a timeout', run(['gate', '--diff', str(shards), str(exempt)]), 1)
+        exempt.write_text(every + 'no reason here\n')
+        expect('--diff still refuses a bad line', run(['gate', '--diff', str(shards), str(exempt)]), 1)
+        expect('--diff with no outcomes fails', run(['gate', '--diff', str(Path(tmp) / 'nothing')]), 1)
     print('mutants_gate selftest: %s' % ('ok' if ok else 'FAILED'))
     return 0 if ok else 1
 

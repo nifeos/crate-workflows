@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-"""The template's workflows keep their shape: reusable ones declare permissions, the three
-per-pull-request and weekly workflows start with the lag check, and no job loses its budget.
+"""The template's workflows keep their shape: reusable ones declare permissions, the
+per-pull-request, weekly and mutation workflows start with the lag check, and no job loses its budget.
 
     python3 workflow_shape.py [--workflows-dir .github/workflows] [--selftest]
 
@@ -15,7 +15,7 @@ import sys
 from pathlib import Path
 
 # Which files are reusable at all, and which must open with the lag job.
-LAG_FIRST = ('check.yml', 'proofs.yml', 'weekly.yml', 'fuzz.yml')
+LAG_FIRST = ('check.yml', 'proofs.yml', 'weekly.yml', 'fuzz.yml', 'mutation.yml')
 REUSABLE = LAG_FIRST + ('release.yml', 'label.yml', 'hold.yml', 'ruled.yml')
 
 

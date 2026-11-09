@@ -57,7 +57,7 @@ WARN_FRACTION = 0.85
 MARGIN_MINUTES = 5
 WORKFLOWS = [".github/workflows/check.yml", ".github/workflows/proofs.yml",
              ".github/workflows/weekly.yml", ".github/workflows/fuzz.yml",
-             ".github/workflows/release.yml"]
+             ".github/workflows/release.yml", ".github/workflows/mutation.yml"]
 RATCHET = ".github/ci-job-budgets"
 
 START_MARK = "JOB_STARTED_AT"
