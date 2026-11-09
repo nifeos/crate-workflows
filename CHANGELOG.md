@@ -6,6 +6,10 @@ call that sits behind the newest release.
 
 ## Unreleased
 
+- The `mutation` verdict reads a one-shard run. `actions/download-artifact` extracts a lone artifact
+  into the download directory itself, not a subdirectory, so the verdict's `find -mindepth 2` found
+  no `outcomes.json` and failed every one-shard repository. `mutants_gate.py --shards N` now counts
+  both layouts and refuses any count other than N, zero included; a survivor or timeout still fails.
 - `check / mutation-diff` is a required check in `settings/repository-settings.json`, ten in all.
   A repository runs `script/apply-settings` from this release after its pin bump brings the job,
   since a required check that never reports holds every pull request.

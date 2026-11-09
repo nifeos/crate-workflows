@@ -266,12 +266,9 @@ jobs:
           OUT: ${{ runner.temp }}/mutants-shards
         run: |
           set -e
-          found=$(find "$OUT" -mindepth 2 -maxdepth 2 -name outcomes.json | wc -l)
-          if [ "$found" -ne "$SHARDS" ]; then
-            echo "::error::$found of $SHARDS shards left an outcomes.json"
-            exit 1
-          fi
-          if ! python3 .crate-workflows/helpers/mutants_gate.py "$OUT" "$GITHUB_WORKSPACE/.github/mutants-exempts"; then
+          # One shard downloads with outcomes.json in $OUT itself, several into a subdirectory
+          # each; the gate counts both layouts and refuses a count other than $SHARDS.
+          if ! python3 .crate-workflows/helpers/mutants_gate.py --shards "$SHARDS" "$OUT" "$GITHUB_WORKSPACE/.github/mutants-exempts"; then
             echo "::error::the mutation gate refused this run: each SURVIVOR, TIMEOUT or stale exemption it names is above"
             exit 1
           fi
