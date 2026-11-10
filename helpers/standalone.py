@@ -15,7 +15,11 @@ What each check is, and where it came from:
   permissive source (BSD or ISC) carries that source's notice, and its field says so by adding
   `AND <id>` for each such license after the pair in parentheses, as in
   `(MIT OR Apache-2.0) AND BSD-3-Clause`. The ids allowed are `BSD-2-Clause`, `BSD-3-Clause` and
-  `ISC`; any other field is a finding.
+  `ISC`; any other field is a finding. The field and the notices must also agree in each direction: every
+  notice opens with a line `SPDX-License-Identifier: <id>` (after any comment marker) naming its
+  license, and the set of those ids must equal the `AND` terms of the field. A notice with no term
+  and a term with no notice each fail, naming the file or the term. `LICENSE-<name>` files at the
+  root are read as well as the text files, since a repository may keep a notice there.
 - manifest: no workspace inheritance left (`lints.workspace = true` dies here), a `rust-version`
   so `weekly / msrv` has something to build, and `[lints]` carrying `unsafe_op_in_unsafe_fn` and
   `missing_docs` themselves, which is the workspace-lints row of nife's table inlined where a
@@ -134,6 +138,50 @@ def license_ok(field):
     return all(term in NOTICE_LICENSES for term in terms) and len(set(terms)) == len(terms)
 
 
+NOTICE_LINE = re.compile(r'^\s*(?://[!/]?|#|\*)?\s*SPDX-License-Identifier:(.*)$', re.M)
+OWN_IDENTIFIERS = {'MIT', 'Apache-2.0'}
+EXPRESSION_WORDS = {'AND', 'OR', 'WITH'}
+
+
+def notice_licenses(root):
+    """{identifier: first file whose notice opens with it}, minus the crate's own pair.
+
+    Only a line that begins with the marker counts, so prose that quotes one (a table of the
+    licenses of sources that were read and not adapted) is not a notice.
+    """
+    root = Path(root)
+    found = {}
+    for path in sorted(root.rglob('*')):
+        parts = path.relative_to(root).parts
+        if (not path.is_file() or any(p in ('.git', 'target', '.crate-workflows') for p in parts)
+                or path.name in LICENSE_FILES
+                or not (path.suffix in TEXT or path.name.startswith('LICENSE-'))):
+            continue
+        try:
+            text = path.read_text()
+        except UnicodeDecodeError:
+            continue
+        for m in NOTICE_LINE.finditer(text):
+            for ident in re.findall(r'[A-Za-z0-9][A-Za-z0-9.+-]*', m.group(1)):
+                if ident not in OWN_IDENTIFIERS | EXPRESSION_WORDS:
+                    found.setdefault(ident, '/'.join(parts))
+    return found
+
+
+def notice_findings(root, manifest):
+    """Findings where the license field and the notices the crate carries disagree."""
+    field = manifest.get('package', {}).get('license')
+    if not license_ok(field):
+        return []  # the shape finding already names it
+    terms = set(field[len(f'({LICENSE}) AND '):].split(' AND ')) if field != LICENSE else set()
+    notices = notice_licenses(root)
+    found = [f'{where} carries the {ident} notice, which the license field {field!r} does not name'
+             for ident, where in sorted(notices.items()) if ident not in terms]
+    found += [f'license field names {term}, but no file carries an SPDX-License-Identifier: {term} notice'
+              for term in sorted(terms - set(notices))]
+    return found
+
+
 def file_findings(root_names, manifest):
     found = []
     if not any(n.upper().startswith('README') for n in root_names):
@@ -199,6 +247,7 @@ def findings(root, allow_unpublished):
     except FileNotFoundError:
         return ['no Cargo.toml at the crate root']
     found = file_findings({p.name for p in root.iterdir()}, manifest)
+    found += notice_findings(root, manifest)
     found += manifest_findings(manifest, allow_unpublished)
     found += citation_findings(files)
     found += rustfmt_findings(root)
@@ -243,6 +292,23 @@ unexpected_cfgs = { level = "warn", check-cfg = ['cfg(kani)'] }
                             (f'({LICENSE}) AND ISC AND ISC', False), (f'{LICENSE} AND ISC', False),
                             ('MIT', False), (None, False)):
             expect(f'license {field!r}', license_ok(field), want)
+
+        isc_field = f'license = "({LICENSE}) AND ISC"'
+        isc_manifest = manifest.replace(f'license = "{LICENSE}"', isc_field)
+        (root / 'Cargo.toml').write_text(isc_manifest)
+        expect('term with no notice', notice_findings(root, tomllib.loads(isc_manifest)),
+               ['license field names ISC, but no file carries an SPDX-License-Identifier: ISC notice'])
+        (root / 'LICENSE-ISC').write_text('SPDX-License-Identifier: ISC\n\nCopyright (c) someone\n')
+        expect('notice and term agree', findings(root, allow_unpublished=False), [])
+        (root / 'Cargo.toml').write_text(manifest)
+        expect('notice with no term', notice_findings(root, tomllib.loads(manifest)),
+               ['LICENSE-ISC carries the ISC notice, which the license field '
+                "'MIT OR Apache-2.0' does not name"])
+        (root / 'LICENSE-ISC').write_text('The ISC license requires this notice.\n')
+        (root / 'src' / 'lib.rs').write_text('//! Read, not adapted: `// SPDX-License-Identifier: GPL-2.0`.\n')
+        expect('prose is not a notice', notice_findings(root, tomllib.loads(manifest)), [])
+        (root / 'LICENSE-ISC').unlink()
+        (root / 'src' / 'lib.rs').write_text('//! A crate.\n')
 
         (root / 'Cargo.toml').write_text(manifest + '\n[package.publish]\nfalse = true\n')
         # A malformed publish table is still "not false": tomllib reads the table, not a bool.
