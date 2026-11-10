@@ -6,7 +6,7 @@ call that sits behind the newest release.
 
 ## Unreleased
 
-- `check / standalone` compares the notices a crate carries with its `license` field, both ways. A
+- `check / standalone` compares the notices a crate carries with its `license` field. A
   notice opens with a line `SPDX-License-Identifier: <id>`, in a text file or a `LICENSE-<name>`
   file at the root; the set of those ids, minus `MIT` and `Apache-2.0`, must equal the `AND` terms
   of the field. A notice with no term and a term with no notice each fail, naming the file or the

@@ -15,7 +15,7 @@ What each check is, and where it came from:
   permissive source (BSD or ISC) carries that source's notice, and its field says so by adding
   `AND <id>` for each such license after the pair in parentheses, as in
   `(MIT OR Apache-2.0) AND BSD-3-Clause`. The ids allowed are `BSD-2-Clause`, `BSD-3-Clause` and
-  `ISC`; any other field is a finding. The field and the notices must also agree both ways: every
+  `ISC`; any other field is a finding. The field and the notices must also agree in each direction: every
   notice opens with a line `SPDX-License-Identifier: <id>` (after any comment marker) naming its
   license, and the set of those ids must equal the `AND` terms of the field. A notice with no term
   and a term with no notice each fail, naming the file or the term. `LICENSE-<name>` files at the
