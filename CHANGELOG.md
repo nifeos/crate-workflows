@@ -6,6 +6,12 @@ call that sits behind the newest release.
 
 ## Unreleased
 
+- `check / standalone` compares the notices a crate carries with its `license` field, both ways. A
+  notice opens with a line `SPDX-License-Identifier: <id>`, in a text file or a `LICENSE-<name>`
+  file at the root; the set of those ids, minus `MIT` and `Apache-2.0`, must equal the `AND` terms
+  of the field. A notice with no term and a term with no notice each fail, naming the file or the
+  term. A line that merely quotes the marker inside prose is not a notice. Nothing changes for a
+  repository whose notices already carry the line.
 - `actionlint` 1.7.12 is a required gate of `script/lint` and so of the selftest's lint job, no
   longer an optional one: a missing or different binary fails with the install command. It lints
   `.github/workflows/` and `scaffold/caller-workflows/` (placeholders filled in a scratch copy).
