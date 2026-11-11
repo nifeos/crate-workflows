@@ -117,6 +117,12 @@ min = "minute"
 [units_after_number]
 s = "seconds"
 
+# Symbols that are a unit only as the last part of a name that has others (`DRIFT_PPM`, never the bare
+# `ppm`, and never `ppm` in the middle of a name): `ppm` is also the Portable PixMap image format,
+# whose bare name and whose compounds such as `ppm_channel_order` stay as they are.
+[units_as_suffix]
+ppm = "parts_per_million"
+
 # British spellings, refused in a name: the house spelling is American. Read by
 # helpers/british_spelling.py. A key is one component of a name, in lowercase; the value is the
 # American form. The tables below hold stems and endings so one line covers a family.

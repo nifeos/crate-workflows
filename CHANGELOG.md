@@ -6,6 +6,10 @@ call that sits behind the newest release.
 
 ## Unreleased
 
+- The unit check refuses `ppm` as the last part of a name with more than one part (`DRIFT_PPM`),
+  and asks for `parts_per_million`. A bare `ppm` and one mid-name stay allowed, because `ppm` is
+  also the Portable PixMap format. A crate that names a parts-per-million quantity with the symbol
+  now fails `check / standalone`.
 - `check / standalone` compares the notices a crate carries with its `license` field. A
   notice opens with a line `SPDX-License-Identifier: <id>`, in a text file or a `LICENSE-<name>`
   file at the root; the set of those ids, minus `MIT` and `Apache-2.0`, must equal the `AND` terms
