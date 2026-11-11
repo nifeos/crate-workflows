@@ -6,6 +6,10 @@ call that sits behind the newest release.
 
 ## Unreleased
 
+- The release workflow's `rehearse` and `publish` jobs tell git to ignore the template checkout
+  at `.crate-workflows/`. It lies inside the crate's tree, so a crate without an `include` list
+  failed `cargo package` and `cargo publish` with the template's files reported as uncommitted
+  changes. Nothing changes for a crate that already packaged.
 - The scaffold's README starting shape gains a "Building and testing" section, and the stranger
   cadence page lists what a README must say. The list covers the build and test commands with any
   required feature, and `rustup target add`. It covers the Kani install before the first

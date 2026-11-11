@@ -165,6 +165,11 @@ jobs:
           ref: ${{ job.workflow_sha }}
           path: .crate-workflows
           persist-credentials: false
+      # The template checkout lies inside the crate's tree, and cargo refuses to package a tree with
+      # files git does not know. Git is told to ignore it, so a crate without an `include` list
+      # packages, and the template's files never reach the archive.
+      - name: keep the template checkout out of the package
+        run: echo '/.crate-workflows/' >> .git/info/exclude
       - run: rustup toolchain install stable --profile minimal
       - name: package builds
         run: |
@@ -208,6 +213,11 @@ jobs:
           ref: ${{ job.workflow_sha }}
           path: .crate-workflows
           persist-credentials: false
+      # The template checkout lies inside the crate's tree, and cargo refuses to package a tree with
+      # files git does not know. Git is told to ignore it, so a crate without an `include` list
+      # packages, and the template's files never reach the archive.
+      - name: keep the template checkout out of the package
+        run: echo '/.crate-workflows/' >> .git/info/exclude
       - run: rustup toolchain install stable --profile minimal
       - name: package builds (cargo publish --dry-run)
         run: cargo publish --manifest-path "$MANIFEST" --dry-run
