@@ -161,8 +161,20 @@ jobs:
           path: .crate-workflows
           persist-credentials: false
       - run: rustup toolchain install stable --profile minimal
+      # A soak crate carries publish = false, and cargo publish refuses it even with --dry-run.
+      # A rehearsal of such a crate packages and verifies the same archive with cargo package, and
+      # says so; a real release never takes this branch, because it needs publish to be true.
       - name: package builds (cargo publish --dry-run)
-        run: cargo publish --manifest-path "$MANIFEST" --dry-run
+        run: |
+          set -e
+          unpublished=$(python3 -c 'import sys,tomllib; p=tomllib.load(open(sys.argv[1],"rb")).get("package",{}).get("publish"); print("yes" if p is False else "no")' "$MANIFEST")
+          if [ "$unpublished" = yes ] && [ "${{ inputs.dry-run }}" = true ]; then
+            echo "publish = false: rehearsing with cargo package, which builds the same archive"
+            cargo package --manifest-path "$MANIFEST" --list
+            cargo package --manifest-path "$MANIFEST"
+          else
+            cargo publish --manifest-path "$MANIFEST" --dry-run
+          fi
       # A trusted publisher binds only to a crate that exists, so a crate's first publish uses the
       # crates-io environment's CRATES_IO_FIRST_PUBLISH_TOKEN (provisional name). The mode follows
       # the crate's presence on crates.io, not the secret's: an existing crate is published through
