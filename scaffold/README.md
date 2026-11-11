@@ -33,7 +33,7 @@ github-actions ecosystem opens the bumps afterward; the lag check fails closed i
 | `CONTRIBUTING.md` | disclosure of agent-written work, and how outside contributions are reviewed |
 | `SECURITY.md` | what a security report means here, and private reporting |
 | CHANGELOG.md | one line per release; the release gate reads nothing from it, people do |
-| README-crate.md | the crate README's starting shape: the badge row under the title (fill in `<crate>` and `<rust-version>`), then its sections in the order every crate shares |
+| README-crate.md | the crate README's starting shape: the badge row under the title (fill in `<crate>` and `<rust-version>`), then its sections in the order every crate shares, including a "Building and testing" section that holds the commands, the Kani install, the proofs' cost and the falsification run |
 | deny.toml | the cargo-deny policy: no skipped crate, no ignored advisory |
 | _typos.toml | the en-us locale for the typos step; add a word only with its reason, never to hide a misspelling |
 | rustfmt.toml | the stable subset; the two unstable options are refused |

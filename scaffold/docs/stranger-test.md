@@ -9,6 +9,11 @@ What a run is:
 
 1. Clone the repository fresh.
 2. Follow the README and nothing else: build, test, and run the proofs.
+   The README must name the build and test commands (with any feature a test target needs), the
+   bare-metal build with `rustup target add`, the Kani install before the first `cargo kani`, how
+   long the proofs take and how to run one harness, what a passing run prints that looks alarming,
+   how to run and revert one falsification patch, and how to check the minimum Rust version.
+   Each one it lacks is a finding.
 3. Note every place the README lied, omitted, or assumed. Those are findings against the README,
    not against the stranger.
 4. Record the date on the line below.
