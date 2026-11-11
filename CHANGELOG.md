@@ -7,11 +7,11 @@ call that sits behind the newest release.
 ## Unreleased
 
 - The scaffold's README starting shape gains a "Building and testing" section, and the stranger
-  cadence page lists what a README must say: the build and test commands with any required
-  feature, `rustup target add`, the Kani install before the first `cargo kani`, the proofs' time
-  and memory, how to run one harness and one falsification patch, what a passing Kani run prints
-  that looks alarming, and how to check the minimum Rust version. A new crate inherits it; nothing
-  fails for an existing one.
+  cadence page lists what a README must say. The list covers the build and test commands with any
+  required feature, and `rustup target add`. It covers the Kani install before the first
+  `cargo kani`, and the proofs' time and memory. It covers how to run one harness and one
+  falsification patch, what a passing Kani run prints that looks alarming, and how to check the
+  minimum Rust version. A new crate inherits it; nothing fails for an existing one.
 - The unit check refuses `ppm` as the last part of a name with more than one part (`DRIFT_PPM`),
   and asks for `parts_per_million`. A bare `ppm` and one mid-name stay allowed, because `ppm` is
   also the Portable PixMap format. A crate that names a parts-per-million quantity with the symbol
