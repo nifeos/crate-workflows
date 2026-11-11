@@ -6,8 +6,8 @@
 # environment (a person approves), holding `id-token: write` and nothing else, and exchanges the
 # OIDC token for a temporary crates.io token through trusted publishing (Fork 6); a crate's first
 # publish, before any trusted publisher can exist, uses the environment's scoped token instead.
-# `dry-run`
-# defaults to true: a rehearsal runs the gate and a `cargo publish --dry-run` and creates no tag.
+# `dry-run` defaults to true: a rehearsal runs the gate, then `rehearse` (a package build, in no
+# environment and with no secret, so nothing waits for approval) and creates no tag.
 
 name: release
 
@@ -137,15 +137,55 @@ jobs:
         if: always()
         run: python3 .crate-workflows/helpers/job_budget.py check "${{ github.job }}" "$JOB_STARTED_AT"
 
+  # A rehearsal: runs in no environment and holds no secret, so nothing waits for approval and
+  # nothing can publish. A crate that carries publish = false (a soak) is packaged with cargo
+  # package, because cargo publish refuses it even with --dry-run.
+  rehearse:
+    name: rehearse (package builds, no environment)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: gate
+    if: ${{ inputs.dry-run }}
+    permissions:
+      contents: read
+    steps:
+      - name: clock
+        run: echo "JOB_STARTED_AT=$(date +%s)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: .crate-workflows
+          persist-credentials: false
+      - run: rustup toolchain install stable --profile minimal
+      - name: package builds
+        run: |
+          set -e
+          unpublished=$(python3 -c 'import sys,tomllib; p=tomllib.load(open(sys.argv[1],"rb")).get("package",{}).get("publish"); print("yes" if p is False else "no")' "$MANIFEST")
+          if [ "$unpublished" = yes ]; then
+            echo "publish = false: rehearsing with cargo package, which builds the same archive"
+            cargo package --manifest-path "$MANIFEST" --list
+            cargo package --manifest-path "$MANIFEST"
+          else
+            cargo publish --manifest-path "$MANIFEST" --dry-run
+          fi
+      # The crates-io environment's secrets are not visible here, so this says only whether the
+      # crate exists on crates.io; the real release reads the token from the environment.
+      - name: which door a real release would use
+        run: python3 .crate-workflows/helpers/publish_mode.py plan "$MANIFEST" || true
+      - name: budget
+        if: always()
+        run: python3 .crate-workflows/helpers/job_budget.py check "${{ github.job }}" "$JOB_STARTED_AT"
+
   publish:
     name: publish
     runs-on: ubuntu-latest
     timeout-minutes: 30
     needs: [gate, tag]
-    # A dry run skips `tag`; the release must still publish nothing without that job either
-    # passing (a real release) or being skipped by the dry run (a rehearsal).
-    if: ${{ always() && needs.gate.result == 'success' &&
-            (needs.tag.result == 'success' || needs.tag.result == 'skipped') }}
+    # Only a real release reaches here. A dry run takes `rehearse`, which has no environment, so a
+    # rehearsal never asks a person to approve a deployment.
+    if: ${{ !inputs.dry-run }}
     environment: crates-io
     permissions:
       contents: read
@@ -161,20 +201,8 @@ jobs:
           path: .crate-workflows
           persist-credentials: false
       - run: rustup toolchain install stable --profile minimal
-      # A soak crate carries publish = false, and cargo publish refuses it even with --dry-run.
-      # A rehearsal of such a crate packages and verifies the same archive with cargo package, and
-      # says so; a real release never takes this branch, because it needs publish to be true.
       - name: package builds (cargo publish --dry-run)
-        run: |
-          set -e
-          unpublished=$(python3 -c 'import sys,tomllib; p=tomllib.load(open(sys.argv[1],"rb")).get("package",{}).get("publish"); print("yes" if p is False else "no")' "$MANIFEST")
-          if [ "$unpublished" = yes ] && [ "${{ inputs.dry-run }}" = true ]; then
-            echo "publish = false: rehearsing with cargo package, which builds the same archive"
-            cargo package --manifest-path "$MANIFEST" --list
-            cargo package --manifest-path "$MANIFEST"
-          else
-            cargo publish --manifest-path "$MANIFEST" --dry-run
-          fi
+        run: cargo publish --manifest-path "$MANIFEST" --dry-run
       # A trusted publisher binds only to a crate that exists, so a crate's first publish uses the
       # crates-io environment's CRATES_IO_FIRST_PUBLISH_TOKEN (provisional name). The mode follows
       # the crate's presence on crates.io, not the secret's: an existing crate is published through
@@ -191,14 +219,14 @@ jobs:
         env:
           FIRST_PUBLISH_TOKEN: ${{ secrets.CRATES_IO_FIRST_PUBLISH_TOKEN }}
       - name: exchange the OIDC token for a crates.io token
-        if: ${{ !inputs.dry-run && steps.mode.outputs.mode == 'trusted' }}
+        if: ${{ steps.mode.outputs.mode == 'trusted' }}
         id: auth
         uses: rust-lang/crates-io-auth-action@3268eb413133e2960fa4ae0e963ca76380c54cd9 # v1.0.6
       - name: publish through trusted publishing
-        if: ${{ !inputs.dry-run && steps.mode.outputs.mode == 'trusted' }}
+        if: ${{ steps.mode.outputs.mode == 'trusted' }}
         run: cargo publish --manifest-path "$MANIFEST" --token "${{ steps.auth.outputs.token }}"
       - name: publish the crate's first version with the scoped token
-        if: ${{ !inputs.dry-run && steps.mode.outputs.mode == 'token' }}
+        if: ${{ steps.mode.outputs.mode == 'token' }}
         run: cargo publish --manifest-path "$MANIFEST"
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CRATES_IO_FIRST_PUBLISH_TOKEN }}
