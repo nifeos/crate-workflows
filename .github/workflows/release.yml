@@ -7,7 +7,8 @@
 # OIDC token for a temporary crates.io token through trusted publishing (Fork 6); a crate's first
 # publish, before any trusted publisher can exist, uses the environment's scoped token instead.
 # `dry-run` defaults to true: a rehearsal runs the gate, then `rehearse` (a package build, in no
-# environment and with no secret, so nothing waits for approval) and creates no tag.
+# environment and with no secret, so nothing waits for approval) and creates no tag. `publish: false`
+# with `dry-run: false` is tag-only: gate and tag, no publish job.
 
 name: release
 
@@ -22,6 +23,12 @@ on:
         type: string
         default: Cargo.toml
       dry-run:
+        type: boolean
+        default: true
+      # Tag-only mode: with publish false a real run (dry-run false) gates and tags and stops. The
+      # publish job, and with it the crates-io environment, is never reached. Callers pass false.
+      publish:
+        description: Run the publish job after tagging. False tags and stops.
         type: boolean
         default: true
     secrets:
@@ -183,9 +190,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     needs: [gate, tag]
-    # Only a real release reaches here. A dry run takes `rehearse`, which has no environment, so a
-    # rehearsal never asks a person to approve a deployment.
-    if: ${{ !inputs.dry-run }}
+    # Only a real release with publish true reaches here. A dry run takes `rehearse`, which has no
+    # environment, and a tag-only run (publish false) stops after `tag`, so neither asks a person to
+    # approve a deployment.
+    if: ${{ !inputs.dry-run && inputs.publish }}
     environment: crates-io
     permissions:
       contents: read

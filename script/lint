@@ -230,7 +230,7 @@ echo "==> workflow shape and budgets"
 "$py" helpers/job_budget.py lint
 echo "ok"
 
-echo "==> release rehearsal holds no environment"
+echo "==> release rehearsal and tag-only runs hold no environment"
 # A dry run must never ask a person to approve a deployment: only the publish job may name an
 # environment, and the rehearse job must exist and run only in a dry run.
 "$py" - <<'PY' || fail "release.yml: the rehearsal must run in no environment"
@@ -243,7 +243,14 @@ jobs = yaml.safe_load(open(".github/workflows/release.yml"))["jobs"]
 with_env = sorted(k for k, v in jobs.items() if "environment" in v)
 assert with_env == ["publish"], with_env
 assert jobs["rehearse"]["if"].strip("${} ") == "inputs.dry-run", jobs["rehearse"]["if"]
-assert jobs["publish"]["if"].strip("${} ") == "!inputs.dry-run", jobs["publish"]["if"]
+# Tag-only mode: publish runs only when dry-run is false and publish is true, and nothing else
+# may depend on it, so a tag-only run cannot reach the crates-io environment.
+assert jobs["publish"]["if"].strip("${} ") == "!inputs.dry-run && inputs.publish", jobs["publish"]["if"]
+assert jobs["tag"]["if"].strip("${} ") == "!inputs.dry-run", jobs["tag"]["if"]
+for k, v in jobs.items():
+    needs = v.get("needs", [])
+    needs = [needs] if isinstance(needs, str) else needs
+    assert "publish" not in needs, k
 PY
 echo "ok"
 
