@@ -111,7 +111,7 @@ found the tree unchanged since a green full run. `tag` creates
 already exists. `publish` runs last, in the `crates-io` environment (a person approves), gets
 `id-token: write` and nothing else, and exchanges the OpenID Connect (OIDC) token for a temporary crates.io token
 through trusted publishing. `dry-run` defaults to true, so a rehearsal publishes nothing and needs
-no approval.
+no approval. With `publish=false` a real run tags and stops.
 
 crates.io binds a trusted publisher only to a crate that already exists, so a crate's first publish
 uses a token instead. `helpers/publish_mode.py` picks the door by whether the crate is on crates.io:
@@ -288,8 +288,9 @@ sed -i 's/@PINS@/<release SHA>/g' .github/workflows/*.yml
 # put the crate under src/, its proofs under src/ with #[kani::proof],
 # its falsification patches under falsifications/
 git add -A && git commit -m "adopt the shared crate workflows"
-gh workflow run release.yml -f version=0.1.0 -f dry-run=true   # rehearse
-gh workflow run release.yml -f version=0.1.0 -f dry-run=false  # publish, after approval
+gh workflow run release.yml -f version=0.1.0 -f dry-run=true
+gh workflow run release.yml -f version=0.1.0 -f dry-run=false -f publish=false  # tag only
+gh workflow run release.yml -f version=0.1.0 -f dry-run=false -f publish=true   # publish
 ```
 
 Run the settings drift check by hand:

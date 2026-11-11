@@ -10,6 +10,10 @@ on:
         description: Rehearse without tagging or publishing.
         type: boolean
         default: true
+      publish:
+        description: Publish to crates.io after tagging. False tags and stops, with no approval step.
+        type: boolean
+        default: false
 permissions:
   contents: read
 jobs:
@@ -21,6 +25,7 @@ jobs:
     with:
       version: ${{ inputs.version }}
       dry-run: ${{ inputs.dry-run }}
+      publish: ${{ inputs.publish }}
     secrets:
       NIFE_SMELTER_APP_ID: ${{ secrets.NIFE_SMELTER_APP_ID }}
       NIFE_SMELTER_PRIVATE_KEY: ${{ secrets.NIFE_SMELTER_PRIVATE_KEY }}
