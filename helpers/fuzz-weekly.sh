@@ -14,6 +14,10 @@
 # crate holds `unsafe`; 2 for a mistake in the arguments or a failure of cargo-fuzz itself that
 # names no target.
 #
+# Each target starts from its committed seeds in fuzz/seeds/<target>/ when that directory exists,
+# beside fuzz/corpus/<target>/, which libFuzzer creates and writes. New inputs go only to the corpus,
+# so a run never changes the committed seeds.
+#
 # The time per target is the smaller of SECONDS_PER_TARGET and TOTAL_SECONDS divided by the number
 # of targets, and never under 10 seconds, so a crate with many targets still ends inside the budget
 # (the build time of each target is outside this bound).
@@ -75,8 +79,15 @@ seconds=$((total / count))
 
 failed=""
 for target in $targets; do
-	echo "==> cargo fuzz run $target for $seconds seconds"
-	if ! cargo +nightly fuzz run "$target" -- -max_total_time="$seconds"; then
+	mkdir -p "fuzz/corpus/$target"
+	if [ -d "fuzz/seeds/$target" ]; then
+		set -- "fuzz/corpus/$target" "fuzz/seeds/$target"
+		echo "==> cargo fuzz run $target for $seconds seconds, from fuzz/seeds/$target"
+	else
+		set -- "fuzz/corpus/$target"
+		echo "==> cargo fuzz run $target for $seconds seconds, with no committed seeds"
+	fi
+	if ! cargo +nightly fuzz run "$target" "$@" -- -max_total_time="$seconds"; then
 		echo "==> $target failed"
 		failed="$failed $target"
 	fi

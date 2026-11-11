@@ -6,7 +6,7 @@
 # job safe: no fork pull request, no self-hosted runner, no write permission, no step that files an
 # issue or an advisory, and an upload of the crashing inputs. The second runs helpers/fuzz-weekly.sh
 # against a stand-in cargo and holds its verdicts: red on a seeded crash, green on a clean target,
-# green with a note on a crate with no fuzz targets, and a time per target that never exceeds the
+# green with a note on a crate with no fuzz targets, each target started from its committed seeds when it has them, and a time per target that never exceeds the
 # total. The third part runs helpers/unsafe_scan.py on the fixtures in fixtures/unsafe-scan and holds
 # that an opt-in is refused for shipped `unsafe` and passes otherwise. The live proof, with the real cargo-fuzz, is the selftest workflow's fuzz jobs.
 
@@ -50,15 +50,25 @@ trap 'rm -rf "$work"' EXIT
 mkdir -p "$work/bin"
 cat >"$work/bin/cargo" <<'SHIM'
 #!/bin/sh
-# Stand-in for `cargo +nightly fuzz list` and `cargo +nightly fuzz run TARGET -- -max_total_time=N`.
+# Stand-in for `cargo +nightly fuzz list` and
+# `cargo +nightly fuzz run TARGET CORPUS... -- -max_total_time=N`. Logs the target, the time and
+# the corpus directories, and refuses a corpus directory that does not exist, as libFuzzer does.
 case "$3" in
 list) printf '%s' "$SHIM_TARGETS" ;;
 run)
-	printf '%s %s\n' "$4" "$6" >>"$SHIM_LOG"
+	target="$4"
+	shift 4
+	corpora=""
+	while [ "$1" != "--" ]; do
+		[ -d "$1" ] || exit 2
+		corpora="$corpora $1"
+		shift
+	done
+	printf '%s %s%s\n' "$target" "$2" "$corpora" >>"$SHIM_LOG"
 	case " $SHIM_CRASH " in
-	*" $4 "*)
-		mkdir -p "fuzz/artifacts/$4"
-		: >"fuzz/artifacts/$4/crash-seeded"
+	*" $target "*)
+		mkdir -p "fuzz/artifacts/$target"
+		: >"fuzz/artifacts/$target/crash-seeded"
 		exit 77
 		;;
 	esac
@@ -123,6 +133,18 @@ run 'a
 b
 ' '' 300 5 || fail "the floor run was red"
 [ "$(cut -d' ' -f2 "$SHIM_LOG" | sort -u)" = "-max_total_time=10" ] || fail "the 10-second floor did not hold"
+
+# A target with committed seeds starts from them, after the corpus it writes; one without starts
+# from its corpus alone.
+crate
+mkdir -p "$work/crate/fuzz/seeds/alpha"
+run 'alpha
+beta
+' '' 300 1200 || fail "the seeded run was red"
+grep -qx 'alpha -max_total_time=300 fuzz/corpus/alpha fuzz/seeds/alpha' "$SHIM_LOG" ||
+	fail "a target with fuzz/seeds/<target> did not start from it: $(cat "$SHIM_LOG")"
+grep -qx 'beta -max_total_time=300 fuzz/corpus/beta' "$SHIM_LOG" ||
+	fail "a target with no seeds was not run on its corpus alone: $(cat "$SHIM_LOG")"
 
 # The opt-in is refused for a crate with shipped unsafe code, and the script fuzzes nothing then.
 crate

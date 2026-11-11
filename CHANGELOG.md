@@ -6,6 +6,9 @@ call that sits behind the newest release.
 
 ## Unreleased
 
+- The weekly fuzz run starts each target from the crate's committed seeds in
+  `fuzz/seeds/<target>/` when that directory exists, beside `fuzz/corpus/<target>/`. New inputs go
+  to the corpus only, so the committed seeds never change. A crate without seeds runs as before.
 - The release workflow's `rehearse` and `publish` jobs tell git to ignore the template checkout
   at `.crate-workflows/`. It lies inside the crate's tree, so a crate without an `include` list
   failed `cargo package` and `cargo publish` with the template's files reported as uncommitted
