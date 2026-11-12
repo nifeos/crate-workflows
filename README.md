@@ -58,16 +58,17 @@ artifact, and both are readable by any signed-in GitHub user.
 
 Why only safe-Rust crates opt in: in a crate with no `unsafe` code, a crash is a panic or a hang, a
 denial of service at worst. In a crate with `unsafe` code, a crash may be a memory-safety flaw, and
-the input that triggers it would be published before anyone could fix it. So an opt-in is refused,
-and the job is red, when the crate's shipped source (`src/**/*.rs`, outside `#[cfg(test)]`) contains
+its input would be published before anyone could fix it. So an opt-in is refused, and the job red, when the crate's shipped source (`src/**/*.rs`, outside `#[cfg(test)]`) contains
 an `unsafe` block, fn, impl, trait or attribute. The message names the file and line. The check
 (`helpers/unsafe_scan.py`) ignores comments, strings and character literals, and passes a crate whose
 every root carries `#![forbid(unsafe_code)]`. It does not look at fuzz targets or dependencies. It
-is a scan of the standard library rather than `cargo geiger` so that it costs no install and
-`script/lint` can prove it against the fixtures in `fixtures/unsafe-scan`.
+costs no install, and `script/lint` proves it against `fixtures/unsafe-scan`.
+
+Standing approval (ruled 2026-11-12 UTC): `libfuzzer-sys` 0.4 is approved in advance as a dependency of
+the unpublished `fuzz/` crate of any crate repository, and nowhere else.
 
 A suspected security flaw goes to the private channel in the repository's `SECURITY.md`, never to
-an issue or a comment. A person who suspects one in a run deletes the run and its artifact.
+an issue or a comment. Whoever suspects one deletes the run and its artifact.
 
 To opt in, set `public-crash-inputs: true` in the repository's `.github/workflows/fuzz.yml`. To opt
 out again, set it back to `false` (or remove the line), and delete earlier runs and artifacts if
@@ -85,7 +86,7 @@ days. A person reads the run and decides what the crash is.
 The job never runs on a pull request: the caller has no `pull_request` trigger, the job refuses a
 pull request from a fork, and it never uses a self-hosted runner. `script/lint` holds those rules
 (`helpers/fuzz-ci-selftest.sh`), proves the script red on a seeded crash and green on a clean target
-against a stand-in cargo, and proves the scan on the unsafe fixtures. The selftest workflow proves the rest with cargo-fuzz itself. `fixtures/fuzz-clean` goes through the
+against a stand-in cargo, and proves the scan on the unsafe fixtures. The selftest workflow proves the rest with cargo-fuzz. `fixtures/fuzz-clean` goes through the
 live workflow with the opt-in and must pass. `fixtures/fuzz-crash` goes through it without the
 opt-in and must pass having run nothing, and through the script, where it must fail and leave its
 input behind. A crate with an `unsafe` block must be refused.

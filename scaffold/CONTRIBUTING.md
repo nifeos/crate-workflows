@@ -23,3 +23,8 @@ and does not need to say which.
 - A dependency new to the graph holds the pull request until a maintainer approves it, and so does a
   breaking change against the last release. The hold check stays red until the maintainer clears
   the hold.
+- Standing approval (ruled 2026-11-12 UTC): `libfuzzer-sys` 0.4 is approved in advance as a dependency
+  of the unpublished `fuzz/` crate (the cargo-fuzz layout) of any nifeos crate repository, and
+  nowhere else. A crate's own `Cargo.toml` never gets it. Its license, `(MIT OR Apache-2.0) AND` the
+  National Center for Supercomputing Applications (NCSA) license, needs no `deny.toml` exception
+  while `fuzz/` is a workspace of its own, because the supply-chain job reads the crate's manifest only.
