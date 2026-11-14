@@ -107,6 +107,43 @@ info="$py helpers/crate_info.py"
 "$py" helpers/settings_members.py --selftest >/dev/null
 echo "ok"
 
+echo "==> a crate at the repository root keeps its names"
+# GitHub's `a && b || c` answers c when b is empty, which is how a name once came out as
+# `mutation record [Cargo.toml]` for every existing caller. The expressions that name a crate's
+# concurrency group and mutation record job are evaluated here, for a root manifest and a nested one.
+"$py" - <<'PY' || fail "a name expression gives a root crate a suffix, or a nested crate none"
+import re
+import sys
+try:
+    import yaml
+except ImportError:
+    sys.exit(0)
+
+def evaluate(text, manifest):
+    def fmt(template, *args):
+        return template.format(*args)
+    def expr(m):
+        body = m.group(1).replace('inputs.manifest-path', 'manifest')
+        body = body.replace('&&', ' and ').replace('||', ' or ')
+        body = re.sub(r"needs\.[\w.-]+", "'R'", body)
+        return str(eval(body, {'manifest': manifest, 'format': fmt}))
+    return re.sub(r'\$\{\{(.*?)\}\}', expr, text)
+
+mutation = yaml.safe_load(open('.github/workflows/mutation.yml'))
+name = mutation['jobs']['mutation-record']['name']
+want = {'Cargo.toml': 'mutation record: R', './Cargo.toml': 'mutation record: R',
+        'a/Cargo.toml': 'mutation record [a/Cargo.toml]: R'}
+for manifest, expected in want.items():
+    got = evaluate(name, manifest)
+    assert got == expected, (manifest, got, expected)
+for w in ('check', 'fuzz', 'mutation', 'proofs', 'weekly'):
+    group = yaml.safe_load(open(f'.github/workflows/{w}.yml'))['concurrency']['group']
+    for manifest, suffix in (('Cargo.toml', ''), ('./Cargo.toml', ''), ('a/Cargo.toml', '-a/Cargo.toml')):
+        got = evaluate(group.replace('github.workflow', "'W'").replace('github.ref', "'F'"), manifest)
+        assert got == f'{w}-W-F{suffix}', (w, manifest, got)
+PY
+echo "ok"
+
 echo "==> the weekly fuzz job files nothing and fails on a crash"
 # Reads the workflow and its caller, then runs the fuzz script against a stand-in cargo.
 sh helpers/fuzz-ci-selftest.sh

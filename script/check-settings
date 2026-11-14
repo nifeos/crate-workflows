@@ -215,11 +215,17 @@ def main(argv):
     settings = SETTINGS
     if '--settings' in args:
         i = args.index('--settings')
+        if i + 1 >= len(args):
+            print('check-settings: --settings wants a path', file=sys.stderr)
+            return 2
         settings = Path(args[i + 1])
         args = args[:i] + args[i + 2:]
     members = []
     while '--member' in args:
         i = args.index('--member')
+        if i + 1 >= len(args):
+            print('check-settings: --member wants a crate name', file=sys.stderr)
+            return 2
         members.append(args[i + 1])
         args = args[:i] + args[i + 2:]
     if len(args) != 1:

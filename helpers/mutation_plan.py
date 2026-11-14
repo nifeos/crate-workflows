@@ -142,7 +142,7 @@ def record_of(job_names, manifest=ROOT_MANIFEST):
     want = manifest_key(manifest)
     for name in job_names:
         m = RECORD_JOB.search(name)
-        if m and m.group(1) == want:
+        if m and manifest_key(m.group(1)) == want:
             return m.group(2)
     return ''
 
@@ -417,6 +417,8 @@ def selftest():
     expect('the root crate reads the unnamed one', record_of(two), 'repeat since run 4')
     expect('a crate with no record job has none', record_of(two, 'crates/c/Cargo.toml'), '')
     expect('the root crate does not read a named one', record_of(two[:2]), '')
+    expect('a root record that names Cargo.toml still reads as the root one',
+           record_of(['m / mutation record [Cargo.toml]: deferred']), 'deferred')
     expect('unchanged parsed', parse_record('unchanged %s since run 7' % ('b' * 64)),
            ('unchanged', 'b' * 64, 7))
     expect('a short fingerprint is no record', parse_record('full abc'), None)

@@ -16,9 +16,17 @@ on:
         type: string
         default: ''
       caller-checks:
-        description: Run the settings-drift and stranger jobs (off for the template's selftest). In a
-          repository of several crates, the drift job reads the repository's settings once, so only one
-          call passes true there, and the stranger job passes over a member that may not be published.
+        description: Run the settings-drift and stranger jobs (off for the template's selftest).
+        type: boolean
+        default: true
+      settings-drift:
+        description: Run the settings-drift job, when caller-checks is on. In a repository of several
+          crates the drift job reads the repository's settings once, so one call keeps this true.
+        type: boolean
+        default: true
+      stranger-cadence:
+        description: Run the stranger-cadence job, when caller-checks is on. Each publishable crate
+          keeps its own; the job passes over a member that may not be published.
         type: boolean
         default: true
     secrets:
@@ -33,7 +41,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: weekly-${{ github.workflow }}-${{ github.ref }}-${{ inputs.manifest-path }}
+  group: weekly-${{ github.workflow }}-${{ github.ref }}${{ (inputs.manifest-path != 'Cargo.toml' && inputs.manifest-path != './Cargo.toml') && format('-{0}', inputs.manifest-path) || '' }}
   cancel-in-progress: false
 
 defaults:
@@ -210,7 +218,7 @@ jobs:
     name: settings drift
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    if: ${{ inputs.caller-checks }}
+    if: ${{ inputs.caller-checks && inputs.settings-drift }}
     steps:
       - name: clock
         run: echo "JOB_STARTED_AT=$(date +%s)" >> "$GITHUB_ENV"
@@ -277,7 +285,7 @@ jobs:
     name: stranger cadence
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    if: ${{ inputs.caller-checks }}
+    if: ${{ inputs.caller-checks && inputs.stranger-cadence }}
     steps:
       - name: clock
         run: echo "JOB_STARTED_AT=$(date +%s)" >> "$GITHUB_ENV"

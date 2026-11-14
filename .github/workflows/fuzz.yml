@@ -41,7 +41,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: fuzz-${{ github.workflow }}-${{ github.ref }}-${{ inputs.manifest-path }}
+  group: fuzz-${{ github.workflow }}-${{ github.ref }}${{ (inputs.manifest-path != 'Cargo.toml' && inputs.manifest-path != './Cargo.toml') && format('-{0}', inputs.manifest-path) || '' }}
   cancel-in-progress: false
 
 defaults:

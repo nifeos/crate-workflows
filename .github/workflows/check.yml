@@ -35,7 +35,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: check-${{ github.workflow }}-${{ github.ref }}-${{ inputs.manifest-path }}
+  group: check-${{ github.workflow }}-${{ github.ref }}${{ (inputs.manifest-path != 'Cargo.toml' && inputs.manifest-path != './Cargo.toml') && format('-{0}', inputs.manifest-path) || '' }}
   cancel-in-progress: ${{ !startsWith(github.ref, 'refs/heads/') }}
 
 defaults:

@@ -16,5 +16,6 @@ jobs:
     uses: nifeos/crate-workflows/.github/workflows/weekly.yml@PINS@
     with:
       manifest-path: second_crate/Cargo.toml
-      # The settings drift is the repository's, and the first call reads it.
-      caller-checks: false
+      # The settings drift is the repository's, and the first call reads it. The stranger cadence
+      # is the crate's own, and this one passes over itself because it may not be published.
+      settings-drift: false

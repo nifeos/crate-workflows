@@ -26,4 +26,10 @@ What differs from a repository of one crate:
   that crate's own previous tag. A crate carrying `publish = false` is never published, never
   compared with a release and owes no stranger-test record; the releases of the others are
   unchanged.
-- **Settings drift once.** Only one call of `weekly.yml` passes `caller-checks: true`.
+- **Settings drift once.** Only one call of `weekly.yml` keeps `settings-drift` on; every
+  publishable crate keeps its own `stranger-cadence`.
+- **Converting a repository of one crate.** Its tag prefix changes from `v` to `<crate>-v`, so the
+  old `v*` tags are no longer semver baselines (the first release after the change has none), and
+  the tags ruleset needs `apply-settings --member` run again. A workspace whose root is itself a
+  crate (a `[package]` and a `[workspace]` in one `Cargo.toml`) is not supported: the root of a
+  repository of several crates is virtual.
