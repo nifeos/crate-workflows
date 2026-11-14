@@ -7,7 +7,11 @@
 # - exempted.patch touches the clamp line, whose one survivor .github/mutants-exempts lists: pass,
 #   although the exemptions also name proof-file lines this run cannot reach;
 # - untested.patch adds a function no test pins: its survivors fail the check;
-# - a change to sample/README.md alone makes no mutants: pass, saying so.
+# - a change to sample/README.md alone makes no mutants: pass, saying so;
+# - untested-workspace-member.patch adds the same kind of function to a crate that is a member of
+#   a workspace (sample-workspace/), whose mutants cargo-mutants names from the workspace root: the
+#   diff must be taken from there too, or it matches nothing and the check passes having tested
+#   nothing. The survivors must fail it.
 #
 # Each case is committed on a throwaway detached worktree of this checkout (a shallow checkout
 # holds one, where a clone may not) and judged against its parent.
@@ -25,7 +29,7 @@ case_of() {
 	# $1 = label, $2 = expected exit (0 or 1); the change is already in the working tree.
 	git -c user.name=selftest -c user.email=selftest@invalid commit -q -am "$1"
 	rc=0
-	sh "$root/helpers/mutation-diff.sh" sample/Cargo.toml HEAD^ .github/mutants-exempts 5 || rc=$?
+	sh "$root/helpers/mutation-diff.sh" "${3:-sample/Cargo.toml}" HEAD^ .github/mutants-exempts 5 || rc=$?
 	git reset -q --hard HEAD^
 	if [ "$rc" -ne "$2" ]; then
 		echo "mutation-diff selftest: $1 exited $rc, want $2" >&2
@@ -40,4 +44,6 @@ git apply "$root/fixtures/mutation-diff/untested.patch"
 case_of "an untested function" 1
 printf '\nOne more line.\n' >>sample/README.md
 case_of "a diff with no Rust" 0
+git apply "$root/fixtures/mutation-diff/untested-workspace-member.patch"
+case_of "an untested function in a workspace member" 1 sample-workspace/workspace_sample_contract/Cargo.toml
 echo "mutation-diff selftest: ok"

@@ -2,8 +2,10 @@
 
 One CI template for every crate repository under `nifeos`. A crate repository's own workflow files
 are a few lines each that call the reusable workflows here, pinned by commit SHA, the way nife pins
-every action it runs. The name is provisional, for calef's naming pass, as are the workflow names
-and the release cadence.
+every action it runs.
+
+A repository of several crates calls each workflow once for each crate; see
+`scaffold-workspace/README.md`.
 
 The ruling behind it: 857's Fork 1 put one repository per crate under `nifeos` and said every one
 of them uses one shared CI template (Kani, lint, release) through reusable workflows. Fork 4 ruled

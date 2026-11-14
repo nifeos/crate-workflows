@@ -85,6 +85,28 @@ done
 "$py" script/apply-settings --help >/dev/null && echo "apply-settings --help ok"
 echo "ok"
 
+echo "==> a repository of several crates"
+# sample-workspace/ is a virtual workspace over a crate that may be published and one that may not;
+# sample/ is a repository of one. The release tag, the semver baseline's prefix and the passes over
+# an unpublished member come from helpers/crate_info.py, so the two shapes are asked here.
+several=sample-workspace/workspace_sample_contract/Cargo.toml
+unpublished=sample-workspace/workspace_sample_fixture/Cargo.toml
+info="$py helpers/crate_info.py"
+[ "$($info tag $several 1.2.3)" = workspace_sample_contract-v1.2.3 ] || fail "a crate of several is not tagged by name"
+[ "$($info tag $unpublished 1.2.3)" = workspace_sample_fixture-v1.2.3 ] || fail "the unpublished crate is not tagged by name"
+[ "$($info tag sample/Cargo.toml 1.2.3)" = v1.2.3 ] || fail "a crate of one repository lost its plain v tag"
+[ "$($info published $several)" = yes ] || fail "the publishable member is not publishable"
+[ "$($info published $unpublished || true)" = no ] || fail "publish = false is publishable"
+[ "$($info release-target $unpublished || true)" = no ] || fail "an unpublished member of several is a release target"
+[ "$($info release-target sample/Cargo.toml)" = yes ] || fail "the only crate of a repository is not a release target"
+[ "$($info members sample-workspace/Cargo.toml --release-targets)" = "$several" ] || fail "the workspace's release targets are not the publishable member"
+[ "$($info prefix $several)" = workspace_sample_contract/ ] || fail "a member's prefix is not its directory"
+[ -z "$($info prefix sample/Cargo.toml)" ] || fail "a crate at its workspace's root has a prefix"
+[ "$(sh helpers/crate-slug.sh sample-workspace/workspace_sample_contract/Cargo.toml)" = -sample-workspace-workspace_sample_contract ] || fail "crate-slug does not name the directory"
+[ -z "$(sh helpers/crate-slug.sh Cargo.toml)" ] || fail "crate-slug names a crate at the repository root"
+"$py" helpers/settings_members.py --selftest >/dev/null
+echo "ok"
+
 echo "==> the weekly fuzz job files nothing and fails on a crash"
 # Reads the workflow and its caller, then runs the fuzz script against a stand-in cargo.
 sh helpers/fuzz-ci-selftest.sh
