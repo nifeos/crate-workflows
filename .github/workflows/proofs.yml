@@ -24,7 +24,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: proofs-${{ github.workflow }}-${{ github.ref }}
+  group: proofs-${{ github.workflow }}-${{ github.ref }}-${{ inputs.manifest-path }}
   cancel-in-progress: ${{ !startsWith(github.ref, 'refs/heads/') }}
 
 defaults:

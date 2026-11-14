@@ -41,7 +41,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: fuzz-${{ github.workflow }}-${{ github.ref }}
+  group: fuzz-${{ github.workflow }}-${{ github.ref }}-${{ inputs.manifest-path }}
   cancel-in-progress: false
 
 defaults:
@@ -99,7 +99,9 @@ jobs:
             echo "### fuzz"
             echo "Not opted in, so nothing ran. Crash inputs are public; a crate with no unsafe code opts in with \`public-crash-inputs: true\`."
           } >> "$GITHUB_STEP_SUMMARY"
-      - run: echo "CRATE_DIR=$(dirname "$MANIFEST")" >> "$GITHUB_ENV"
+      - run: |
+          echo "CRATE_DIR=$(dirname "$MANIFEST")" >> "$GITHUB_ENV"
+          echo "ARTIFACT_SUFFIX=$(.crate-workflows/helpers/crate-slug.sh "$MANIFEST")" >> "$GITHUB_ENV"
         if: ${{ inputs.public-crash-inputs }}
       - run: rustup toolchain install nightly --profile minimal
         if: ${{ inputs.public-crash-inputs }}
@@ -115,7 +117,7 @@ jobs:
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: ${{ always() && inputs.public-crash-inputs }}
         with:
-          name: fuzz-artifacts
+          name: fuzz-artifacts${{ env.ARTIFACT_SUFFIX }}
           path: ${{ env.CRATE_DIR }}/fuzz/artifacts
           if-no-files-found: ignore
           retention-days: 14
