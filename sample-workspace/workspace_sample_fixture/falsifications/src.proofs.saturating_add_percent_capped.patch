@@ -1,0 +1,13 @@
+diff --git a/src/lib.rs b/src/lib.rs
+index de68769..4561547 100644
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -12,7 +12,7 @@
+ /// assert_eq!(workspace_sample_fixture::saturating_add_percent(30, 40), 70);
+ /// ```
+ pub fn saturating_add_percent(a: u8, b: u8) -> u8 {
+-    a.saturating_add(b).min(100)
++    a.saturating_add(b).min(200)
+ }
+ 
+ #[cfg(kani)]

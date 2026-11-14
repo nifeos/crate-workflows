@@ -193,7 +193,8 @@ jobs:
         run: |
           cd "$(dirname "$MANIFEST")"
           echo "MUTANTS_OUT=$(pwd)/mutants.out" >> "$GITHUB_ENV"
-          cargo mutants --jobs 2 --timeout 300 --shard "$SHARD/$SHARDS" --sharding round-robin || rc=$?
+          # --output keeps mutants.out here: cargo-mutants otherwise writes it at the workspace root.
+          cargo mutants --output "$(pwd)" --jobs 2 --timeout 300 --shard "$SHARD/$SHARDS" --sharding round-robin || rc=$?
           case "${rc:-0}" in
             0 | 2 | 3) ;;
             *) exit "$rc" ;;
@@ -273,9 +274,11 @@ jobs:
           set -e
           # One shard downloads with outcomes.json in $OUT itself, several into a subdirectory
           # each; the gate counts both layouts and refuses a count other than $SHARDS.
-          # The crate's own exemptions when it has them: two crates' `src/lib.rs:16` are not one line.
-          exempts=$(.crate-workflows/helpers/crate-file.sh "$MANIFEST" .github/mutants-exempts)
-          if ! python3 .crate-workflows/helpers/mutants_gate.py --shards "$SHARDS" "$OUT" "$exempts"; then
+          # cargo-mutants names a file from the workspace root, so a crate in a directory of its
+          # own is `<crate>/src/lib.rs:16` in the exemptions, and only the entries under this
+          # crate's directory can be called stale by this crate's run.
+          prefix=$(python3 .crate-workflows/helpers/crate_info.py prefix "$MANIFEST")
+          if ! python3 .crate-workflows/helpers/mutants_gate.py --shards "$SHARDS" --prefix "$prefix" "$OUT" "$GITHUB_WORKSPACE/.github/mutants-exempts"; then
             echo "::error::the mutation gate refused this run: each SURVIVOR, TIMEOUT or stale exemption it names is above"
             exit 1
           fi

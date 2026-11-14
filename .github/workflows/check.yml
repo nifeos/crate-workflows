@@ -199,9 +199,7 @@ jobs:
           # Exported, not expressed: GitHub's expression language has no dirname, and a path built
           # by concatenating the manifest path points through the manifest file itself.
           echo "COVERAGE_DIR=$(pwd)/target/llvm-cov" >> "$GITHUB_ENV"
-      - run: |
-          exempts=$(.crate-workflows/helpers/crate-file.sh "$MANIFEST" .github/coverage-exemptions)
-          .crate-workflows/helpers/coverage-floor.sh "${{ inputs.coverage-floor }}" "$COVERAGE_DIR/lcov.info" "$exempts"
+      - run: .crate-workflows/helpers/coverage-floor.sh "${{ inputs.coverage-floor }}" "$COVERAGE_DIR/lcov.info" "$GITHUB_WORKSPACE/.github/coverage-exemptions"
       # One call for each crate lands in one run, and two artifacts of one name in a run collide.
       - run: echo "ARTIFACT_SUFFIX=$(.crate-workflows/helpers/crate-slug.sh "$MANIFEST")" >> "$GITHUB_ENV"
         if: always()
@@ -505,8 +503,7 @@ jobs:
             echo "::error::the checkout has $parents parent(s), not a pull request's merge; no diff to mutate"
             exit 1
           fi
-          exempts=$(.crate-workflows/helpers/crate-file.sh "$MANIFEST" .github/mutants-exempts)
-          .crate-workflows/helpers/mutation-diff.sh "$MANIFEST" HEAD^1 "$exempts" 20
+          .crate-workflows/helpers/mutation-diff.sh "$MANIFEST" HEAD^1 "$GITHUB_WORKSPACE/.github/mutants-exempts" 20
       - name: budget
         if: always()
         run: python3 .crate-workflows/helpers/job_budget.py check "${{ github.job }}" "$JOB_STARTED_AT"

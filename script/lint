@@ -215,6 +215,7 @@ for bad in nife calef milestone; do
 	fi
 done
 sh helpers/scaffold_alone.sh scaffold || fail "the scaffold names another tree's vocabulary"
+sh helpers/scaffold_alone.sh scaffold-workspace || fail "the callers for several crates name another tree's vocabulary"
 echo "ok"
 
 echo "==> actions are pinned to a commit SHA"
@@ -302,6 +303,11 @@ mkdir -p "$tpl/.github/workflows"
 for f in scaffold/caller-workflows/*.yml; do
 	sed -e 's/@PINS@/@0000000000000000000000000000000000000000/' -e 's/@MUTATION_CRON@/20 8 * * 1/' "$f" >"$tpl/.github/workflows/$(basename "$f")"
 done
+# The callers for a repository of several crates are linted the same way, in a tree of their own.
+mkdir -p "$tpl-several/.github/workflows"
+for f in scaffold-workspace/*.yml; do
+	sed -e 's/@PINS@/@0000000000000000000000000000000000000000/' -e 's/@MUTATION_CRON@/20 8 * * 1/' "$f" >"$tpl-several/.github/workflows/$(basename "$f")"
+done
 # EXCEPTION, marked: actionlint 1.7.12's job-context model predates GitHub's
 # job.workflow_sha / job.workflow_repository, which the contexts reference documents and which
 # the lag check and helper checkout depend on. The two -ignore patterns name exactly those
@@ -316,7 +322,7 @@ set -- \
 	-ignore 'property "workflow_sha" is not defined' \
 	-ignore 'property "workflow_repository" is not defined'
 actionlint "$@"
-actionlint "$@" "$tpl"/.github/workflows/*.yml
+actionlint "$@" "$tpl"/.github/workflows/*.yml "$tpl-several"/.github/workflows/*.yml
 echo "ok"
 
 echo "==> lint: ok"

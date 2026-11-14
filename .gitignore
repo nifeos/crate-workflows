@@ -14,3 +14,5 @@ fixtures/*/fuzz/corpus
 # Python bytecode
 __pycache__/
 *.pyc
+sample-workspace/target
+sample-workspace/*/mutants.out

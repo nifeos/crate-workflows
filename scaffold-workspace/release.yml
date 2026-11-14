@@ -1,0 +1,53 @@
+name: release
+on:
+  workflow_dispatch:
+    inputs:
+      crate:
+        description: The crate to release.
+        required: true
+        type: choice
+        options: [first_crate, second_crate]
+      version:
+        description: The version to release, matching the crate's manifest (e.g. 0.1.0).
+        required: true
+        type: string
+      dry-run:
+        description: Rehearse without tagging or publishing.
+        type: boolean
+        default: true
+      publish:
+        description: Publish to crates.io after tagging. False tags and stops, with no approval step.
+        type: boolean
+        default: false
+permissions:
+  contents: read
+jobs:
+  release-first_crate:
+    if: ${{ inputs.crate == 'first_crate' }}
+    permissions:
+      contents: read
+      id-token: write
+    uses: nifeos/crate-workflows/.github/workflows/release.yml@PINS@
+    with:
+      manifest-path: first_crate/Cargo.toml
+      version: ${{ inputs.version }}
+      dry-run: ${{ inputs.dry-run }}
+      publish: ${{ inputs.publish }}
+    secrets:
+      NIFE_SMELTER_APP_ID: ${{ secrets.NIFE_SMELTER_APP_ID }}
+      NIFE_SMELTER_PRIVATE_KEY: ${{ secrets.NIFE_SMELTER_PRIVATE_KEY }}
+  # A crate carrying publish = false can be tagged and never published: the gate refuses publish.
+  release-second_crate:
+    if: ${{ inputs.crate == 'second_crate' }}
+    permissions:
+      contents: read
+      id-token: write
+    uses: nifeos/crate-workflows/.github/workflows/release.yml@PINS@
+    with:
+      manifest-path: second_crate/Cargo.toml
+      version: ${{ inputs.version }}
+      dry-run: ${{ inputs.dry-run }}
+      publish: false
+    secrets:
+      NIFE_SMELTER_APP_ID: ${{ secrets.NIFE_SMELTER_APP_ID }}
+      NIFE_SMELTER_PRIVATE_KEY: ${{ secrets.NIFE_SMELTER_PRIVATE_KEY }}

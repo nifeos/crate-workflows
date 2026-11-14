@@ -1,0 +1,20 @@
+name: weekly
+on:
+  schedule:
+    - cron: '30 6 * * 1'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  weekly-first_crate:
+    uses: nifeos/crate-workflows/.github/workflows/weekly.yml@PINS@
+    with:
+      manifest-path: first_crate/Cargo.toml
+    secrets:
+      SETTINGS_TOKEN: ${{ secrets.SETTINGS_TOKEN }}
+  weekly-second_crate:
+    uses: nifeos/crate-workflows/.github/workflows/weekly.yml@PINS@
+    with:
+      manifest-path: second_crate/Cargo.toml
+      # The settings drift is the repository's, and the first call reads it.
+      caller-checks: false

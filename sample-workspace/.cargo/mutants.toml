@@ -1,0 +1,3 @@
+# The proof modules compile only under cfg(kani), so a cargo test run never reaches them and every
+# mutant in one survives. proofs.yml is what tests them.
+exclude_globs = ["**/proofs.rs"]

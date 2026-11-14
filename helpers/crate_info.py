@@ -8,6 +8,8 @@
     python3 crate_info.py release-target MANIFEST     # prints yes or no; exit 0 for yes, 1 for no
     python3 crate_info.py tag-prefix   MANIFEST      # `v`, or `<name>-v` in a repository of several crates
     python3 crate_info.py tag          MANIFEST VERSION
+    python3 crate_info.py workspace-root MANIFEST    # the workspace's directory, absolute
+    python3 crate_info.py prefix       MANIFEST      # the crate's directory under the workspace's, `` or `dir/`
     python3 crate_info.py members      MANIFEST [--release-targets]   # manifests, one per line
     python3 crate_info.py names        MANIFEST      # package names, one per line
     python3 crate_info.py --selftest
@@ -36,6 +38,9 @@ import os
 import subprocess
 import sys
 import tempfile
+
+
+WORKSPACE_ROOT = 'workspace_root'
 
 
 def metadata(manifest):
@@ -80,6 +85,21 @@ def release_target(pkg, everyone):
 
 def relative(path):
     return os.path.relpath(path)
+
+
+def workspace_root(manifest):
+    return metadata(manifest)[WORKSPACE_ROOT]
+
+
+def prefix(manifest):
+    """The crate's directory under its workspace's, with a trailing slash, or '' at the root.
+
+    cargo-mutants names every file from the workspace root, so a crate in a directory of its own
+    has its sources at `<prefix>src/lib.rs` in a mutants.out and in `.github/mutants-exempts`.
+    """
+    here = os.path.dirname(os.path.realpath(manifest))
+    rel = os.path.relpath(here, os.path.realpath(workspace_root(manifest)))
+    return '' if rel == '.' else rel + '/'
 
 
 def selftest():
@@ -128,6 +148,11 @@ def selftest():
         pkg, everyone = own(os.path.join(ws, 'inheriting', 'Cargo.toml'))
         check('workspace: inherited version resolves', pkg['version'], '2.0.0')
         check('workspace: an empty registry list is unpublished', pkg['published'], False)
+        check('workspace: a member sits under its directory', prefix(os.path.join(ws, 'contract', 'Cargo.toml')),
+              'contract/')
+        check('workspace: workspace root', os.path.realpath(workspace_root(os.path.join(ws, 'contract', 'Cargo.toml'))),
+              os.path.realpath(ws))
+        check('single: no prefix', prefix(os.path.join(single, 'Cargo.toml')), '')
         check('workspace: names', [m['name'] for m in members(os.path.join(ws, 'Cargo.toml'))],
               ['contract', 'fixture', 'inheriting'])
         try:
@@ -155,6 +180,12 @@ def main(argv):
             for m in everyone:
                 if '--release-targets' not in rest or release_target(m, everyone):
                     print(relative(m['manifest']))
+            return 0
+        if command == 'workspace-root':
+            print(os.path.realpath(workspace_root(manifest)))
+            return 0
+        if command == 'prefix':
+            print(prefix(manifest))
             return 0
         pkg, everyone = own(manifest)
     except (RuntimeError, OSError) as e:
