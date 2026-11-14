@@ -6,6 +6,11 @@ call that sits behind the newest release.
 
 ## Unreleased
 
+- The spelled-out check asks for `management_data_io` in place of `mdio` and `sd_io` in place of
+  `sdio`, because `io` is a word every name keeps whole, inside an expansion too. A crate that
+  wrote `management_data_input_output` passes as before; the failure message for `mdio` or `sdio`
+  names the new spelling.
+
 - The weekly fuzz run starts each target from the crate's committed seeds in
   `fuzz/seeds/<target>/` when that directory exists, beside `fuzz/corpus/<target>/`. New inputs go
   to the corpus only, so the committed seeds never change. A crate without seeds runs as before.
