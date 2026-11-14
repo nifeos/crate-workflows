@@ -102,8 +102,15 @@ jobs:
       # new repository's weekly run is red until its first stranger run is recorded.
       # The record sits in the crate's own docs/, which is the repository's docs/ for a crate at the
       # root.
+      # A member of several crates that may not be published has no release to claim, so it owes none.
       - name: a stranger-test run is on record
-        run: .crate-workflows/script/stranger-recorded "$(dirname "$MANIFEST")/docs/stranger-test.md"
+        run: |
+          set -e
+          if [ "$(python3 .crate-workflows/helpers/crate_info.py release-target "$MANIFEST" || true)" = no ]; then
+            echo "==> $MANIFEST may not be published, and the repository holds other crates: no stranger-test record owed"
+            exit 0
+          fi
+          .crate-workflows/script/stranger-recorded "$(dirname "$MANIFEST")/docs/stranger-test.md"
       - name: check, proofs and a full mutation run are green on this commit
         run: .crate-workflows/helpers/release-gate.sh "$GITHUB_REPOSITORY" "$GITHUB_SHA" "$MANIFEST"
         env:

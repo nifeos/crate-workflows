@@ -5,10 +5,10 @@
     python3 crate_info.py version      MANIFEST      # the version, workspace inheritance resolved
     python3 crate_info.py rust-version MANIFEST      # the rust-version, or nothing
     python3 crate_info.py published    MANIFEST      # prints yes or no; exit 0 for yes, 1 for no
-    python3 crate_info.py semver-target MANIFEST     # prints yes or no; exit 0 for yes, 1 for no
+    python3 crate_info.py release-target MANIFEST     # prints yes or no; exit 0 for yes, 1 for no
     python3 crate_info.py tag-prefix   MANIFEST      # `v`, or `<name>-v` in a repository of several crates
     python3 crate_info.py tag          MANIFEST VERSION
-    python3 crate_info.py members      MANIFEST [--semver-targets]   # manifests, one per line
+    python3 crate_info.py members      MANIFEST [--release-targets]   # manifests, one per line
     python3 crate_info.py names        MANIFEST      # package names, one per line
     python3 crate_info.py --selftest
 
@@ -20,10 +20,11 @@ PUBLISHED. A package may be published unless it says `publish = false` (or an em
 A crate that may not be published is never packaged for release, never checked against crates.io
 and never given a first-publish door.
 
-SEMVER TARGET. A crate that may be published, or the only crate of its repository. A repository
+RELEASE TARGET. A crate that may be published, or the only crate of its repository. A repository
 of one crate keeps its old behavior (a crate carrying `publish = false` there is still checked
-against its own release tags); in a repository of several, a member that may not be published has
-no release to compare against.
+against its own release tags and owes its stranger-test record); in a repository of several, a
+member that may not be published has no release to compare against and nobody to be a stranger
+to, so the semver and stranger-test gates pass it over.
 
 TAG. A repository whose workspace holds one crate tags a release `v<version>`. A repository whose
 workspace holds several tags `<name>-v<version>`, because two crates at one version would otherwise
@@ -73,7 +74,7 @@ def tag_prefix(pkg, everyone):
     return f"{pkg['name']}-v" if len(everyone) > 1 else 'v'
 
 
-def semver_target(pkg, everyone):
+def release_target(pkg, everyone):
     return pkg['published'] or len(everyone) == 1
 
 
@@ -103,7 +104,7 @@ def selftest():
         pkg, everyone = own(os.path.join(single, 'Cargo.toml'))
         check('single: tag prefix', tag_prefix(pkg, everyone), 'v')
         check('single: unpublished', pkg['published'], False)
-        check('single: still a semver target', semver_target(pkg, everyone), True)
+        check('single: still a release target', release_target(pkg, everyone), True)
         check('single: rust-version', pkg['rust_version'], '1.85')
 
         ws = os.path.join(d, 'ws')
@@ -120,10 +121,10 @@ def selftest():
         pkg, everyone = own(os.path.join(ws, 'contract', 'Cargo.toml'))
         check('workspace: published', pkg['published'], True)
         check('workspace: tag prefix names the crate', tag_prefix(pkg, everyone), 'contract-v')
-        check('workspace: the published one is a target', semver_target(pkg, everyone), True)
+        check('workspace: the published one is a target', release_target(pkg, everyone), True)
         pkg, everyone = own(os.path.join(ws, 'fixture', 'Cargo.toml'))
         check('workspace: unpublished', pkg['published'], False)
-        check('workspace: an unpublished member is no semver target', semver_target(pkg, everyone), False)
+        check('workspace: an unpublished member is no release target', release_target(pkg, everyone), False)
         pkg, everyone = own(os.path.join(ws, 'inheriting', 'Cargo.toml'))
         check('workspace: inherited version resolves', pkg['version'], '2.0.0')
         check('workspace: an empty registry list is unpublished', pkg['published'], False)
@@ -152,7 +153,7 @@ def main(argv):
                 print('\n'.join(m['name'] for m in everyone))
                 return 0
             for m in everyone:
-                if '--semver-targets' not in rest or semver_target(m, everyone):
+                if '--release-targets' not in rest or release_target(m, everyone):
                     print(relative(m['manifest']))
             return 0
         pkg, everyone = own(manifest)
@@ -165,8 +166,8 @@ def main(argv):
         print(pkg['version'])
     elif command == 'rust-version':
         print(pkg['rust_version'])
-    elif command in ('published', 'semver-target'):
-        yes = pkg['published'] if command == 'published' else semver_target(pkg, everyone)
+    elif command in ('published', 'release-target'):
+        yes = pkg['published'] if command == 'published' else release_target(pkg, everyone)
         print('yes' if yes else 'no')
         return 0 if yes else 1
     elif command == 'tag-prefix':

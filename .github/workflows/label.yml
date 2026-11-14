@@ -105,19 +105,30 @@ jobs:
           # main in an earlier pull request was ruled there and waits for its release.
           # helpers/semver-rule.sh says how. Its trigger filter is the one above, repeated here so a
           # pull request that runs no tool installs none; script/lint keeps the two the same.
-          set +e
-          RUSTUP_TOOLCHAIN=stable .crate-workflows/helpers/semver-rule.sh "$MANIFEST" "$base" semver-found.txt
-          rc=$?
-          set -e
-          if [ "$rc" -ne 0 ]; then
-            cat semver.err >&2 || true
-            echo "semver-rule.sh exited $rc; routing to a person"
-            exit 1
-          fi
-          if [ -s semver-found.txt ]; then
-            cat semver-found.txt >> findings.txt
-            echo "the semver rule fired"
-          fi
+          # Every crate that has releases to compare against (helpers/crate_info.py, RELEASE
+          # TARGET): one for a repository of one crate, each publishable member for several. A
+          # member that may not be published has no release, so no break to hold a merge for.
+          targets=$(python3 .crate-workflows/helpers/crate_info.py members "$MANIFEST" --release-targets)
+          [ -n "$targets" ] || echo "no crate here has a release to compare against"
+          for target in $targets; do
+            echo "==> semver rule: $target"
+            set +e
+            RUSTUP_TOOLCHAIN=stable .crate-workflows/helpers/semver-rule.sh "$target" "$base" semver-found.txt
+            rc=$?
+            set -e
+            if [ "$rc" -ne 0 ]; then
+              cat semver.err >&2 || true
+              echo "semver-rule.sh exited $rc on $target; routing to a person"
+              exit 1
+            fi
+            if [ -s semver-found.txt ]; then
+              if [ "$(printf '%s\n' "$targets" | wc -l)" -gt 1 ]; then
+                echo "semver, $target:" >> findings.txt
+              fi
+              cat semver-found.txt >> findings.txt
+              echo "the semver rule fired on $target"
+            fi
+          done
       - name: hold the pull request when a rule fired
         if: env.SKIP != '1'
         run: |

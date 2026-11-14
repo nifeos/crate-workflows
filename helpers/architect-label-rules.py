@@ -14,7 +14,9 @@ on stdin is enough to say WHICH manifests changed; the graphs themselves are rea
 worktree (head) and from `git show <base>:<path>` (base), because a dependency "new to the graph"
 means new against every manifest at the base, not just the ones this diff touches: adding a
 dependency to one crate is new even when another crate already had it. `Cargo.lock` is not a
-manifest and is skipped.
+manifest and is skipped. A path dependency names a directory of this checkout, which in a
+repository of several crates is how one crate uses another, so it is not a dependency new to the
+graph; the crate it names is read as a manifest of its own.
 
 The second rule (a semver break new against the last release) is not here:
 it needs `cargo-semver-checks` run against the crate twice, which helpers/semver-rule.sh does as
@@ -45,6 +47,8 @@ def manifest_deps(text, path):
         if not isinstance(node, dict):
             continue
         for name, spec in node.items():
+            if isinstance(spec, dict) and 'path' in spec and 'git' not in spec:
+                continue
             req = spec if isinstance(spec, str) else (spec or {}).get('version', '*')
             out.add((name, req))
     return out
@@ -126,6 +130,10 @@ thing = { version = "1.2", features = ["x"] }
 trybuild = "1"
 """, 'Cargo.toml')
     expect('three deps, one per table', len(deps), 3)
+    expect('a path dependency is a sibling crate, not a new dependency',
+           manifest_deps('[dependencies]\nsibling = { path = "../sibling", version = "0.1" }\n'
+                         'git_one = { git = "https://example.invalid/x", path = "y" }\n', 'c'),
+           {('git_one', '*')})
     expect('workspace table', len(manifest_deps('[workspace.dependencies]\nlog = "0.4"\n', 'w')), 1)
     expect('bad toml is empty, not a crash', manifest_deps('not [ toml', 'x'), set())
     report = 'dependency: Cargo.toml: log 0.4'

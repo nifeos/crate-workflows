@@ -16,7 +16,9 @@ on:
         type: string
         default: ''
       caller-checks:
-        description: Run the settings-drift and stranger jobs (off for the template's selftest).
+        description: Run the settings-drift and stranger jobs (off for the template's selftest). In a
+          repository of several crates, the drift job reads the repository's settings once, so only one
+          call passes true there, and the stranger job passes over a member that may not be published.
         type: boolean
         default: true
     secrets:
@@ -31,7 +33,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: weekly-${{ github.workflow }}-${{ github.ref }}
+  group: weekly-${{ github.workflow }}-${{ github.ref }}-${{ inputs.manifest-path }}
   cancel-in-progress: false
 
 defaults:
@@ -155,6 +157,13 @@ jobs:
       - name: cargo-semver-checks against the previous release tag
         run: |
           set -e
+          # A member that may not be published, in a repository of several crates, has no release
+          # to compare against (helpers/crate_info.py, RELEASE TARGET).
+          if [ "$(python3 .crate-workflows/helpers/crate_info.py release-target "$MANIFEST" || true)" = no ]; then
+            echo "==> $MANIFEST may not be published; semver has no release to compare against"
+            echo "### semver: $MANIFEST may not be published, so there is no release to compare against" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
           baseline=$(.crate-workflows/helpers/semver-run.sh "$MANIFEST" semver-report.txt)
           {
             echo "### semver against the last release ($baseline)"
@@ -205,13 +214,23 @@ jobs:
     steps:
       - name: clock
         run: echo "JOB_STARTED_AT=$(date +%s)" >> "$GITHUB_ENV"
+      # The caller's checkout says how many crates the repository holds, and a repository of
+      # several is read back by crate (helpers/settings_members.py).
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           repository: ${{ job.workflow_repository }}
           ref: ${{ job.workflow_sha }}
           path: .crate-workflows
           persist-credentials: false
-      - run: .crate-workflows/script/check-settings "${{ github.repository }}"
+      - run: |
+          set -e
+          names=$(python3 .crate-workflows/helpers/crate_info.py names "$MANIFEST")
+          members=()
+          if [ "$(printf '%s\n' "$names" | wc -l)" -gt 1 ]; then
+            for n in $names; do members+=(--member "$n"); done
+          fi
+          .crate-workflows/script/check-settings "${{ github.repository }}" "${members[@]}"
         env:
           GH_TOKEN: ${{ secrets.SETTINGS_TOKEN || github.token }}
       - name: budget
@@ -238,6 +257,12 @@ jobs:
           path: .crate-workflows
           persist-credentials: false
       - run: |
+          set -e
+          # A crate that may not be published has no crates.io pair to judge.
+          if [ "$(python3 .crate-workflows/helpers/crate_info.py published "$MANIFEST" || true)" = no ]; then
+            echo "==> $MANIFEST may not be published; no crates.io badges to judge"
+            exit 0
+          fi
           python3 .crate-workflows/helpers/readme_badges.py --crate-dir "$(dirname "$MANIFEST")" \
             --repository "$GITHUB_REPOSITORY" --published lookup --published-only \
             --summary "$GITHUB_STEP_SUMMARY"
@@ -263,7 +288,13 @@ jobs:
           ref: ${{ job.workflow_sha }}
           path: .crate-workflows
           persist-credentials: false
-      - run: .crate-workflows/script/stranger-due docs/stranger-test.md
+      - run: |
+          set -e
+          if [ "$(python3 .crate-workflows/helpers/crate_info.py release-target "$MANIFEST" || true)" = no ]; then
+            echo "==> $MANIFEST may not be published, and the repository holds other crates: no stranger-test cadence owed"
+            exit 0
+          fi
+          .crate-workflows/script/stranger-due "$(dirname "$MANIFEST")/docs/stranger-test.md"
       - name: budget
         if: always()
         run: python3 .crate-workflows/helpers/job_budget.py check "${{ github.job }}" "$JOB_STARTED_AT"
