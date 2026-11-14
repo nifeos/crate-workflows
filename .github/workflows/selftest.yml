@@ -97,6 +97,96 @@ jobs:
       skip-unchanged: false
       stagger: false
 
+  # A repository of several crates calls each reusable workflow once for each crate, and the calls
+  # land in one run. sample-workspace/ is that repository: a virtual workspace over a crate that
+  # may be published and one that may not, called the way scaffold-workspace/ shows. A call that
+  # collides with its sibling (a concurrency group, an artifact name, a code scan category, a
+  # mutants.out), or a gate that reads the repository's root and finds no crate, is red here.
+  check-contract:
+    name: selftest (check, workspace, publishable crate)
+    needs: lint
+    permissions:
+      contents: read
+      security-events: write
+    uses: ./.github/workflows/check.yml
+    with:
+      manifest-path: sample-workspace/workspace_sample_contract/Cargo.toml
+
+  check-fixture:
+    name: selftest (check, workspace, unpublished crate)
+    needs: lint
+    permissions:
+      contents: read
+      security-events: write
+    uses: ./.github/workflows/check.yml
+    with:
+      manifest-path: sample-workspace/workspace_sample_fixture/Cargo.toml
+      allow-unpublished: true
+
+  proofs-contract:
+    name: selftest (proofs, workspace, publishable crate)
+    needs: lint
+    permissions:
+      contents: read
+    uses: ./.github/workflows/proofs.yml
+    with:
+      manifest-path: sample-workspace/workspace_sample_contract/Cargo.toml
+
+  proofs-fixture:
+    name: selftest (proofs, workspace, unpublished crate)
+    needs: lint
+    permissions:
+      contents: read
+    uses: ./.github/workflows/proofs.yml
+    with:
+      manifest-path: sample-workspace/workspace_sample_fixture/Cargo.toml
+
+  weekly-contract:
+    name: selftest (weekly, workspace, publishable crate)
+    needs: lint
+    permissions:
+      contents: read
+    uses: ./.github/workflows/weekly.yml
+    with:
+      manifest-path: sample-workspace/workspace_sample_contract/Cargo.toml
+      caller-checks: false
+
+  weekly-fixture:
+    name: selftest (weekly, workspace, unpublished crate)
+    needs: lint
+    permissions:
+      contents: read
+    uses: ./.github/workflows/weekly.yml
+    with:
+      manifest-path: sample-workspace/workspace_sample_fixture/Cargo.toml
+      caller-checks: false
+
+  # One mutant a shard, so each crate's two mutants make two shards and the two calls upload four
+  # artifacts that must keep their names apart, and each verdict must read only its own.
+  mutation-contract:
+    name: selftest (mutation, workspace, publishable crate)
+    needs: lint
+    permissions:
+      contents: read
+    uses: ./.github/workflows/mutation.yml
+    with:
+      manifest-path: sample-workspace/workspace_sample_contract/Cargo.toml
+      mutants-per-shard: 1
+      skip-unchanged: false
+      stagger: false
+
+  mutation-fixture:
+    name: selftest (mutation, workspace, unpublished crate)
+    needs: lint
+    permissions:
+      contents: read
+    uses: ./.github/workflows/mutation.yml
+    with:
+      manifest-path: sample-workspace/workspace_sample_fixture/Cargo.toml
+      mutants-per-shard: 1
+      skip-unchanged: false
+      stagger: false
+
   # check.yml's mutation-diff job sees this repository's own pull request diffs, which rarely touch
   # the fixture's Rust. So its script runs here on three fixed diffs (fixtures/mutation-diff/): an
   # exempted survivor passes, an untested function fails, and a diff with no Rust passes.

@@ -6,8 +6,10 @@
 #
 #     helpers/mutation-diff.sh <manifest-path> <base-rev> <exempts-file> [<cap-minutes>]
 #
-# The diff is `git diff <base-rev> HEAD`, taken relative to the crate's directory so its paths are
-# the ones cargo-mutants reads there. `cargo mutants --in-diff` makes mutants on the changed lines
+# The diff is `git diff <base-rev> HEAD`, taken relative to the crate's workspace root (which is the
+# crate's directory unless the repository holds several crates) so its paths are the ones
+# cargo-mutants reads. A diff relative to a member's own directory matches no mutant there, and
+# cargo-mutants then says nothing is to be tested, so the root is what the paths must start from. `cargo mutants --in-diff` makes mutants on the changed lines
 # only, so the run scales with the pull request rather than the crate. The verdict is
 # `mutants_gate.py --diff`, against the same exemptions as the full run, without the stale check
 # (a changed-lines run reaches only some survivors; the full run calls an exemption stale).
@@ -35,6 +37,7 @@ case "$exempts" in
 *) exempts="$(pwd)/$exempts" ;;
 esac
 crate_dir="$(dirname "$manifest")"
+root="$(python3 "$(dirname "$gate")/crate_info.py" workspace-root "$manifest")"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 
@@ -50,11 +53,11 @@ git rev-parse --verify --quiet "$base^{commit}" >/dev/null || {
 	echo "mutation-diff: the base $base does not resolve; the check cannot guess the diff" >&2
 	exit 1
 }
-git diff --relative "$base" HEAD >"$work/pr.diff"
+git -C "$root" diff --relative "$base" HEAD >"$work/pr.diff"
 rm -rf mutants.out mutants.out.old
 
 rc=0
-timeout --kill-after=30s "${cap}m" cargo mutants --in-diff "$work/pr.diff" --jobs 2 --timeout 300 || rc=$?
+timeout --kill-after=30s "${cap}m" cargo mutants --output "$(pwd)" --in-diff "$work/pr.diff" --jobs 2 --timeout 300 || rc=$?
 case "$rc" in
 0 | 2 | 3) ;;
 124 | 137)

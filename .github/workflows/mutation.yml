@@ -36,7 +36,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: mutation-${{ github.workflow }}-${{ github.ref }}
+  group: mutation-${{ github.workflow }}-${{ github.ref }}${{ (inputs.manifest-path != 'Cargo.toml' && inputs.manifest-path != './Cargo.toml') && format('-{0}', inputs.manifest-path) || '' }}
   cancel-in-progress: false
 
 defaults:
@@ -129,7 +129,7 @@ jobs:
           python3 .crate-workflows/helpers/mutation_plan.py compare --event "$EVENT" \
             --repository "$GITHUB_REPOSITORY" --workflow-ref "$WORKFLOW_REF" \
             --branch "$GITHUB_REF_NAME" --run-id "$GITHUB_RUN_ID" --now "$RUN_CLOCK" \
-            --fingerprint "$fp" --skip-unchanged "$SKIP_UNCHANGED"
+            --fingerprint "$fp" --skip-unchanged "$SKIP_UNCHANGED" --manifest-path "$MANIFEST"
       # The shard count is ceil(mutants / mutants-per-shard), at least one. A matrix holds at most
       # 256 jobs, so a count above that is refused with the input that fixes it.
       - id: plan
@@ -193,15 +193,19 @@ jobs:
         run: |
           cd "$(dirname "$MANIFEST")"
           echo "MUTANTS_OUT=$(pwd)/mutants.out" >> "$GITHUB_ENV"
-          cargo mutants --jobs 2 --timeout 300 --shard "$SHARD/$SHARDS" --sharding round-robin || rc=$?
+          # --output keeps mutants.out here: cargo-mutants otherwise writes it at the workspace root.
+          cargo mutants --output "$(pwd)" --jobs 2 --timeout 300 --shard "$SHARD/$SHARDS" --sharding round-robin || rc=$?
           case "${rc:-0}" in
             0 | 2 | 3) ;;
             *) exit "$rc" ;;
           esac
+      # One call of this workflow for each crate lands in one run, and two artifacts of one name
+      # in a run collide, so a crate not at the repository root puts its directory in the name.
+      - run: echo "ARTIFACT_SUFFIX=$(.crate-workflows/helpers/crate-slug.sh "$MANIFEST")" >> "$GITHUB_ENV"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
         if: always()
         with:
-          name: mutants-shard-${{ matrix.shard }}
+          name: mutants${{ env.ARTIFACT_SUFFIX }}-shard-${{ matrix.shard }}
           path: ${{ env.MUTANTS_OUT }}
       - name: budget
         if: always()
@@ -252,10 +256,12 @@ jobs:
             exit 1
           fi
           echo "judge=true" >> "$GITHUB_OUTPUT"
+      - name: this crate's artifact names
+        run: echo "ARTIFACT_SUFFIX=$(.crate-workflows/helpers/crate-slug.sh "$MANIFEST")" >> "$GITHUB_ENV"
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
         if: steps.ran.outputs.judge == 'true'
         with:
-          pattern: mutants-shard-*
+          pattern: mutants${{ env.ARTIFACT_SUFFIX }}-shard-*
           path: ${{ runner.temp }}/mutants-shards
       # Named, with an annotation of its own, so a refusal reads as the gate's and not as the
       # download step above it, whose echoed inputs include the words `digest-mismatch: error`.
@@ -268,7 +274,11 @@ jobs:
           set -e
           # One shard downloads with outcomes.json in $OUT itself, several into a subdirectory
           # each; the gate counts both layouts and refuses a count other than $SHARDS.
-          if ! python3 .crate-workflows/helpers/mutants_gate.py --shards "$SHARDS" "$OUT" "$GITHUB_WORKSPACE/.github/mutants-exempts"; then
+          # cargo-mutants names a file from the workspace root, so a crate in a directory of its
+          # own is `<crate>/src/lib.rs:16` in the exemptions, and only the entries under this
+          # crate's directory can be called stale by this crate's run.
+          prefix=$(python3 .crate-workflows/helpers/crate_info.py prefix "$MANIFEST")
+          if ! python3 .crate-workflows/helpers/mutants_gate.py --shards "$SHARDS" --prefix "$prefix" "$OUT" "$GITHUB_WORKSPACE/.github/mutants-exempts"; then
             echo "::error::the mutation gate refused this run: each SURVIVOR, TIMEOUT or stale exemption it names is above"
             exit 1
           fi
@@ -282,7 +292,9 @@ jobs:
   # (helpers/mutation_plan.py lists the four forms). It runs on always() so a red run is on record
   # too; whether a run counts is read from the run's own conclusion, never from this job.
   mutation-record:
-    name: 'mutation record: ${{ needs.mutation-plan.outputs.record }}'
+    # A crate not at the repository root names itself in brackets, so a repository of several crates
+    # keeps one record for each in one run (helpers/mutation_plan.py, THE RECORD).
+    name: 'mutation record${{ (inputs.manifest-path != ''Cargo.toml'' && inputs.manifest-path != ''./Cargo.toml'') && format('' [{0}]'', inputs.manifest-path) || '''' }}: ${{ needs.mutation-plan.outputs.record }}'
     needs: [mutation-plan, mutation-verdict]
     if: always()
     runs-on: ubuntu-latest

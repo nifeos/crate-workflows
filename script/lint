@@ -78,11 +78,70 @@ fi
 # The helpers that carry their own tests, named here so a helper without a selftest is a visible
 # gap in this list rather than an invisible gap in a grep.
 for f in rust_names spelled_out unit_symbols abbreviations register_names british_spelling service_model contract_names question_shape standalone prose_caps passive_voice history_phrases prose_text prose_acronyms prose_figures readme_documents readme_acronyms inflated_wording readme_sections readme_badges function_length orphan_modules check_links falsify architect-label-rules \
-	mutants_gate mutation_plan job_budget workflow_shape kani_bump publish_mode semver_baseline semver_major; do
+	mutants_gate mutation_plan job_budget workflow_shape kani_bump publish_mode semver_baseline semver_major crate_info settings_members; do
 	"$py" "helpers/$f.py" --selftest
 done
 "$py" script/check-settings --selftest
 "$py" script/apply-settings --help >/dev/null && echo "apply-settings --help ok"
+echo "ok"
+
+echo "==> a repository of several crates"
+# sample-workspace/ is a virtual workspace over a crate that may be published and one that may not;
+# sample/ is a repository of one. The release tag, the semver baseline's prefix and the passes over
+# an unpublished member come from helpers/crate_info.py, so the two shapes are asked here.
+several=sample-workspace/workspace_sample_contract/Cargo.toml
+unpublished=sample-workspace/workspace_sample_fixture/Cargo.toml
+info="$py helpers/crate_info.py"
+[ "$($info tag $several 1.2.3)" = workspace_sample_contract-v1.2.3 ] || fail "a crate of several is not tagged by name"
+[ "$($info tag $unpublished 1.2.3)" = workspace_sample_fixture-v1.2.3 ] || fail "the unpublished crate is not tagged by name"
+[ "$($info tag sample/Cargo.toml 1.2.3)" = v1.2.3 ] || fail "a crate of one repository lost its plain v tag"
+[ "$($info published $several)" = yes ] || fail "the publishable member is not publishable"
+[ "$($info published $unpublished || true)" = no ] || fail "publish = false is publishable"
+[ "$($info release-target $unpublished || true)" = no ] || fail "an unpublished member of several is a release target"
+[ "$($info release-target sample/Cargo.toml)" = yes ] || fail "the only crate of a repository is not a release target"
+[ "$($info members sample-workspace/Cargo.toml --release-targets)" = "$several" ] || fail "the workspace's release targets are not the publishable member"
+[ "$($info prefix $several)" = workspace_sample_contract/ ] || fail "a member's prefix is not its directory"
+[ -z "$($info prefix sample/Cargo.toml)" ] || fail "a crate at its workspace's root has a prefix"
+[ "$(sh helpers/crate-slug.sh sample-workspace/workspace_sample_contract/Cargo.toml)" = -sample-workspace-workspace_sample_contract ] || fail "crate-slug does not name the directory"
+[ -z "$(sh helpers/crate-slug.sh Cargo.toml)" ] || fail "crate-slug names a crate at the repository root"
+"$py" helpers/settings_members.py --selftest >/dev/null
+echo "ok"
+
+echo "==> a crate at the repository root keeps its names"
+# GitHub's `a && b || c` answers c when b is empty, which is how a name once came out as
+# `mutation record [Cargo.toml]` for every existing caller. The expressions that name a crate's
+# concurrency group and mutation record job are evaluated here, for a root manifest and a nested one.
+"$py" - <<'PY' || fail "a name expression gives a root crate a suffix, or a nested crate none"
+import re
+import sys
+try:
+    import yaml
+except ImportError:
+    sys.exit(0)
+
+def evaluate(text, manifest):
+    def fmt(template, *args):
+        return template.format(*args)
+    def expr(m):
+        body = m.group(1).replace('inputs.manifest-path', 'manifest')
+        body = body.replace('&&', ' and ').replace('||', ' or ')
+        body = re.sub(r"needs\.[\w.-]+", "'R'", body)
+        return str(eval(body, {'manifest': manifest, 'format': fmt}))
+    return re.sub(r'\$\{\{(.*?)\}\}', expr, text)
+
+mutation = yaml.safe_load(open('.github/workflows/mutation.yml'))
+name = mutation['jobs']['mutation-record']['name']
+want = {'Cargo.toml': 'mutation record: R', './Cargo.toml': 'mutation record: R',
+        'a/Cargo.toml': 'mutation record [a/Cargo.toml]: R'}
+for manifest, expected in want.items():
+    got = evaluate(name, manifest)
+    assert got == expected, (manifest, got, expected)
+for w in ('check', 'fuzz', 'mutation', 'proofs', 'weekly'):
+    group = yaml.safe_load(open(f'.github/workflows/{w}.yml'))['concurrency']['group']
+    for manifest, suffix in (('Cargo.toml', ''), ('./Cargo.toml', ''), ('a/Cargo.toml', '-a/Cargo.toml')):
+        got = evaluate(group.replace('github.workflow', "'W'").replace('github.ref', "'F'"), manifest)
+        assert got == f'{w}-W-F{suffix}', (w, manifest, got)
+PY
 echo "ok"
 
 echo "==> the weekly fuzz job files nothing and fails on a crash"
@@ -215,6 +274,7 @@ for bad in nife calef milestone; do
 	fi
 done
 sh helpers/scaffold_alone.sh scaffold || fail "the scaffold names another tree's vocabulary"
+sh helpers/scaffold_alone.sh scaffold-workspace || fail "the callers for several crates name another tree's vocabulary"
 echo "ok"
 
 echo "==> actions are pinned to a commit SHA"
@@ -302,6 +362,11 @@ mkdir -p "$tpl/.github/workflows"
 for f in scaffold/caller-workflows/*.yml; do
 	sed -e 's/@PINS@/@0000000000000000000000000000000000000000/' -e 's/@MUTATION_CRON@/20 8 * * 1/' "$f" >"$tpl/.github/workflows/$(basename "$f")"
 done
+# The callers for a repository of several crates are linted the same way, in a tree of their own.
+mkdir -p "$tpl-several/.github/workflows"
+for f in scaffold-workspace/*.yml; do
+	sed -e 's/@PINS@/@0000000000000000000000000000000000000000/' -e 's/@MUTATION_CRON@/20 8 * * 1/' "$f" >"$tpl-several/.github/workflows/$(basename "$f")"
+done
 # EXCEPTION, marked: actionlint 1.7.12's job-context model predates GitHub's
 # job.workflow_sha / job.workflow_repository, which the contexts reference documents and which
 # the lag check and helper checkout depend on. The two -ignore patterns name exactly those
@@ -316,7 +381,7 @@ set -- \
 	-ignore 'property "workflow_sha" is not defined' \
 	-ignore 'property "workflow_repository" is not defined'
 actionlint "$@"
-actionlint "$@" "$tpl"/.github/workflows/*.yml
+actionlint "$@" "$tpl"/.github/workflows/*.yml "$tpl-several"/.github/workflows/*.yml
 echo "ok"
 
 echo "==> lint: ok"

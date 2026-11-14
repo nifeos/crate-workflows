@@ -4,7 +4,7 @@
 # helpers/release-gate.sh: refuse a release whose check or proof runs are not green on the commit
 # being released, or that has no green full mutation run there.
 #
-#     helpers/release-gate.sh <owner/repo> <sha>
+#     helpers/release-gate.sh <owner/repo> <sha> [<manifest-path>]
 #
 # The release gate reads the Actions API for runs of the caller's two gating workflows at exactly
 # the released commit. "Green" means a completed run with conclusion success; a run still in
@@ -17,6 +17,10 @@
 # (helpers/mutation_plan.py verify, which reads each run's record job). A deferred or repeat run
 # tested nothing and does not count. A release commit whose tree changed needs a full run there.
 #
+# A repository of several crates runs the mutation workflow once for each, and each run names its
+# record job for its crate (helpers/mutation_plan.py, THE RECORD); <manifest-path>, the manifest of
+# the crate being released, picks that crate's record. Without it, the record is the root crate's.
+#
 # The workflow filenames are the scaffold's (ci.yml, proofs.yml, mutation.yml). A caller that renames
 # them raises the release gate's red rather than silently passing, which is the right direction.
 
@@ -24,6 +28,7 @@ set -eu
 
 repo="$1"
 sha="$2"
+manifest="${3:-Cargo.toml}"
 
 green() {
 	# $1 = workflow filename. The API matches on head_sha, so a re-run of an older commit
@@ -42,7 +47,7 @@ for workflow in ci.yml proofs.yml; do
 		exit 1
 	fi
 done
-if ! python3 "$(dirname "$0")/mutation_plan.py" verify "$repo" "$sha" --workflow mutation.yml; then
+if ! python3 "$(dirname "$0")/mutation_plan.py" verify "$repo" "$sha" --workflow mutation.yml --manifest-path "$manifest"; then
 	echo "release-gate: dispatch mutation.yml on main at this commit and let it finish green; an unchanged tree finishes in seconds, a changed one runs every mutant." >&2
 	exit 1
 fi

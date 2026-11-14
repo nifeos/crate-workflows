@@ -6,7 +6,8 @@
     python3 mutation_plan.py fingerprint --crate-dir DIR --template-dir DIR
     python3 mutation_plan.py compare --event E --repository OWNER/NAME --workflow-ref REF
         --branch B --run-id N --now ISO-8601 --fingerprint HEX [--skip-unchanged B]
-    python3 mutation_plan.py verify OWNER/NAME SHA [--workflow mutation.yml]
+        [--manifest-path PATH]
+    python3 mutation_plan.py verify OWNER/NAME SHA [--workflow mutation.yml] [--manifest-path PATH]
     python3 mutation_plan.py --selftest
 
 THE WEEKDAY. Each repository runs on its own weekday, derived from its name alone (the part after
@@ -27,7 +28,10 @@ Cargo.lock, rust-toolchain, mutants configuration and exemptions are all in it, 
 toolchain and tool versions; a README change is in it too, since a README may carry doctests.
 
 THE RECORD. Every run names one job `mutation record: <record>`, and that job name is where the
-fingerprint is stored: it is part of the run, returned by the jobs API to any token that can read
+fingerprint is stored. A crate whose manifest is not the repository's `Cargo.toml` names it
+`mutation record [<manifest-path>]: <record>`, so a repository of several crates, which calls the
+mutation workflow once for each, keeps one record for each crate in the same run, and a crate reads
+only its own: it is part of the run, returned by the jobs API to any token that can read
 the repository's Actions runs (the default GITHUB_TOKEN with `contents: read` on a public
 repository), and it lasts as long as the run does, past the expiry of logs and artifacts. A record
 is one of:
@@ -68,7 +72,8 @@ TRY_HOURS = (8, 10, 12)
 # How many of the branch's newest runs the comparison reads: about ten weeks at three tries a week.
 # A green full run further back than this is not found, and the run tests everything again.
 HISTORY_RUNS = 30
-RECORD_JOB = re.compile(r'mutation record: (\S.*?)\s*$')
+RECORD_JOB = re.compile(r'mutation record(?: \[([^\]]+)\])?: (\S.*?)\s*$')
+ROOT_MANIFEST = 'Cargo.toml'
 FULL = re.compile(r'^full ([0-9a-f]{64})$')
 UNCHANGED = re.compile(r'^unchanged ([0-9a-f]{64}) since run (\d+)$')
 CRON_DAYS = ('Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday')
@@ -124,12 +129,21 @@ def parse_record(text):
     return None
 
 
-def record_of(job_names):
-    """The record a run's jobs carry, as text, or '' when no job is a record job."""
+def manifest_key(manifest):
+    """A manifest path as a record names it: the root crate's has no name, any other is its path."""
+    manifest = manifest or ROOT_MANIFEST
+    while manifest.startswith('./'):
+        manifest = manifest[2:]
+    return None if manifest == ROOT_MANIFEST else manifest
+
+
+def record_of(job_names, manifest=ROOT_MANIFEST):
+    """The record this crate's record job carries, as text, or '' when it has none."""
+    want = manifest_key(manifest)
     for name in job_names:
         m = RECORD_JOB.search(name)
-        if m:
-            return m.group(1)
+        if m and manifest_key(m.group(1)) == want:
+            return m.group(2)
     return ''
 
 
@@ -213,19 +227,19 @@ def gh_json(path):
     return json.loads(out)
 
 
-def run_record(repository, run_id):
+def run_record(repository, run_id, manifest=ROOT_MANIFEST):
     jobs = gh_json('repos/%s/actions/runs/%d/jobs?per_page=100' % (repository, run_id))
-    return record_of(j.get('name', '') for j in jobs.get('jobs', []))
+    return record_of((j.get('name', '') for j in jobs.get('jobs', [])), manifest)
 
 
-def history(repository, workflow_ref, branch):
+def history(repository, workflow_ref, branch, manifest=ROOT_MANIFEST):
     """This branch's runs of the calling workflow, newest first, each record fetched on demand."""
     workflow = workflow_ref.split('@', 1)[0].rsplit('/', 1)[-1]
     listing = gh_json('repos/%s/actions/workflows/%s/runs?branch=%s&per_page=%d'
                       % (repository, workflow, urllib.parse.quote(branch, safe=''), HISTORY_RUNS))
     return [{'id': run['id'], 'status': run.get('status'), 'event': run.get('event'),
              'conclusion': run.get('conclusion'), 'created_at': run.get('created_at', ''),
-             'record': (lambda rid=run['id']: run_record(repository, rid))}
+             'record': (lambda rid=run['id']: run_record(repository, rid, manifest))}
             for run in listing.get('workflow_runs', [])]
 
 
@@ -296,13 +310,15 @@ def main(argv):
     c.add_argument('--run-id', required=True, type=int)
     c.add_argument('--now', required=True, type=parse_now)
     c.add_argument('--skip-unchanged', type=flag, default=True)
+    c.add_argument('--manifest-path', default=ROOT_MANIFEST)
     v = sub.add_parser('verify')
     v.add_argument('repository')
     v.add_argument('sha')
     v.add_argument('--workflow', default='mutation.yml')
+    v.add_argument('--manifest-path', default=ROOT_MANIFEST)
     a = p.parse_args(argv[1:])
     if a.command == 'verify':
-        return verify_live(a.repository, a.sha, a.workflow)
+        return verify_live(a.repository, a.sha, a.workflow, a.manifest_path)
     if a.command == 'schedule':
         print(cron_line(a.repository))
         return 0
@@ -320,13 +336,13 @@ def main(argv):
     if not re.match(r'^[0-9a-f]{64}$', a.fingerprint):
         print('::error::mutation: %r is not a SHA-256 fingerprint' % a.fingerprint)
         return 1
-    runs = history(a.repository, a.workflow_ref, a.branch) if a.skip_unchanged else []
+    runs = history(a.repository, a.workflow_ref, a.branch, a.manifest_path) if a.skip_unchanged else []
     mode, record, message = compare(a.event, a.now, a.fingerprint, runs, a.run_id, a.skip_unchanged)
     emit({'mode': mode, 'record': record}, message, notice=mode != 'full')
     return 0
 
 
-def verify_live(repository, sha, workflow):
+def verify_live(repository, sha, workflow, manifest=ROOT_MANIFEST):
     try:
         listing = gh_json('repos/%s/actions/workflows/%s/runs?head_sha=%s&status=success&per_page=100'
                           % (repository, workflow, sha))
@@ -334,7 +350,7 @@ def verify_live(repository, sha, workflow):
         print('release-gate: %s: the runs could not be read (%s); the repository needs the caller '
               '.github/workflows/%s' % (workflow, (e.stderr or '').strip(), workflow), file=sys.stderr)
         return 1
-    sha_runs = [{'id': r['id'], 'record': (lambda rid=r['id']: run_record(repository, rid))}
+    sha_runs = [{'id': r['id'], 'record': (lambda rid=r['id']: run_record(repository, rid, manifest))}
                 for r in listing.get('workflow_runs', []) if r.get('conclusion') == 'success']
 
     def fetch_run(n):
@@ -343,7 +359,7 @@ def verify_live(repository, sha, workflow):
         except subprocess.CalledProcessError:
             return None
         return {'id': n, 'conclusion': run.get('conclusion'), 'path': run.get('path'),
-                'record': run_record(repository, n)}
+                'record': run_record(repository, n, manifest)}
 
     ok, message = verify(sha_runs, fetch_run, '.github/workflows/%s' % workflow)
     print('release-gate: %s: %s' % (workflow, message), file=sys.stdout if ok else sys.stderr)
@@ -393,6 +409,16 @@ def selftest():
                                                'mutation / mutation record: full ' + 'a' * 64]),
            'full ' + 'a' * 64)
     expect('an empty record', parse_record(record_of(['mutation / mutation record: '])), None)
+    two = ['a / mutation record [crates/a/Cargo.toml]: full ' + 'a' * 64,
+           'b / mutation record [crates/b/Cargo.toml]: deferred',
+           'c / mutation record: repeat since run 4']
+    expect('a crate reads its own record', record_of(two, 'crates/a/Cargo.toml'), 'full ' + 'a' * 64)
+    expect('another crate reads its own', record_of(two, './crates/b/Cargo.toml'), 'deferred')
+    expect('the root crate reads the unnamed one', record_of(two), 'repeat since run 4')
+    expect('a crate with no record job has none', record_of(two, 'crates/c/Cargo.toml'), '')
+    expect('the root crate does not read a named one', record_of(two[:2]), '')
+    expect('a root record that names Cargo.toml still reads as the root one',
+           record_of(['m / mutation record [Cargo.toml]: deferred']), 'deferred')
     expect('unchanged parsed', parse_record('unchanged %s since run 7' % ('b' * 64)),
            ('unchanged', 'b' * 64, 7))
     expect('a short fingerprint is no record', parse_record('full abc'), None)

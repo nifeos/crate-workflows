@@ -1,0 +1,13 @@
+diff --git a/sample-workspace/workspace_sample_contract/src/lib.rs b/sample-workspace/workspace_sample_contract/src/lib.rs
+index d4ea8f4..be96a37 100644
+--- a/sample-workspace/workspace_sample_contract/src/lib.rs
++++ b/sample-workspace/workspace_sample_contract/src/lib.rs
+@@ -38,3 +38,8 @@ mod tests {
+         assert_eq!(saturating_add_percent(98, 1), 99);
+     }
+ }
++
++/// Doubles a percentage, wrapping; no test pins it.
++pub fn double_percent(a: u8) -> u8 {
++    a.wrapping_mul(2)
++}

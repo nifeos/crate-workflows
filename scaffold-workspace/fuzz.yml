@@ -1,0 +1,19 @@
+name: fuzz
+on:
+  schedule:
+    - cron: '45 6 * * 2'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  fuzz-first_crate:
+    uses: nifeos/crate-workflows/.github/workflows/fuzz.yml@PINS@
+    with:
+      manifest-path: first_crate/Cargo.toml
+      # Crash inputs are public. Set true only for a crate with no unsafe code.
+      public-crash-inputs: false
+  fuzz-second_crate:
+    uses: nifeos/crate-workflows/.github/workflows/fuzz.yml@PINS@
+    with:
+      manifest-path: second_crate/Cargo.toml
+      public-crash-inputs: false

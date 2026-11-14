@@ -5,8 +5,9 @@
 #
 #     helpers/semver-run.sh <manifest> <report.txt> [ref]
 #
-# The baseline is the newest `v<x>.<y>.<z>` tag before <ref> (default HEAD), named by
-# helpers/semver_baseline.py and passed as --baseline-rev, so a crate that has never been
+# The baseline is the newest release tag of this crate before <ref> (default HEAD): `v<x>.<y>.<z>`
+# in a repository of one crate, `<crate>-v<x>.<y>.<z>` in a repository of several
+# (helpers/crate_info.py tag-prefix), named by helpers/semver_baseline.py and passed as --baseline-rev, so a crate that has never been
 # published has a baseline too. With no such tag the tool is left to its default, the last version
 # on crates.io; a crate with neither has no baseline and the report says so.
 #
@@ -25,8 +26,12 @@ report="$2"
 ref="${3:-HEAD}"
 here="$(dirname "$0")"
 
+prefix="$(python3 "$here/crate_info.py" tag-prefix "$manifest")" || {
+	echo "semver-run: could not read the tag prefix of $manifest" >&2
+	exit 1
+}
 tag=""
-if tag="$(python3 "$here/semver_baseline.py" --ref "$ref")"; then
+if tag="$(python3 "$here/semver_baseline.py" --ref "$ref" --tag-prefix "$prefix")"; then
 	echo "baseline: $tag"
 	# Reading every file of the tag fetches the missing ones in one batch; a full clone has them.
 	top="$(git -C "$(dirname "$manifest")" rev-parse --show-toplevel)" || exit 1

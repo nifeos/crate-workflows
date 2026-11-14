@@ -2,7 +2,9 @@
 
 # The caller dispatches it with a version. `gate` refuses unless the check and proof runs for this
 # exact commit are green, so a tag whose proof job is red never gets made. `tag` creates `v<version>`
-# and is the only thing in the crate repository that may. `publish` runs last, in the `crates-io`
+# (`<crate>-v<version>` in a repository of several crates, where `manifest-path` names the crate
+# being released and a crate that may not be published releases no further than a tag) and is the
+# only thing in the crate repository that may. `publish` runs last, in the `crates-io`
 # environment (a person approves), holding `id-token: write` and nothing else, and exchanges the
 # OIDC token for a temporary crates.io token through trusted publishing (Fork 6); a crate's first
 # publish, before any trusted publisher can exist, uses the environment's scoped token instead.
@@ -55,6 +57,8 @@ jobs:
     name: gate (checks and proofs green on this commit)
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    outputs:
+      tag: ${{ steps.release.outputs.tag }}
     steps:
       - name: clock
         run: echo "JOB_STARTED_AT=$(date +%s)" >> "$GITHUB_ENV"
@@ -74,13 +78,41 @@ jobs:
             echo "Bump the manifest (and the changelog) first, then dispatch again."
             exit 1
           fi
+      # The tag names the crate when the repository holds several (helpers/crate_info.py), and a
+      # crate that carries publish = false is tagged at most: asking to publish it is refused here,
+      # before a tag exists, and not by cargo after one does.
+      - name: the release's tag, and whether this crate may be published
+        id: release
+        env:
+          VERSION: ${{ inputs.version }}
+          PUBLISH: ${{ inputs.publish }}
+          DRY_RUN: ${{ inputs.dry-run }}
+        run: |
+          set -e
+          tag=$(python3 .crate-workflows/helpers/crate_info.py tag "$MANIFEST" "$VERSION")
+          echo "==> this release is the tag $tag"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          if [ "$PUBLISH" = true ] && [ "$DRY_RUN" = false ] \
+              && [ "$(python3 .crate-workflows/helpers/crate_info.py published "$MANIFEST" || true)" = no ]; then
+            echo "$MANIFEST carries publish = false, so it cannot be published; dispatch with publish false to tag it."
+            exit 1
+          fi
       # A crate needs a stranger-test run on record before its first release (ruled 2026-11-01
       # UTC). The weekly cadence job is separate and also fails closed on 'Last run: none', so a
       # new repository's weekly run is red until its first stranger run is recorded.
+      # The record sits in the crate's own docs/, which is the repository's docs/ for a crate at the
+      # root.
+      # A member of several crates that may not be published has no release to claim, so it owes none.
       - name: a stranger-test run is on record
-        run: .crate-workflows/script/stranger-recorded docs/stranger-test.md
+        run: |
+          set -e
+          if [ "$(python3 .crate-workflows/helpers/crate_info.py release-target "$MANIFEST" || true)" = no ]; then
+            echo "==> $MANIFEST may not be published, and the repository holds other crates: no stranger-test record owed"
+            exit 0
+          fi
+          .crate-workflows/script/stranger-recorded "$(dirname "$MANIFEST")/docs/stranger-test.md"
       - name: check, proofs and a full mutation run are green on this commit
-        run: .crate-workflows/helpers/release-gate.sh "$GITHUB_REPOSITORY" "$GITHUB_SHA"
+        run: .crate-workflows/helpers/release-gate.sh "$GITHUB_REPOSITORY" "$GITHUB_SHA" "$MANIFEST"
         env:
           GH_TOKEN: ${{ github.token }}
       - name: budget
@@ -131,15 +163,16 @@ jobs:
       - name: create the tag (refusing one that exists)
         run: |
           set -e
-          ref="refs/tags/v${{ inputs.version }}"
-          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/v${{ inputs.version }}" >/dev/null 2>&1; then
-            echo "the tag v${{ inputs.version }} already exists; a tag is never updated"
+          ref="refs/tags/$TAG"
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$TAG" >/dev/null 2>&1; then
+            echo "the tag $TAG already exists; a tag is never updated"
             exit 1
           fi
           gh api "repos/$GITHUB_REPOSITORY/git/refs" -f "ref=$ref" -f "sha=$GITHUB_SHA"
           echo "created $ref at $GITHUB_SHA"
         env:
           GH_TOKEN: ${{ steps.app.outputs.token }}
+          TAG: ${{ needs.gate.outputs.tag }}
       - name: budget
         if: always()
         run: python3 .crate-workflows/helpers/job_budget.py check "${{ github.job }}" "$JOB_STARTED_AT"
@@ -174,8 +207,8 @@ jobs:
       - name: package builds
         run: |
           set -e
-          unpublished=$(python3 -c 'import sys,tomllib; p=tomllib.load(open(sys.argv[1],"rb")).get("package",{}).get("publish"); print("yes" if p is False else "no")' "$MANIFEST")
-          if [ "$unpublished" = yes ]; then
+          published=$(python3 .crate-workflows/helpers/crate_info.py published "$MANIFEST" || true)
+          if [ "$published" = no ]; then
             echo "publish = false: rehearsing with cargo package, which builds the same archive"
             cargo package --manifest-path "$MANIFEST" --list
             cargo package --manifest-path "$MANIFEST"

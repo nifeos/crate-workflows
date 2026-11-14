@@ -6,6 +6,9 @@ call that sits behind the newest release.
 
 ## Unreleased
 
+- A repository of several crates is supported (`scaffold-workspace/README.md`); its releases are
+  tagged `<crate>-v<version>`. One crate per repository is unchanged.
+
 - The spelled-out check asks for `management_data_io` in place of `mdio` and `sd_io` in place of
   `sdio`, because `io` is a word every name keeps whole, inside an expansion too. A crate that
   wrote `management_data_input_output` passes as before; the failure message for `mdio` or `sdio`

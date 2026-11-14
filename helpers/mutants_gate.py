@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """A mutation survivor fails the run unless the caller exempted it with a reason.
 
-    python3 mutants_gate.py [--diff] [--shards N] <mutants.out-dir> [<exempts-file>]
+    python3 mutants_gate.py [--diff] [--shards N] [--prefix DIR/] <mutants.out-dir> [<exempts-file>]
 
 cargo-mutants writes `outcomes.json` in its `mutants.out` directory. The directory given here is
 either one such directory, or a directory whose subdirectories each hold one: the shards of one
@@ -20,6 +20,11 @@ The exempt file carries one mutant per line, matched on its `file:line` prefix, 
 words on the same line after a `#`. One line covers every mutant on that source line. An exempt
 line without a reason is refused, and a mutant listed in the file that no longer exists is refused
 too, so the list can only shrink by a diff that says why.
+
+`--prefix DIR/` is for a repository of several crates, whose one exempts file holds every crate's
+entries, each named from the workspace root (`DIR/src/lib.rs:16`, which is how cargo-mutants names
+a file). A run of one crate can only reach its own survivors, so only the entries under its
+prefix can be called stale; the rest are judged by their own crate's run.
 
 `--diff` judges a run over a pull request's changed lines (`cargo mutants --in-diff`). Such a run
 generates the mutants of the changed lines only, so an exemption that names no survivor in it is
@@ -91,6 +96,15 @@ def main(argv):
     diff_only = '--diff' in argv[1:]
     args = [a for a in argv[1:] if a != '--diff']
     want_shards = None
+    prefix = ''
+    if '--prefix' in args:
+        i = args.index('--prefix')
+        try:
+            prefix = args[i + 1]
+        except IndexError:
+            print('mutants_gate: --prefix wants a directory', file=sys.stderr)
+            return 2
+        del args[i:i + 2]
     if '--shards' in args:
         i = args.index('--shards')
         try:
@@ -132,7 +146,7 @@ def main(argv):
         else:
             print(f'mutants_gate: {verdict} {key}: {desc}', file=sys.stderr)
             bad = True
-    for key in ([] if diff_only else sorted(set(exempts) - used)):
+    for key in ([] if diff_only else sorted(k for k in set(exempts) - used if k.startswith(prefix))):
         print(f'mutants_gate: {exempt_path}: {key} is exempted but no such survivor exists now',
               file=sys.stderr)
         bad = True
@@ -230,6 +244,20 @@ def selftest():
         expect('zero files fails', run(['gate', '--shards', '1', str(empty)]), 1)
         expect('zero files fails without a count', run(['gate', str(empty)]), 1)
         expect('bad count refused', run(['gate', '--shards', 'x', str(lone)]), 2)
+
+        # A repository of several crates: one exempts file, every entry named from the workspace
+        # root. The run of one crate calls stale only the entries under its own prefix.
+        exempt.write_text(every.replace('src/', 'a_crate/src/') + 'b_crate/src/lib.rs:2 # that crate\'s run\n')
+        (lone / 'outcomes.json').write_text(json.dumps({'outcomes': [
+            mutant('a_crate/src/a.rs', 3, 'a_crate/src/a.rs:3:5: replace + with -', 'MissedMutant'),
+            mutant('a_crate/src/a.rs', 7, 'a_crate/src/a.rs:7:9: replace | with ^', 'MissedMutant'),
+            mutant('a_crate/src/b.rs', 5, 'a_crate/src/b.rs:5:1: replace += with *=', 'Timeout')]}))
+        expect('without a prefix another crate\'s entry is stale', run(['gate', str(lone), str(exempt)]), 1)
+        expect('with its prefix it is out of reach',
+               run(['gate', '--prefix', 'a_crate/', str(lone), str(exempt)]), 0)
+        exempt.write_text(every.replace('src/', 'a_crate/src/') + 'a_crate/src/lib.rs:2 # gone\n')
+        expect('an entry under the prefix is still stale',
+               run(['gate', '--prefix', 'a_crate/', str(lone), str(exempt)]), 1)
 
         # --diff: a changed-lines run reaches only some mutants, so an exemption it does not reach
         # is not stale there; an unexempted survivor or timeout still fails, and a bad line is

@@ -1,0 +1,30 @@
+name: check
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, ready_for_review]
+  # The push on main is what the release gate reads. A pull request's runs are recorded at the
+  # pull request's head SHA, never at the merge commit a release dispatches at, so without this
+  # trigger no release can pass the gate.
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  check-first_crate:
+    permissions:
+      contents: read
+      security-events: write
+    uses: nifeos/crate-workflows/.github/workflows/check.yml@PINS@
+    with:
+      manifest-path: first_crate/Cargo.toml
+      targets: ''
+  check-second_crate:
+    permissions:
+      contents: read
+      security-events: write
+    uses: nifeos/crate-workflows/.github/workflows/check.yml@PINS@
+    with:
+      manifest-path: second_crate/Cargo.toml
+      targets: ''
+      # The crate carries publish = false.
+      allow-unpublished: true

@@ -14,7 +14,10 @@ on stdin is enough to say WHICH manifests changed; the graphs themselves are rea
 worktree (head) and from `git show <base>:<path>` (base), because a dependency "new to the graph"
 means new against every manifest at the base, not just the ones this diff touches: adding a
 dependency to one crate is new even when another crate already had it. `Cargo.lock` is not a
-manifest and is skipped.
+manifest and is skipped. A path dependency on another member of the same workspace is how one
+crate of a repository of several uses another, so it is not a dependency new to the graph (the
+member is read as a manifest of its own). Any other path, a vendored third-party crate included,
+is a dependency like the rest.
 
 The second rule (a semver break new against the last release) is not here:
 it needs `cargo-semver-checks` run against the crate twice, which helpers/semver-rule.sh does as
@@ -22,6 +25,7 @@ the calling workflow's own step, merged into the same findings list.
 """
 
 import argparse
+import os
 import re
 import subprocess
 import sys
@@ -30,8 +34,20 @@ import tomllib
 TABLES = ('dependencies', 'dev-dependencies', 'build-dependencies', 'workspace.dependencies')
 
 
-def manifest_deps(text, path):
-    """{(name, version-req)} from one manifest's dependency tables, or () when it parses to nothing."""
+def workspace_member_dirs(path):
+    """The real directories of the workspace's members, for the manifest at `path`; empty when
+    cargo cannot say (no such manifest, no cargo), which exempts nothing."""
+    try:
+        import crate_info
+        return {os.path.dirname(os.path.realpath(m['manifest'])) for m in crate_info.members(path)}
+    except (ImportError, RuntimeError, OSError):
+        return set()
+
+
+def manifest_deps(text, path, member_dirs=frozenset()):
+    """{(name, version-req)} from one manifest's dependency tables, or () when it parses to nothing.
+
+    A path dependency that resolves to a directory in `member_dirs` is left out."""
     try:
         data = tomllib.loads(text)
     except tomllib.TOMLDecodeError as e:
@@ -45,6 +61,9 @@ def manifest_deps(text, path):
         if not isinstance(node, dict):
             continue
         for name, spec in node.items():
+            if (isinstance(spec, dict) and isinstance(spec.get('path'), str) and 'git' not in spec
+                    and os.path.realpath(os.path.join(os.path.dirname(path), spec['path'])) in member_dirs):
+                continue
             req = spec if isinstance(spec, str) else (spec or {}).get('version', '*')
             out.add((name, req))
     return out
@@ -86,7 +105,7 @@ def run(base_rev, diff_text):
             head = open(path).read()
         except FileNotFoundError:
             continue  # deleted in this diff; a deletion adds nothing to the graph
-        for name, req in sorted(manifest_deps(head, path) - base):
+        for name, req in sorted(manifest_deps(head, path, workspace_member_dirs(path)) - base):
             found.append(f'dependency: {path}: {name} {req}')
     return found
 
@@ -126,6 +145,13 @@ thing = { version = "1.2", features = ["x"] }
 trybuild = "1"
 """, 'Cargo.toml')
     expect('three deps, one per table', len(deps), 3)
+    sibling = os.path.realpath('sibling')
+    text = ('[dependencies]\nsibling = { path = "../sibling", version = "0.1" }\n'
+            'vendored = { path = "../vendor/thing", version = "2" }\n')
+    expect('a path dependency on a workspace member is not a new dependency',
+           manifest_deps(text, 'c/Cargo.toml', {sibling}), {('vendored', '2')})
+    expect('with no member known, a path dependency counts',
+           manifest_deps(text, 'c/Cargo.toml'), {('sibling', '0.1'), ('vendored', '2')})
     expect('workspace table', len(manifest_deps('[workspace.dependencies]\nlog = "0.4"\n', 'w')), 1)
     expect('bad toml is empty, not a crash', manifest_deps('not [ toml', 'x'), set())
     report = 'dependency: Cargo.toml: log 0.4'

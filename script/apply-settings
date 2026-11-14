@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """Apply settings/repository-settings.json to a crate repository, with gh api.
 
-    script/apply-settings <owner/name> [--crate NAME] [--topic extra-topic] [--dry-run]
+    script/apply-settings <owner/name> [--crate NAME] [--member CRATE]... [--topic extra-topic] [--dry-run]
 
 `--crate` fills the metadata (description's first word and the docs.rs homepage); `--topic` appends
-the crate's domain topic. Every step reports what it did and what the API refused. A refusal is a
+the crate's domain topic. A repository of several crates passes each crate with `--member`, which
+names the required checks and the tag patterns for each (helpers/settings_members.py).
+Every step reports what it did and what the API refused. A refusal is a
 finding, never a silent skip: some settings (organization teams, app installation permissions, the
 org Actions allowlist) need scopes a repository-scoped token does not carry, and the honest output
 is the list of what a person still owes. Exit 1 when anything was refused.
@@ -15,6 +17,9 @@ import json
 import subprocess
 import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / 'helpers'))
+import settings_members  # noqa: E402
 
 SETTINGS = Path(__file__).resolve().parent.parent / 'settings' / 'repository-settings.json'
 
@@ -48,11 +53,12 @@ def main(argv):
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument('repo')
     ap.add_argument('--crate')
+    ap.add_argument('--member', action='append', default=[])
     ap.add_argument('--topic', action='append', default=[])
     ap.add_argument('--dry-run', action='store_true')
     ap.add_argument('--settings', default=str(SETTINGS))
     args = ap.parse_args(argv[1:])
-    s = json.loads(open(args.settings).read())
+    s = settings_members.expand(json.loads(open(args.settings).read()), args.member)
     refusals = []
 
     def step(label, *api, **kw):

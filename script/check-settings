@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Read a crate repository's live settings back and fail on any difference.
 
-    script/check-settings <owner/name> [--settings PATH]
+    script/check-settings <owner/name> [--settings PATH] [--member CRATE]...
 
 The weekly `settings-drift` job runs this against the pinned template's own settings file, so the
 comparison is always against the version of the template the caller actually runs. A setting
@@ -19,6 +19,9 @@ import json
 import subprocess
 import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / 'helpers'))
+import settings_members  # noqa: E402
 
 SETTINGS = Path(__file__).resolve().parent.parent / 'settings' / 'repository-settings.json'
 
@@ -212,13 +215,24 @@ def main(argv):
     settings = SETTINGS
     if '--settings' in args:
         i = args.index('--settings')
+        if i + 1 >= len(args):
+            print('check-settings: --settings wants a path', file=sys.stderr)
+            return 2
         settings = Path(args[i + 1])
+        args = args[:i] + args[i + 2:]
+    members = []
+    while '--member' in args:
+        i = args.index('--member')
+        if i + 1 >= len(args):
+            print('check-settings: --member wants a crate name', file=sys.stderr)
+            return 2
+        members.append(args[i + 1])
         args = args[:i] + args[i + 2:]
     if len(args) != 1:
         print(__doc__, file=sys.stderr)
         return 2
     repo = args[0]
-    s = json.loads(settings.read_text())
+    s = settings_members.expand(json.loads(settings.read_text()), members)
     diffs = []
 
     live, err = api(f'repos/{repo}')
