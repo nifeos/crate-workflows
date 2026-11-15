@@ -1,0 +1,26 @@
+--- a/fixtures/loom-mailbox/src/lib.rs
++++ b/fixtures/loom-mailbox/src/lib.rs
+@@ -87,23 +87,3 @@
+         assert_eq!(mailbox.take(), Some(7));
+     }
+ }
+-
+-#[cfg(all(test, loom))]
+-mod interleavings {
+-    use super::Mailbox;
+-    use loom::{sync::Arc, thread};
+-
+-    #[test]
+-    fn a_reader_sees_the_value_or_nothing() {
+-        loom::model(|| {
+-            let mailbox = Arc::new(Mailbox::new());
+-            let writer = Arc::clone(&mailbox);
+-            // SAFETY: the one put of this mailbox, from the one writer thread.
+-            let handle = thread::spawn(move || unsafe { writer.put(7) });
+-            if let Some(value) = mailbox.take() {
+-                assert_eq!(value, 7);
+-            }
+-            handle.join().unwrap();
+-        });
+-    }
+-}
