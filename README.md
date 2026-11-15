@@ -143,7 +143,7 @@ no credential: `cargo publish --dry-run`, then the door. It publishes nothing.
 | falsification sweep | every patch applied with `-p1` must turn its harness red at its own assertion; the form check (every harness carries a patch or a reason) runs beside it | `proofs / falsify` |
 | kani-reach | dropped: a dispatch-only measurement of nife's reach | |
 | loom interleavings | dropped: none of the first crates uses loom | |
-| cargo-deny | nife's policy without its exceptions | `check / supply-chain` |
+| cargo-deny | nife's policy without its exceptions, with git sources allowed on the project's organization only, pinned by `rev` | `check / supply-chain` |
 | vendor-verify, vendor-watch | dropped: no vendored code | |
 | toolchain drift and bump | weekly build on newest stable and beta | `weekly / drift` |
 | MSRV build | the manifest's `rust-version` builds and tests | `weekly / msrv` |
