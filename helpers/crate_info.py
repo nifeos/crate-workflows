@@ -12,6 +12,7 @@
     python3 crate_info.py prefix       MANIFEST      # the crate's directory under the workspace's, `` or `dir/`
     python3 crate_info.py members      MANIFEST [--release-targets]   # manifests, one per line
     python3 crate_info.py names        MANIFEST      # package names, one per line
+    python3 crate_info.py uses-loom    MANIFEST      # prints yes or no; exit 0 for yes, 1 for no
     python3 crate_info.py --selftest
 
 Every answer comes from `cargo metadata --no-deps`, which resolves `version.workspace = true` and
@@ -27,6 +28,12 @@ of one crate keeps its old behavior (a crate carrying `publish = false` there is
 against its own release tags and owes its stranger-test record); in a repository of several, a
 member that may not be published has no release to compare against and nobody to be a stranger
 to, so the semver and stranger-test gates pass it over.
+
+USES LOOM. The crate declares the `loom` package as a dependency of any kind: a normal one, a
+dev-dependency, a build dependency or one under a `[target.'cfg(...)'.dependencies]` table such as
+`cfg(loom)`. A renamed dependency counts by its package name, and `loom.workspace = true` counts
+once cargo resolves it. A virtual workspace root uses loom when any member does. The `proofs /
+loom` job runs only for a crate that uses loom and reports skipped for every other.
 
 TAG. A repository whose workspace holds one crate tags a release `v<version>`. A repository whose
 workspace holds several tags `<name>-v<version>`, because two crates at one version would otherwise
@@ -61,6 +68,7 @@ def members(manifest):
             out.append({'name': p['name'], 'version': p['version'],
                         'rust_version': p.get('rust_version') or '',
                         'published': p.get('publish') is None or bool(p['publish']),
+                        'uses_loom': any(d['name'] == 'loom' for d in p.get('dependencies', [])),
                         'manifest': p['manifest_path']})
     return sorted(out, key=lambda m: m['name'])
 
@@ -73,6 +81,14 @@ def own(manifest):
         if os.path.realpath(m['manifest']) == here:
             return m, everyone
     raise RuntimeError(f'{manifest} is not a package of its workspace (a virtual root names none)')
+
+
+def uses_loom(manifest):
+    """Whether this crate, or any member of this virtual root, declares the loom package."""
+    everyone = members(manifest)
+    here = os.path.realpath(manifest)
+    mine = [m for m in everyone if os.path.realpath(m['manifest']) == here]
+    return any(m['uses_loom'] for m in (mine or everyone))
 
 
 def tag_prefix(pkg, everyone):
@@ -155,6 +171,26 @@ def selftest():
         check('single: no prefix', prefix(os.path.join(single, 'Cargo.toml')), '')
         check('workspace: names', [m['name'] for m in members(os.path.join(ws, 'Cargo.toml'))],
               ['contract', 'fixture', 'inheriting'])
+
+        loom = os.path.join(d, 'loom')
+        os.makedirs(loom)
+        with open(os.path.join(loom, 'Cargo.toml'), 'w') as f:
+            f.write('[workspace]\nresolver = "3"\n'
+                    'members = ["by_cfg", "by_dev", "by_rename", "by_workspace", "none"]\n'
+                    '[workspace.dependencies]\nloom = "0.7"\n')
+        crate(loom, 'by_cfg', "[target.'cfg(loom)'.dependencies]\nloom = \"0.7\"")
+        crate(loom, 'by_dev', '[dev-dependencies]\nloom = "0.7"')
+        crate(loom, 'by_rename', '[dev-dependencies]\nmodel = { package = "loom", version = "0.7" }')
+        crate(loom, 'by_workspace', "[target.'cfg(loom)'.dependencies]\nloom.workspace = true")
+        crate(loom, 'none', '[dev-dependencies]\nloomish = "0.1"')
+        for name, want in (('by_cfg', True), ('by_dev', True), ('by_rename', True),
+                           ('by_workspace', True), ('none', False)):
+            check(f'uses loom: {name}', uses_loom(os.path.join(loom, name, 'Cargo.toml')), want)
+        check('uses loom: a virtual root with a member that does', uses_loom(os.path.join(loom, 'Cargo.toml')),
+              True)
+        check('uses loom: a virtual root with no member that does', uses_loom(os.path.join(ws, 'Cargo.toml')),
+              False)
+        check('uses loom: a single crate with none', uses_loom(os.path.join(single, 'Cargo.toml')), False)
         try:
             own(os.path.join(ws, 'Cargo.toml'))
             check('a virtual root has no package of its own', 'returned', 'raised')
@@ -187,6 +223,10 @@ def main(argv):
         if command == 'prefix':
             print(prefix(manifest))
             return 0
+        if command == 'uses-loom':
+            yes = uses_loom(manifest)
+            print('yes' if yes else 'no')
+            return 0 if yes else 1
         pkg, everyone = own(manifest)
     except (RuntimeError, OSError) as e:
         print(f'crate_info: {e}', file=sys.stderr)
