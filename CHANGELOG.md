@@ -6,6 +6,9 @@ call that sits behind the newest release.
 
 ## Unreleased
 
+- `deny.toml` and its `scaffold/` copy allow git sources on the project's GitHub organization
+  (`[sources.allow-org]`). Other git sources stay refused. A crate pins a sibling by `rev`, with the
+  version beside it. A selftest job proves the allow and the refusal.
 - A repository of several crates is supported (`scaffold-workspace/README.md`); its releases are
   tagged `<crate>-v<version>`. One crate per repository is unchanged.
 
@@ -23,10 +26,10 @@ call that sits behind the newest release.
   changes. Nothing changes for a crate that already packaged.
 - The scaffold's README starting shape gains a "Building and testing" section, and the stranger
   cadence page lists what a README must say. The list covers the build and test commands with any
-  required feature, and `rustup target add`. It covers the Kani install before the first
-  `cargo kani`, and the proofs' time and memory. It covers how to run one harness and one
-  falsification patch, what a passing Kani run prints that looks alarming, and how to check the
-  minimum Rust version. A new crate inherits it; nothing fails for an existing one.
+  required feature, and `rustup target add`. It covers the Kani install, the proofs' time and
+  memory, how to run one harness and one falsification patch, what a passing Kani run prints that
+  looks alarming, and how to check the minimum Rust version. A new crate inherits it; nothing fails
+  for an existing one.
 - The unit check refuses `ppm` as the last part of a name with more than one part (`DRIFT_PPM`),
   and asks for `parts_per_million`. A bare `ppm` and one mid-name stay allowed, because `ppm` is
   also the Portable PixMap format. A crate that names a parts-per-million quantity with the symbol
@@ -35,21 +38,19 @@ call that sits behind the newest release.
   notice opens with a line `SPDX-License-Identifier: <id>`, in a text file or a `LICENSE-<name>`
   file at the root; the set of those ids, minus `MIT` and `Apache-2.0`, must equal the `AND` terms
   of the field. A notice with no term and a term with no notice each fail, naming the file or the
-  term. A line that merely quotes the marker inside prose is not a notice. Nothing changes for a
-  repository whose notices already carry the line.
+  term. A line that merely quotes the marker inside prose is not a notice.
 - `actionlint` 1.7.12 is a required gate of `script/lint` and so of the selftest's lint job, no
   longer an optional one: a missing or different binary fails with the install command. It lints
   `.github/workflows/` and `scaffold/caller-workflows/` (placeholders filled in a scratch copy).
   The version and its SHA-256 are pinned in `helpers/install_actionlint.sh`, which the selftest
-  runs. Two findings fixed (`selftest.yml` empty assignment, `mutation.yml` literal backticks); the
-  stale ignore for the `administration` permission scope is gone.
+  runs. Two findings are fixed, and the stale ignore for the `administration` scope is gone.
 - The `mutation` verdict reads a one-shard run. `actions/download-artifact` extracts a lone artifact
   into the download directory itself, not a subdirectory, so the verdict's `find -mindepth 2` found
   no `outcomes.json` and failed every one-shard repository. `mutants_gate.py --shards N` now counts
   both layouts and refuses any count other than N, zero included; a survivor or timeout still fails.
 - `check / mutation-diff` is a required check in `settings/repository-settings.json`, ten in all.
-  A repository runs `script/apply-settings` from this release after its pin bump brings the job,
-  since a required check that never reports holds every pull request.
+  A repository runs `script/apply-settings` after its pin bump, since a required check that never
+  reports holds every pull request.
 - `release / gate` also needs a green full mutation run at the released commit:
   `helpers/release-gate.sh` calls `mutation_plan.py verify`. A green `mutation.yml` run there counts
   when it recorded `full`, or `unchanged <fingerprint> since run N` where run N is a green full run
