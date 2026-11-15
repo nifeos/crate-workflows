@@ -107,6 +107,18 @@ info="$py helpers/crate_info.py"
 "$py" helpers/settings_members.py --selftest >/dev/null
 echo "ok"
 
+echo "==> the loom job runs only for a crate that uses loom"
+# proofs.yml's loom-plan job asks helpers/crate_info.py; the live selftest runs the loom fixture.
+loom=fixtures/loom-mailbox/Cargo.toml
+[ "$($info uses-loom $loom)" = yes ] || fail "the loom fixture does not use loom"
+[ "$($info uses-loom sample/Cargo.toml || true)" = no ] || fail "sample/ uses loom"
+[ "$($info uses-loom sample-workspace/Cargo.toml || true)" = no ] || fail "sample-workspace/ uses loom"
+if helpers/loom-check.sh $loom 2x >/dev/null 2>&1; then fail "loom-check took a bound that is not a number"; fi
+for p in fixtures/loom-mailbox-variants/*.patch; do
+	git apply --check "$p" || fail "$p no longer applies to the loom fixture"
+done
+echo "ok"
+
 echo "==> a crate at the repository root keeps its names"
 # GitHub's `a && b || c` answers c when b is empty, which is how a name once came out as
 # `mutation record [Cargo.toml]` for every existing caller. The expressions that name a crate's

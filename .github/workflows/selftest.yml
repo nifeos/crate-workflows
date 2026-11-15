@@ -356,6 +356,47 @@ jobs:
   # The release workflow is not called here: sample/ carries publish = false, on purpose, because a
   # fixture crate must never reach crates.io. Its gate and dry-run publish are exercised in a
   # throwaway repository before a template release is cut (the roadmap block's exit).
+  # The loom job, live, on a crate whose one model holds: loom plan says yes and loom runs and
+  # passes. Every other proofs call above is on a crate without loom, so its loom job is skipped.
+  proofs-loom:
+    name: selftest (proofs, a crate that uses loom)
+    needs: lint
+    permissions:
+      contents: read
+    uses: ./.github/workflows/proofs.yml
+    with:
+      manifest-path: fixtures/loom-mailbox/Cargo.toml
+
+  # A reusable workflow's failure cannot be inverted by its caller, so each broken variant runs the
+  # script the loom job runs, with the real loom, and passes only when the script is red for the
+  # reason under test: a Relaxed store that loom catches, a crate with no model, and a model that
+  # never runs.
+  loom-broken:
+    name: selftest (loom fails on a broken ordering and on a model that checks nothing)
+    needs: lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - run: |
+          manifest=fixtures/loom-mailbox/Cargo.toml
+          for case in relaxed-ordering:'the loom run failed' no-model:'names loom::model' \
+            model-never-runs:'no test passed'; do
+            patch="fixtures/loom-mailbox-variants/${case%%:*}.patch"
+            git apply "$patch"
+            if helpers/loom-check.sh "$manifest" 2>err; then
+              echo "the loom script passed with $patch applied; the gate is broken"
+              exit 1
+            fi
+            grep -q "${case#*:}" err || { cat err; echo "red with $patch, but not for the reason under test"; exit 1; }
+            git apply -R "$patch"
+            echo "==> the loom script was red with $patch"
+          done
+
   release:
     name: selftest (release gate refuses a red commit)
     needs: lint

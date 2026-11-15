@@ -7,7 +7,8 @@
 #     helpers/release-gate.sh <owner/repo> <sha> [<manifest-path>]
 #
 # The release gate reads the Actions API for runs of the caller's two gating workflows at exactly
-# the released commit. "Green" means a completed run with conclusion success; a run still in
+# the released commit. A green proofs.yml run covers Kani, the falsification replay and, for a crate
+# that depends on loom, the loom models. "Green" means a completed run with conclusion success; a run still in
 # flight is a refusal, not a wait, because the dispatch re-runs in seconds and a gate that waits
 # on a run that may yet fail has decided nothing. On a dry run this is still enforced: a rehearsal
 # of a commit nobody checked is not a rehearsal of anything.

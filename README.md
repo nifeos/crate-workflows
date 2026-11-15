@@ -17,7 +17,7 @@ publishing from a `nifeos` workflow. This repository is where all three land.
 | workflow | called on | jobs |
 |---|---|---|
 | `.github/workflows/check.yml` | every pull request | `lag`, `fmt`, `clippy`, `tests`, `coverage`, `standalone`, `supply-chain`, `mutation-diff` |
-| `.github/workflows/proofs.yml` | every pull request | `lag`, `kani`, `falsify` |
+| `.github/workflows/proofs.yml` | every pull request | `lag`, `kani`, `falsify`, `loom-plan` (named `loom plan`), `loom` |
 | `.github/workflows/weekly.yml` | a weekly schedule, no pull request open | `lag`, `drift`, `msrv`, `semver`, `miri`, `settings-drift`, `stranger` |
 | `.github/workflows/mutation.yml` | a schedule and a dispatch, no pull request open | `lag`, `mutation-plan`, `mutation` (one per shard), `mutation-verdict` (named `mutation`) |
 | `.github/workflows/fuzz.yml` | a weekly schedule, no pull request open | `lag`, `fuzz` |
@@ -29,7 +29,7 @@ publishing from a `nifeos` workflow. This repository is where all three land.
 Inputs every workflow takes (all optional unless named): `manifest-path` (default `Cargo.toml`),
 `targets` (space-separated bare-metal targets to build and lint for, default none), `toolchain`
 (default `stable`), `coverage-floor` (default 85). `check.yml` takes `allow-unpublished` for
-fixture crates that carry `publish = false` on purpose. `proofs.yml` takes `kani-args`.
+fixture crates that carry `publish = false` on purpose. `proofs.yml` takes `kani-args` and `loom-max-preemptions`.
 `weekly.yml` takes `caller-checks` (the settings-drift and stranger jobs, off for this template's
 own selftest). `mutation.yml` takes `mutants-per-shard` (default 200), `skip-unchanged` and `stagger` (both on). `fuzz.yml` takes `public-crash-inputs` (the opt-in, default false), `seconds-per-target` (default 300) and `total-seconds` (default
 1,200). `release.yml` takes `version` (required, e.g. `0.1.0`) and `dry-run`
@@ -63,8 +63,7 @@ denial of service at worst. In a crate with `unsafe` code, a crash may be a memo
 its input would be published before anyone could fix it. So an opt-in is refused, and the job red, when the crate's shipped source (`src/**/*.rs`, outside `#[cfg(test)]`) contains
 an `unsafe` block, fn, impl, trait or attribute. The message names the file and line. The check
 (`helpers/unsafe_scan.py`) ignores comments, strings and character literals, and passes a crate whose
-every root carries `#![forbid(unsafe_code)]`. It does not look at fuzz targets or dependencies. It
-costs no install, and `script/lint` proves it against `fixtures/unsafe-scan`.
+every root carries `#![forbid(unsafe_code)]`. It does not look at fuzz targets or dependencies.
 
 Standing approval (ruled 2026-11-12 UTC): `libfuzzer-sys` 0.4 is approved in advance as a dependency of
 the unpublished `fuzz/` crate of any crate repository, and nowhere else.
@@ -142,7 +141,7 @@ no credential: `cargo publish --dry-run`, then the door. It publishes nothing.
 | `script/verify` (Kani) | `cargo kani` at the version in `.kani-version`, on every pull request | `proofs / kani` |
 | falsification sweep | every patch applied with `-p1` must turn its harness red at its own assertion; the form check (every harness carries a patch or a reason) runs beside it | `proofs / falsify` |
 | kani-reach | dropped: a dispatch-only measurement of nife's reach | |
-| loom interleavings | dropped: none of the first crates uses loom | |
+| loom interleavings | the tests under `--cfg loom -D warnings` in release mode, when the manifest declares a `loom` dependency of any kind (`helpers/crate_info.py uses-loom`), and skipped otherwise; a crate opts in with `loom` under `[target.'cfg(loom)'.dependencies]`, `cfg(loom)` in its `unexpected_cfgs` list, and its models in `#[cfg(loom)]` tests. A run fails when no Rust file names `loom::model` or no test passes | `proofs / loom` |
 | cargo-deny | nife's policy without its exceptions, with git sources allowed on the project's organization only, pinned by `rev` | `check / supply-chain` |
 | vendor-verify, vendor-watch | dropped: no vendored code | |
 | toolchain drift and bump | weekly build on newest stable and beta | `weekly / drift` |
@@ -256,14 +255,15 @@ tree) lives in nife and stays there.
 
 ## Required checks
 
-The ruleset on `main` requires ten checks, with branches up to date: the seven `check /` jobs (fmt,
-clippy, tests, coverage, standalone, supply-chain, mutation-diff), the two `proofs /` jobs (kani, falsify), and
-the hold. The names are the caller's job id, a slash, and the reusable workflow's job name;
-`scaffold/` fixes the caller job ids so the two ends cannot drift.
+The ruleset on `main` requires eleven checks, with branches up to date: the seven `check /` jobs
+(fmt, clippy, tests, coverage, standalone, supply-chain, mutation-diff), the three `proofs /` jobs
+(kani, falsify, loom; a skipped loom passes), and the hold. The names are the caller's job id, a
+slash, and the reusable workflow's job name; `scaffold/` fixes the caller job ids so the two ends
+cannot drift.
 
 ```
 check / fmt, check / clippy, check / tests, check / coverage, check / standalone, check / supply-chain,
-check / mutation-diff, proofs / kani, proofs / falsify, hold / architect hold
+check / mutation-diff, proofs / kani, proofs / falsify, proofs / loom, hold / architect hold
 ```
 
 ## Adopting it for a crate
@@ -326,7 +326,7 @@ repository, with contents write.
 
 The canary repository `nifeos/crate-workflows-test` adopts every release before anything depends
 on one. The ritual after cutting a tag: open a pull request there that moves every caller's pin
-to the new release's commit, expect the ten required checks green, and merge it. A release is
+to the new release's commit, expect the eleven required checks green, and merge it. A release is
 not depended on until the canary has adopted it, and a canary pin behind the newest release is
 the lag check's red, by design. The canary is also the configured repository `apply-settings` and
 `check-settings` run against, so the drift check always has a real repository to read.
@@ -346,8 +346,7 @@ never merges: a person reads the checks, and a release that renames a required c
 - The required-check names above describe what GitHub shows for cross-repository reusable workflow
   calls. The canary repository's runs are the evidence; if GitHub names the checks
   differently, this section and the ruleset in the settings file are both wrong until they match.
-- The coverage floor here is 85, matching nife's current floor. The roadmap block still says 80
-  because it predates the raise.
+- The coverage floor here is 85, matching nife's current floor.
 - The semver baseline is the newest `v<x>.<y>.<z>` tag before the commit (`helpers/semver_baseline.py`),
   passed by revision, so a crate not yet on crates.io has one. With no tag the tool falls back to the
   last published version, and a crate with neither has no baseline, which counts as nothing major.
@@ -372,6 +371,8 @@ never merges: a person reads the checks, and a release that renames a required c
   (measured on the canary; the same patterns with `@*` run). The file must name every third-party
   action the template itself uses: `taiki-e/install-action`. `check-settings` compares the list
   exactly.
+- `proofs / loom` cannot see whether a model reaches the code it checks; the crate asserts
+  that itself.
 - Kani is installed with `cargo install --locked kani-verifier` at the version in `.kani-version`.
   The version is read from the template's own pinned checkout, so a crate inherits it through its
   pin. The `model-checking/kani-github-action` is not used: it calls `dtolnay/rust-toolchain@stable` and

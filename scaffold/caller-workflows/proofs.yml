@@ -10,5 +10,7 @@ on:
 permissions:
   contents: read
 jobs:
+  # Kani, the falsification replay and, for a crate that depends on loom, its loom models. A crate
+  # whose models need a preemption bound passes `loom-max-preemptions: <n>` under `with:`.
   proofs:
     uses: nifeos/crate-workflows/.github/workflows/proofs.yml@PINS@

@@ -1,0 +1,15 @@
+[package]
+name = "loom-mailbox"
+version = "0.1.0"
+edition = "2024"
+publish = false            # a fixture for the loom selftest, never released
+
+[lints.rust]
+missing_docs = "deny"
+unsafe_op_in_unsafe_fn = "deny"
+# The loom job builds with --cfg loom, and cargo does not know that cfg; without it, -D warnings
+# refuses the loom module.
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(kani)', 'cfg(loom)'] }
+
+[target.'cfg(loom)'.dependencies]
+loom = "0.7"

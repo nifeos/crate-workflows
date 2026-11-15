@@ -1,0 +1,11 @@
+--- a/fixtures/loom-mailbox/src/lib.rs
++++ b/fixtures/loom-mailbox/src/lib.rs
+@@ -61,7 +61,7 @@
+     pub unsafe fn put(&self, value: u32) {
+         // SAFETY: the one writer writes before it sets the flag, and no reader reads before it.
+         self.slot.with_mut(|slot| unsafe { *slot = value });
+-        self.full.store(true, Ordering::Release);
++        self.full.store(true, Ordering::Relaxed);
+     }
+ 
+     /// The value in the slot, once it is full.

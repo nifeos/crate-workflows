@@ -1,0 +1,11 @@
+--- a/fixtures/loom-mailbox/src/lib.rs
++++ b/fixtures/loom-mailbox/src/lib.rs
+@@ -88,7 +88,7 @@
+     }
+ }
+ 
+-#[cfg(all(test, loom))]
++#[cfg(all(test, loom, any()))]
+ mod interleavings {
+     use super::Mailbox;
+     use loom::{sync::Arc, thread};
