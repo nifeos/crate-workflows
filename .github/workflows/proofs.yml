@@ -4,6 +4,9 @@
 # applied and must turn its harness red at its own assertion. A crate has few harnesses, so this
 # runs on every pull request rather than weekly.
 
+# A crate that depends on loom also has its loom models run, with `--cfg loom` in release mode. A
+# crate that does not reports the loom job as skipped, which a required check counts as passed.
+
 name: proofs
 
 on:
@@ -17,6 +20,12 @@ on:
         default: stable
       kani-args:
         description: Extra arguments for cargo kani (features, --tests, ...).
+        type: string
+        default: ''
+      loom-max-preemptions:
+        description: >-
+          LOOM_MAX_PREEMPTIONS for the loom models, a whole number. Empty means no bound, so loom
+          explores every interleaving.
         type: string
         default: ''
 
@@ -111,6 +120,64 @@ jobs:
       # Form first (every harness carries a patch or a reason), then truth (each patch turns exactly
       # its own harness red). A survivor, a stale patch, or an unparseable verdict fails the job.
       - run: python3 .crate-workflows/helpers/falsify.py --manifest-path "$MANIFEST"
+      - name: budget
+        if: always()
+        run: python3 .crate-workflows/helpers/job_budget.py check "${{ github.job }}" "$JOB_STARTED_AT"
+
+  loom-plan:
+    name: loom plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      uses-loom: ${{ steps.plan.outputs.uses-loom }}
+    steps:
+      - name: clock
+        run: echo "JOB_STARTED_AT=$(date +%s)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: .crate-workflows
+          persist-credentials: false
+      # yes for a loom dependency of any kind (a cfg(loom) target table, a dev-dependency, one a
+      # workspace lends); helpers/crate_info.py reads it from cargo metadata.
+      - id: plan
+        run: |
+          if python3 .crate-workflows/helpers/crate_info.py uses-loom "$MANIFEST"; then
+            echo "uses-loom=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "uses-loom=false" >> "$GITHUB_OUTPUT"
+            echo "==> the crate does not depend on loom; the loom job is skipped"
+          fi
+      - name: budget
+        if: always()
+        run: python3 .crate-workflows/helpers/job_budget.py check "${{ github.job }}" "$JOB_STARTED_AT"
+
+  loom:
+    name: loom
+    needs: loom-plan
+    if: needs.loom-plan.outputs.uses-loom == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: clock
+        run: echo "JOB_STARTED_AT=$(date +%s)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: .crate-workflows
+          persist-credentials: false
+      - run: rustup toolchain install "$TOOLCHAIN" --profile minimal
+      # Every test under --cfg loom, in release mode, with warnings denied. A model that finds a bad
+      # interleaving fails, and so does a run in which no model ran.
+      - name: models
+        run: .crate-workflows/helpers/loom-check.sh "$MANIFEST" "$LOOM_BOUND"
+        env:
+          RUSTUP_TOOLCHAIN: ${{ inputs.toolchain }}
+          LOOM_BOUND: ${{ inputs.loom-max-preemptions }}
       - name: budget
         if: always()
         run: python3 .crate-workflows/helpers/job_budget.py check "${{ github.job }}" "$JOB_STARTED_AT"
