@@ -6,6 +6,10 @@ call that sits behind the newest release.
 
 ## Unreleased
 
+- `proofs / loom` runs a crate's loom models (`--cfg loom -D warnings`, release mode) when its
+  manifest declares `loom`, and is skipped otherwise. `loom-max-preemptions` bounds them; the
+  default is no bound. A run with no `loom::model` or no passing test fails. It is a required
+  check, so a repository runs `script/apply-settings` from this release after its pin bump.
 - A repository of several crates is supported (`scaffold-workspace/README.md`); its releases are
   tagged `<crate>-v<version>`. One crate per repository is unchanged.
 
@@ -46,9 +50,8 @@ call that sits behind the newest release.
   into the download directory itself, not a subdirectory, so the verdict's `find -mindepth 2` found
   no `outcomes.json` and failed every one-shard repository. `mutants_gate.py --shards N` now counts
   both layouts and refuses any count other than N, zero included; a survivor or timeout still fails.
-- `check / mutation-diff` is a required check in `settings/repository-settings.json`, ten in all.
-  A repository runs `script/apply-settings` from this release after its pin bump brings the job,
-  since a required check that never reports holds every pull request.
+- `check / mutation-diff` is a required check. A repository runs `script/apply-settings` after its
+  pin bump brings the job, since a required check that never reports holds every pull request.
 - `release / gate` also needs a green full mutation run at the released commit:
   `helpers/release-gate.sh` calls `mutation_plan.py verify`. A green `mutation.yml` run there counts
   when it recorded `full`, or `unchanged <fingerprint> since run N` where run N is a green full run

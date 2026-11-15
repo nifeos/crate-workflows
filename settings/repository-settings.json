@@ -113,6 +113,7 @@
             { "context": "check / mutation-diff" },
             { "context": "proofs / kani" },
             { "context": "proofs / falsify" },
+            { "context": "proofs / loom" },
             { "context": "hold / architect hold" }
           ]
         }
