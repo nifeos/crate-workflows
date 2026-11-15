@@ -142,7 +142,7 @@ no credential: `cargo publish --dry-run`, then the door. It publishes nothing.
 | falsification sweep | every patch applied with `-p1` must turn its harness red at its own assertion; the form check (every harness carries a patch or a reason) runs beside it | `proofs / falsify` |
 | kani-reach | dropped: a dispatch-only measurement of nife's reach | |
 | loom interleavings | the tests under `--cfg loom -D warnings` in release mode, when the manifest declares a `loom` dependency of any kind (`helpers/crate_info.py uses-loom`), and skipped otherwise; a crate opts in with `loom` under `[target.'cfg(loom)'.dependencies]`, `cfg(loom)` in its `unexpected_cfgs` list, and its models in `#[cfg(loom)]` tests. A run fails when no Rust file names `loom::model` or no test passes | `proofs / loom` |
-| cargo-deny | nife's policy without its exceptions | `check / supply-chain` |
+| cargo-deny | nife's policy without its exceptions, with git sources allowed on the project's organization only, pinned by `rev` | `check / supply-chain` |
 | vendor-verify, vendor-watch | dropped: no vendored code | |
 | toolchain drift and bump | weekly build on newest stable and beta | `weekly / drift` |
 | MSRV build | the manifest's `rust-version` builds and tests | `weekly / msrv` |

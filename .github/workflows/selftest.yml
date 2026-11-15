@@ -334,6 +334,25 @@ jobs:
           fi
           echo "==> the fuzz script refused a crate with unsafe code"
 
+  # The supply-chain policy allows a git dependency on the organization, pinned by `rev`, and refuses
+  # one anywhere else. The script runs cargo-deny on three throwaway crates, with the template's
+  # pinned version, against both copies of deny.toml.
+  deny-sources:
+    name: selftest (cargo-deny allows only organization git sources)
+    needs: lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - uses: taiki-e/install-action@5488ac5a951645ce95062214902ac4b6bc1a1037 # v2.87.32
+        with:
+          tool: cargo-deny@0.20.2
+      - run: helpers/deny-sources-selftest.sh
+
   # The release workflow is not called here: sample/ carries publish = false, on purpose, because a
   # fixture crate must never reach crates.io. Its gate and dry-run publish are exercised in a
   # throwaway repository before a template release is cut (the roadmap block's exit).

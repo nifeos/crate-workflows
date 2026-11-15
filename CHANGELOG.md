@@ -7,9 +7,12 @@ call that sits behind the newest release.
 ## Unreleased
 
 - `proofs / loom` runs a crate's loom models (`--cfg loom -D warnings`, release mode) when its
-  manifest declares `loom`, and is skipped otherwise. `loom-max-preemptions` bounds them; the
-  default is no bound. A run with no `loom::model` or no passing test fails. It is a required
-  check, so a repository runs `script/apply-settings` from this release after its pin bump.
+  manifest declares `loom`; otherwise it is skipped. `loom-max-preemptions` bounds them (default
+  none). A run with no `loom::model` or no passing test fails. It is required: run
+  `script/apply-settings` after the pin bump.
+- `deny.toml` and its `scaffold/` copy allow git sources on the project's GitHub organization
+  (`[sources.allow-org]`). Other git sources stay refused. A crate pins a sibling by `rev`, with the
+  version beside it. A selftest job proves the allow and the refusal.
 - A repository of several crates is supported (`scaffold-workspace/README.md`); its releases are
   tagged `<crate>-v<version>`. One crate per repository is unchanged.
 
@@ -27,20 +30,18 @@ call that sits behind the newest release.
   changes. Nothing changes for a crate that already packaged.
 - The scaffold's README starting shape gains a "Building and testing" section, and the stranger
   cadence page lists what a README must say. The list covers the build and test commands with any
-  required feature, and `rustup target add`. It covers the Kani install before the first
-  `cargo kani`, and the proofs' time and memory. It covers how to run one harness and one
-  falsification patch, what a passing Kani run prints that looks alarming, and how to check the
-  minimum Rust version. A new crate inherits it; nothing fails for an existing one.
+  required feature, and `rustup target add`. It covers the Kani install, the proofs' time and
+  memory, how to run one harness and one falsification patch, what a passing Kani run prints that
+  looks alarming, and how to check the minimum Rust version. A new crate inherits it; nothing fails
+  for an existing one.
 - The unit check refuses `ppm` as the last part of a name with more than one part (`DRIFT_PPM`),
   and asks for `parts_per_million`. A bare `ppm` and one mid-name stay allowed, because `ppm` is
-  also the Portable PixMap format. A crate that names a parts-per-million quantity with the symbol
-  now fails `check / standalone`.
+  also the Portable PixMap format.
 - `check / standalone` compares the notices a crate carries with its `license` field. A
   notice opens with a line `SPDX-License-Identifier: <id>`, in a text file or a `LICENSE-<name>`
   file at the root; the set of those ids, minus `MIT` and `Apache-2.0`, must equal the `AND` terms
   of the field. A notice with no term and a term with no notice each fail, naming the file or the
-  term. A line that merely quotes the marker inside prose is not a notice. Nothing changes for a
-  repository whose notices already carry the line.
+  term. A line that merely quotes the marker inside prose is not a notice.
 - `actionlint` 1.7.12 is a required gate of `script/lint` and so of the selftest's lint job, no
   longer an optional one: a missing or different binary fails with the install command. It lints
   `.github/workflows/` and `scaffold/caller-workflows/` (placeholders filled in a scratch copy).
