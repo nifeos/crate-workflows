@@ -41,8 +41,7 @@ call that sits behind the newest release.
   longer an optional one: a missing or different binary fails with the install command. It lints
   `.github/workflows/` and `scaffold/caller-workflows/` (placeholders filled in a scratch copy).
   The version and its SHA-256 are pinned in `helpers/install_actionlint.sh`, which the selftest
-  runs. Two findings fixed (`selftest.yml` empty assignment, `mutation.yml` literal backticks); the
-  stale ignore for the `administration` permission scope is gone.
+  runs. Its two findings are fixed.
 - The `mutation` verdict reads a one-shard run. `actions/download-artifact` extracts a lone artifact
   into the download directory itself, not a subdirectory, so the verdict's `find -mindepth 2` found
   no `outcomes.json` and failed every one-shard repository. `mutants_gate.py --shards N` now counts
@@ -146,10 +145,9 @@ call that sits behind the newest release.
   the baseline tag. The labeler checks out with `filter: blob:none`, so the release's files were not
   on disk, and cargo-semver-checks clones the checkout locally, where a missing file cannot be
   fetched. `helpers/semver-run.sh` now reads the baseline tag's files first, which fetches them in
-  one batch. The semver selftest covers a blobless clone. The rule is not weakened.
+  one batch. The semver selftest covers a blobless clone.
 - Compiled Python files (`helpers/__pycache__/*.pyc`, built by one interpreter version) are no longer
-  tracked, and `.gitignore` now ignores `__pycache__/` and `*.pyc`. Nothing read them; the helpers
-  run from their `.py` sources.
+  tracked, and `.gitignore` now ignores `__pycache__/` and `*.pyc`.
 - `weekly / mutation` runs in shards, so a crate with thousands of mutants finishes inside the
   60-minute job timeout. `mutation-plan` counts the mutants and makes ceil(mutants /
   `mutants-per-shard`) shards (a new input, default 200). Each `mutation` job tests one shard, and
@@ -164,8 +162,8 @@ call that sits behind the newest release.
   `helpers/scaffold_alone.sh`, which `script/lint` proves with a bad and a good fixture.
 - A weekly fuzz workflow, `fuzz.yml`, with a scaffold caller. Crash inputs are public, since the run
   log and the artifact are readable by any signed-in GitHub user. So it fuzzes only when the caller
-  sets `public-crash-inputs: true`. The input defaults to false and the scaffold caller leaves it
-  false; without it the run passes with a note.
+  sets `public-crash-inputs: true`. It defaults to false; without it the run passes with a
+  note.
 - An opt-in is refused, naming the file and line, when the crate's shipped source contains `unsafe`
   outside tests (`helpers/unsafe_scan.py`). The run covers every cargo-fuzz target for a bounded time
   on a hosted runner, never on a pull request or a self-hosted runner. It uploads the crashing inputs

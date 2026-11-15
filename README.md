@@ -63,8 +63,7 @@ denial of service at worst. In a crate with `unsafe` code, a crash may be a memo
 its input would be published before anyone could fix it. So an opt-in is refused, and the job red, when the crate's shipped source (`src/**/*.rs`, outside `#[cfg(test)]`) contains
 an `unsafe` block, fn, impl, trait or attribute. The message names the file and line. The check
 (`helpers/unsafe_scan.py`) ignores comments, strings and character literals, and passes a crate whose
-every root carries `#![forbid(unsafe_code)]`. It does not look at fuzz targets or dependencies. It
-costs no install, and `script/lint` proves it against `fixtures/unsafe-scan`.
+every root carries `#![forbid(unsafe_code)]`. It does not look at fuzz targets or dependencies.
 
 Standing approval (ruled 2026-11-12 UTC): `libfuzzer-sys` 0.4 is approved in advance as a dependency of
 the unpublished `fuzz/` crate of any crate repository, and nowhere else.
@@ -346,8 +345,7 @@ never merges: a person reads the checks, and a release that renames a required c
 - The required-check names above describe what GitHub shows for cross-repository reusable workflow
   calls. The canary repository's runs are the evidence; if GitHub names the checks
   differently, this section and the ruleset in the settings file are both wrong until they match.
-- The coverage floor here is 85, matching nife's current floor. The roadmap block still says 80
-  because it predates the raise.
+- The coverage floor here is 85, matching nife's current floor.
 - The semver baseline is the newest `v<x>.<y>.<z>` tag before the commit (`helpers/semver_baseline.py`),
   passed by revision, so a crate not yet on crates.io has one. With no tag the tool falls back to the
   last published version, and a crate with neither has no baseline, which counts as nothing major.
