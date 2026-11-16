@@ -6,6 +6,9 @@ call that sits behind the newest release.
 
 ## Unreleased
 
+- `helpers/scaffold_fill.py` fills a copied scaffold's `@PINS@` and `@MUTATION_CRON@` and fails on
+  any other `@NAME@` left. An existing repository needs nothing. The contributing text no longer
+  says "nifeos crate repository"; the release secret names stay, since they are real identifiers.
 - `proofs / loom` runs a crate's loom models (`--cfg loom -D warnings`, release mode) when its
   manifest declares `loom`; otherwise it is skipped. `loom-max-preemptions` bounds them (default
   none). A run with no `loom::model` or no passing test fails. It is required: run
@@ -15,7 +18,6 @@ call that sits behind the newest release.
   version beside it. A selftest job proves the allow and the refusal.
 - A repository of several crates is supported (`scaffold-workspace/README.md`); its releases are
   tagged `<crate>-v<version>`. One crate per repository is unchanged.
-
 - The spelled-out check asks for `management_data_io` in place of `mdio` and `sd_io` in place of
   `sdio`, because `io` is a word every name keeps whole, inside an expansion too. A crate that
   wrote `management_data_input_output` passes as before; the failure message for `mdio` or `sdio`
@@ -26,17 +28,13 @@ call that sits behind the newest release.
   to the corpus only, so the committed seeds never change. A crate without seeds runs as before.
 - The release workflow's `rehearse` and `publish` jobs tell git to ignore the template checkout
   at `.crate-workflows/`. It lies inside the crate's tree, so a crate without an `include` list
-  failed `cargo package` and `cargo publish` with the template's files reported as uncommitted
-  changes. Nothing changes for a crate that already packaged.
+  failed `cargo package` and `cargo publish`. Nothing changes for a crate that already packaged.
 - The scaffold's README starting shape gains a "Building and testing" section, and the stranger
-  cadence page lists what a README must say. The list covers the build and test commands with any
-  required feature, and `rustup target add`. It covers the Kani install, the proofs' time and
-  memory, how to run one harness and one falsification patch, what a passing Kani run prints that
-  looks alarming, and how to check the minimum Rust version. A new crate inherits it; nothing fails
-  for an existing one.
+  cadence page lists what a README must say. It names build and test commands, the Kani install, the
+  proofs' cost, one harness, one falsification patch and the minimum Rust version. Nothing fails for
+  an existing crate.
 - The unit check refuses `ppm` as the last part of a name with more than one part (`DRIFT_PPM`),
-  and asks for `parts_per_million`. A bare `ppm` and one mid-name stay allowed, because `ppm` is
-  also the Portable PixMap format.
+  and asks for `parts_per_million`. A bare `ppm` and one mid-name stay allowed.
 - `check / standalone` compares the notices a crate carries with its `license` field. A
   notice opens with a line `SPDX-License-Identifier: <id>`, in a text file or a `LICENSE-<name>`
   file at the root; the set of those ids, minus `MIT` and `Apache-2.0`, must equal the `AND` terms
@@ -70,7 +68,7 @@ call that sits behind the newest release.
   `@MUTATION_CRON@` line comes from `mutation_plan.py schedule <name>`). A scheduled run that starts
   outside 08:00-13:00 UTC is deferred, and one on another weekday fails naming the right line. A
   later try the same day is a repeat. A tree whose fingerprint (tracked files outside `.github/` and
-  `docs/`, the exemptions, the resolved toolchain, cargo-mutants and the template's mutation files)
+  `docs/`, the exemptions, the resolved toolchain, cargo-mutants and the mutation files)
   matches the newest full run, when that run was green, records `unchanged since run N`. Each of
   these passes in seconds with a notice. Every run names a `mutation-record` job with its record,
   which the next run reads with the default token. The `skip-unchanged` and `stagger` inputs (both

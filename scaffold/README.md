@@ -5,10 +5,15 @@ file set, and the pins. Copy this directory's contents into the new repository's
 
     cp -R ../crate-workflows/scaffold/. .
 
-then replace `@PINS@` in every caller workflow file with the commit SHA of the template release you are
-adopting (`git rev-parse v1^{commit}` in the template checkout), replace `@MUTATION_CRON@` in
-`mutation.yml` with the line `python3 helpers/mutation_plan.py schedule <repository name>` prints
-there, and commit. Dependabot's
+then fill the placeholders from the template checkout with
+
+    python3 ../crate-workflows/helpers/scaffold_fill.py --name <repository name> --pins <commit SHA> .
+
+where the SHA is the commit of the template release you are adopting (`git rev-parse v1^{commit}`
+in the template checkout). It replaces `@PINS@` in every workflow file and `@MUTATION_CRON@` with the line
+`mutation_plan.py schedule <repository name>` prints (the repository's own weekday, at 08, 10 and 12
+UTC), and it fails, naming the file and line, if any other `@NAME@` placeholder is left. Commit
+afterward. Dependabot's
 github-actions ecosystem opens the bumps afterward; the lag check fails closed in the meantime.
 
 | file | what it is |
