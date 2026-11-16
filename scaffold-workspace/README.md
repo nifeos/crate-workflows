@@ -3,8 +3,7 @@
 These replace `scaffold/caller-workflows/` when the repository is a Cargo workspace of several crates, a
 virtual root over `first_crate/` and `second_crate/`. They show two crates; rename them, and
 copy a job block for each further crate. `first_crate` may be published; `second_crate` carries
-`publish = false`. Fill the placeholders as the single-crate callers do (`@PINS@`,
-`@MUTATION_CRON@`), and take `label.yml`, `hold.yml` and `ruled.yml` from `scaffold/caller-workflows/`
+`publish = false`. Fill the placeholders as the single-crate callers do (`helpers/scaffold_fill.py`), and take `label.yml`, `hold.yml` and `ruled.yml` from `scaffold/caller-workflows/`
 unchanged: the labeler checks every publishable crate by itself.
 
 What differs from a repository of one crate:
