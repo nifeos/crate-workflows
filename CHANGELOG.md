@@ -6,9 +6,7 @@ call that sits behind the newest release.
 
 ## Unreleased
 
-- `register_names` reads an `ipv4` or `ipv6` qualifier before `address` as the list intends: the name
-  splitter cut `IPV4` into `ipv` and `4`, so `IPV4_ADDRESS` was refused although `ipv4` is in
-  `[address_qualifiers]`. A bare `ADDRESS` is still refused.
+- `register_names` accepts `IPV4_ADDRESS`: the `ipv4` qualifier now matches. A bare `ADDRESS` is refused.
 - `helpers/scaffold_fill.py` fills a copied scaffold's `@PINS@` and `@MUTATION_CRON@` and fails on
   any other `@NAME@` left. An existing repository needs nothing. The contributing text no longer
   says "nifeos crate repository"; the release secret names stay, since they are real identifiers.
