@@ -1,0 +1,10 @@
+# Exemptions for readme_test_counts.py (its header is the manual). The list is empty on purpose: a
+# README names the command that runs the tests and leaves the number out. An exemption is for a
+# sentence that states a count of tests and has to, for example a fixed table in a specification
+# that the crate quotes. Each entry needs `phrase`, a regular expression matched in any case against
+# the refused text (as the failure prints it), and `reason`, why the number stays. Both are
+# required; an entry without a reason fails. The file's name and its keys are provisional.
+#
+# [[exempt]]
+# phrase = "^12 conformance tests$"
+# reason = "the specification numbers its conformance tests; the README quotes that table"

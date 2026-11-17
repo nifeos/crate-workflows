@@ -77,7 +77,7 @@ if ! "$py" -c 'import tomllib' 2>/dev/null; then
 fi
 # The helpers that carry their own tests, named here so a helper without a selftest is a visible
 # gap in this list rather than an invisible gap in a grep.
-for f in rust_names spelled_out unit_symbols abbreviations register_names british_spelling service_model contract_names question_shape standalone prose_caps passive_voice history_phrases prose_text prose_acronyms prose_figures readme_documents readme_acronyms inflated_wording readme_sections readme_badges function_length orphan_modules check_links falsify architect-label-rules \
+for f in rust_names spelled_out unit_symbols abbreviations register_names british_spelling service_model contract_names question_shape standalone prose_caps passive_voice history_phrases prose_text prose_acronyms prose_figures readme_test_counts readme_documents readme_acronyms inflated_wording readme_sections readme_badges function_length orphan_modules check_links falsify architect-label-rules \
 	mutants_gate mutation_plan job_budget workflow_shape kani_bump publish_mode semver_baseline semver_major crate_info settings_members scaffold_fill; do
 	"$py" "helpers/$f.py" --selftest
 done
@@ -376,6 +376,19 @@ echo "ok"
 echo "==> acronyms and banned figures (this repository's prose and the sample's doc comments)"
 "$py" helpers/prose_acronyms.py README.md CHANGELOG.md AGENTS.md CONTRIBUTING.md sample/README.md scaffold/*.md scaffold/docs/*.md sample/src/*.rs
 "$py" helpers/prose_figures.py README.md CHANGELOG.md AGENTS.md CONTRIBUTING.md sample/README.md scaffold/*.md scaffold/docs/*.md sample/src/*.rs
+echo "ok"
+
+echo "==> README test counts (this repository's READMEs, and a bad and a good README)"
+"$py" helpers/readme_test_counts.py README.md sample/README.md sample-workspace/*/README.md scaffold/README.md scaffold/README-crate.md
+scratch="$(mktemp -d)"
+printf '# Crate\n\nIt has 118 unit tests and 7 simulator tests.\n' >"$scratch/bad.md"
+printf '# Crate\n\nRun `cargo test` to run the tests.\n' >"$scratch/good.md"
+if "$py" helpers/readme_test_counts.py "$scratch/bad.md" 2>"$scratch/err"; then
+	fail "readme_test_counts passed a README that states a test count"
+fi
+grep -q 'state the test command instead' "$scratch/err" || fail "readme_test_counts did not name the fix"
+"$py" helpers/readme_test_counts.py "$scratch/good.md" >/dev/null || fail "readme_test_counts refused a README that states none"
+rm -rf "$scratch"
 echo "ok"
 
 echo "==> markdown links resolve"

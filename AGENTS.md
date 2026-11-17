@@ -40,7 +40,7 @@ use (per file for documents, once per crate for doc comments), in `Extensible Fi
 form, unless `helpers/prose_acronyms.toml` allows it; keep that allowlist short.
 `helpers/prose_figures.py` refuses the phrases in `helpers/prose_figures.toml`, and every entry
 there needs a plain replacement, which the failure prints. Both read doc comments through
-`helpers/prose_text.py`. A new gate of this kind gets a selftest with a bad and a good fixture.
+`helpers/prose_text.py`. `helpers/readme_test_counts.py` refuses a README sentence that states a count of tests and says to state the test command instead; its exemptions, each with a reason, are in `helpers/readme_test_counts.toml`. A new gate of this kind gets a selftest with a bad and a good fixture.
 
 A crate carries no `Name:` provenance block; git holds a name's history, and `standalone.py`
 refuses a block. The naming rules still hold after a crate moves: `check / standalone` runs
