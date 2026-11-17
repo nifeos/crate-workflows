@@ -379,7 +379,7 @@ echo "==> acronyms and banned figures (this repository's prose and the sample's 
 echo "ok"
 
 echo "==> README test counts (this repository's READMEs, and a bad and a good README)"
-"$py" helpers/readme_test_counts.py README.md sample/README.md scaffold/README.md scaffold/README-crate.md
+"$py" helpers/readme_test_counts.py README.md sample/README.md sample-workspace/*/README.md scaffold/README.md scaffold/README-crate.md
 scratch="$(mktemp -d)"
 printf '# Crate\n\nIt has 118 unit tests and 7 simulator tests.\n' >"$scratch/bad.md"
 printf '# Crate\n\nRun `cargo test` to run the tests.\n' >"$scratch/good.md"

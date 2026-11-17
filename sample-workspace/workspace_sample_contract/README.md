@@ -5,7 +5,7 @@
 [![license](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](https://github.com/nifeos/crate-workflows#license)
 [![minimum Rust version](https://img.shields.io/badge/rust-1.85%2B-blue.svg)](https://github.com/nifeos/crate-workflows/blob/main/sample-workspace/workspace_sample_contract/Cargo.toml)
 
-One crate of the template's fixture for a repository of several: one function, two tests, one proof, and a falsification patch. The
+One crate of the template's fixture for a repository of several: one function, its tests, one proof, and a falsification patch. The
 selftest workflow runs every reusable workflow against this crate, once for each crate of the
 repository, so a gate that cannot pass for a repository of several crates is broken before any real
 repository meets it.
