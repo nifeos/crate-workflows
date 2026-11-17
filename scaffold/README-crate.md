@@ -33,7 +33,7 @@ cargo build --lib --target <bare-metal target>
 
 Name every command a reader needs, with the feature flags. A test target that needs a feature
 (`required-features` in `Cargo.toml`) does not run under a plain `cargo test`, and Cargo says
-nothing about it, so say which flag runs it. Say to run `rustup target add` before the first bare-metal build, and list the
+nothing about it, so say which flag runs it. Do not state how many tests there are: the count goes stale, and `check / standalone` refuses it. Say to run `rustup target add` before the first bare-metal build, and list the
 targets the crate's `ci.yml` builds. Delete the bare-metal lines for a host-only crate.
 
 ### Running the proofs

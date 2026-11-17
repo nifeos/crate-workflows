@@ -6,6 +6,8 @@ call that sits behind the newest release.
 
 ## Unreleased
 
+- `check / standalone` refuses a README sentence that states a count of tests (`118 unit tests`) and
+  says to state the test command instead. The fix is to delete the count.
 - `register_names` accepts `IPV4_ADDRESS`: the `ipv4` qualifier now matches. A bare `ADDRESS` is refused.
 - `helpers/scaffold_fill.py` fills a copied scaffold's `@PINS@` and `@MUTATION_CRON@` and fails on
   any other `@NAME@` left. An existing repository needs nothing. The contributing text no longer
@@ -16,13 +18,11 @@ call that sits behind the newest release.
   `script/apply-settings` after the pin bump.
 - `deny.toml` and its `scaffold/` copy allow git sources on the project's GitHub organization
   (`[sources.allow-org]`). Other git sources stay refused. A crate pins a sibling by `rev`, with the
-  version beside it. A selftest job proves the allow and the refusal.
+  version beside it.
 - A repository of several crates is supported (`scaffold-workspace/README.md`); its releases are
   tagged `<crate>-v<version>`. One crate per repository is unchanged.
 - The spelled-out check asks for `management_data_io` in place of `mdio` and `sd_io` in place of
-  `sdio`, because `io` is a word every name keeps whole, inside an expansion too. A crate that
-  wrote `management_data_input_output` passes as before; the failure message for `mdio` or `sdio`
-  names the new spelling.
+  `sdio`. A crate that wrote `management_data_input_output` passes as before.
 
 - The weekly fuzz run starts each target from the crate's committed seeds in
   `fuzz/seeds/<target>/` when that directory exists, beside `fuzz/corpus/<target>/`. New inputs go
