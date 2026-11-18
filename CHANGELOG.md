@@ -6,6 +6,10 @@ call that sits behind the newest release.
 
 ## Unreleased
 
+Nothing yet.
+
+## v8 (2026-11-18)
+
 - `check / standalone` refuses a README sentence that states a count of tests (`118 unit tests`) and
   says to state the test command instead. The fix is to delete the count.
 - `register_names` accepts `IPV4_ADDRESS`: the `ipv4` qualifier now matches. A bare `ADDRESS` is refused.
