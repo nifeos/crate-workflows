@@ -63,6 +63,7 @@ import os
 import re
 import subprocess
 import sys
+import time
 import urllib.parse
 from pathlib import Path
 
@@ -222,17 +223,33 @@ def fingerprint(crate_dir, template_dir):
     return fingerprint_of(tracked(repo_root), versions, template)
 
 
-def gh_json(path):
-    out = subprocess.run(['gh', 'api', path], check=True, capture_output=True, text=True).stdout
-    return json.loads(out)
+GH_TRIES = 4
+
+
+def gh_json(path, run=subprocess.run, sleep=time.sleep):
+    """One API read. GitHub answers some reads of run and job listings with an HTTP 5xx that the
+    same read a moment later does not, so a 5xx is tried again, up to GH_TRIES times, 2, 4 and 8
+    seconds apart. Every failure prints gh's own message; any other failure, and the last 5xx,
+    raises CalledProcessError."""
+    for attempt in range(1, GH_TRIES + 1):
+        done = run(['gh', 'api', path], capture_output=True, text=True)
+        if done.returncode == 0:
+            return json.loads(done.stdout)
+        message = done.stderr.strip()
+        server_error = re.search(r'HTTP 5[0-9][0-9]', message) is not None
+        print('mutation_plan: gh api %s failed (try %d of %d): %s'
+              % (path, attempt, GH_TRIES, message), file=sys.stderr)
+        if not server_error or attempt == GH_TRIES:
+            raise subprocess.CalledProcessError(done.returncode, done.args, done.stdout,
+                                                done.stderr)
+        sleep(2 ** attempt)
 
 
 JOBS_PER_PAGE = 50
 
 
 def run_job_names(repository, run_id, fetch=gh_json):
-    """Every job name of a run, page by page. One page of 100 missed the jobs past the hundredth,
-    and the API answers 502 to that page size for some runs while pages of 50 succeed."""
+    """Every job name of a run, page by page: one page of 100 missed the jobs past the hundredth."""
     names, page = [], 1
     while True:
         jobs = fetch('repos/%s/actions/runs/%d/jobs?per_page=%d&page=%d'
@@ -459,6 +476,29 @@ def selftest():
         Path(tmp, 'a.rs').write_text('fn main() {}\n')
         subprocess.run(['git', 'add', 'a.rs'], cwd=tmp, check=True)
         expect('git ls-files read', [r[2] for r in tracked(tmp)], ['a.rs'])
+
+    # An API read: a 5xx is tried again, anything else is not, and the last failure raises.
+    def answers(*replies):
+        queue = list(replies)
+
+        def run(cmd, **_):
+            code, stderr = queue.pop(0)
+            return subprocess.CompletedProcess(cmd, code, '{"n": 1}' if code == 0 else '', stderr)
+        return run
+    waits = []
+    five = (1, 'gh: Server Error (HTTP 502)')
+    expect('a 502 then an answer', gh_json('p', answers(five, five, (0, '')), waits.append), {'n': 1})
+    expect('the waits between tries', waits, [2, 4])
+    for label, replies in [('a 404 is not tried again', [(1, 'gh: Not Found (HTTP 404)')]),
+                           ('four 502s raise', [five] * GH_TRIES)]:
+        try:
+            gh_json('p', answers(*replies), lambda _: None)
+            expect(label, 'returned', 'raised')
+        except subprocess.CalledProcessError as e:
+            expect(label, e.stderr, replies[-1][1])
+    pages = [{'jobs': [{'name': 'j%d' % i} for i in range(JOBS_PER_PAGE)]}, {'jobs': [{'name': 'last'}]}]
+    names = run_job_names('o/r', 1, lambda path: pages[int(path.rsplit('=', 1)[1]) - 1])
+    expect('every page of jobs read', (len(names), names[-1]), (JOBS_PER_PAGE + 1, 'last'))
     print('mutation_plan selftest: %s' % ('ok' if ok else 'FAILED'))
     return 0 if ok else 1
 
