@@ -22,6 +22,7 @@ publishing from a `nifeos` workflow. This repository is where all three land.
 | `.github/workflows/mutation.yml` | a schedule and a dispatch, no pull request open | `lag`, `mutation-plan`, `mutation` (one per shard), `mutation-verdict` (named `mutation`) |
 | `.github/workflows/fuzz.yml` | a weekly schedule, no pull request open | `lag`, `fuzz` |
 | `.github/workflows/release.yml` | a dispatch naming a version | `gate`, `tag`, `publish` |
+| `.github/workflows/release-weekly.yml` | this repository only: a weekly schedule and a dispatch | `release` |
 | `.github/workflows/label.yml` | every pull request push | `label` |
 | `.github/workflows/hold.yml` | pull request and label events | `hold` |
 | `.github/workflows/ruled.yml` | label events | `clear`, `rerun` |
@@ -58,9 +59,9 @@ that has not opted in passes with a short note and runs no fuzz step.
 What is public: a crash input is written to the run log and uploaded as the `fuzz-artifacts`
 artifact, and both are readable by any signed-in GitHub user.
 
-Why only safe-Rust crates opt in: in a crate with no `unsafe` code, a crash is a panic or a hang, a
-denial of service at worst. In a crate with `unsafe` code, a crash may be a memory-safety flaw, and
-its input would be published before anyone could fix it. So an opt-in is refused, and the job red, when the crate's shipped source (`src/**/*.rs`, outside `#[cfg(test)]`) contains
+Why only safe-Rust crates opt in: without `unsafe` code a crash is a panic or a hang, a denial of
+service at worst. With it, a crash may be a memory-safety flaw whose input would be published
+before anyone could fix it. So an opt-in is refused, and the job red, when the crate's shipped source (`src/**/*.rs`, outside `#[cfg(test)]`) contains
 an `unsafe` block, fn, impl, trait or attribute. The message names the file and line. The check
 (`helpers/unsafe_scan.py`) ignores comments, strings and character literals, and passes a crate whose
 every root carries `#![forbid(unsafe_code)]`. It does not look at fuzz targets or dependencies.
@@ -80,27 +81,32 @@ each, on a hosted runner, on a Tuesday cron and on dispatch. A crate without one
 Each target runs for the smaller of `seconds-per-target` and an even share of `total-seconds`, and
 never under 10 seconds, so a crate with many targets still ends inside the job's budget.
 
-The run files nothing. It opens no issue, creates no advisory and posts no comment. A crash, a
-timeout, an out-of-memory or a leak turns the run red, and the run uploads `fuzz/artifacts` for 14
-days. A person reads the run and decides what the crash is.
+The run files nothing: no issue, advisory or comment. A crash, timeout, out-of-memory or leak turns
+it red, and it uploads `fuzz/artifacts` for 14 days. A person reads the run.
 
-The job never runs on a pull request: the caller has no `pull_request` trigger, the job refuses a
-pull request from a fork, and it never uses a self-hosted runner. `script/lint` holds those rules
-(`helpers/fuzz-ci-selftest.sh`), proves the script red on a seeded crash and green on a clean target
-against a stand-in cargo, and proves the scan on the unsafe fixtures. The selftest workflow proves the rest with cargo-fuzz. `fixtures/fuzz-clean` goes through the
-live workflow with the opt-in and must pass. `fixtures/fuzz-crash` goes through it without the
-opt-in and must pass having run nothing, and through the script, where it must fail and leave its
-input behind. A crate with an `unsafe` block must be refused.
+The job never runs on a pull request, a fork or a self-hosted runner. `script/lint` holds those rules
+and proves the script and the unsafe scan (`helpers/fuzz-ci-selftest.sh`); the selftest workflow
+runs `fixtures/fuzz-clean` through the live workflow, which must pass, and `fixtures/fuzz-crash`
+without the opt-in, which must pass having run nothing.
 
 ## The lag check
 
 Every reusable workflow's first job is `lag`. It compares the commit the caller pinned
-(`job.workflow_sha`, the SHA of this template's file the call resolved to) with this repository's
-newest release, and fails when the pin is behind it or on a diverged line. A call at an older
-template release is red, Dependabot's `github-actions` ecosystem opens the bump, and the weekly
-schedule runs the same check with no pull request open so a repository nobody touches still finds
-out. When no release exists yet, the check fails closed: an unreleased template has nothing a crate
-repository may pin.
+(`job.workflow_sha`) with this repository's newest release. It fails on a diverged line, on a pin
+behind by more than one release, and on a pin behind once the newest release is more than 7 days
+old (`LAG_GRACE_DAYS`). A pin one release behind passes with a notice inside that week, so a release
+does not turn every crate red before Dependabot's pull request can merge. The weekly schedule runs
+the same check, so an untouched repository still finds out. With no release yet it fails closed.
+`helpers/lag-check-selftest.sh` proves each verdict.
+
+## The weekly release
+
+`release-weekly.yml` runs Sundays at 22:00 UTC, seven hours before the crates' weekly Dependabot run
+(Mondays, 05:00 UTC by default). It tags the newest main commit since the newest tag whose
+`selftest` push run is green as the next `v<N>`, a lightweight tag like `v1` to `v8`. It creates
+the release as latest, with the `## Unreleased` entries of `CHANGELOG.md` as notes, which starts
+`canary-adopt`, and opens a pull request that folds those entries under `## v<N>`. With no green
+commit since the newest tag it does nothing.
 
 ## The release path
 

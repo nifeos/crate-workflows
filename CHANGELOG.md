@@ -2,11 +2,18 @@
 
 Dates are UTC. The template's releases are tags on one commit each (`v1`, `v2`, ...); a crate
 repository pins a release by its commit SHA and Dependabot opens the bump. The lag check fails a
-call that sits behind the newest release.
+call that sits more than one release behind, or behind a release older than 7 days.
 
 ## Unreleased
 
-Nothing yet.
+- A weekly release, `release-weekly.yml`, Sundays 22:00 UTC, seven hours before Dependabot's weekly
+  run. It tags the newest main commit since the newest tag with a green `selftest` push run as the
+  next `v<N>` and creates the release as latest, which starts `canary-adopt`. It then opens a pull
+  request that folds the `## Unreleased` entries under `## v<N>` (`helpers/changelog_fold.py`).
+  It does nothing without a green commit since the newest tag.
+- A lag grace. A pin behind the newest release passes with a notice when it is at the previous
+  release or later and the newest release is at most 7 days old (`LAG_GRACE_DAYS`); otherwise it
+  fails. A diverged pin still fails. `helpers/lag-check-selftest.sh` proves each verdict.
 
 ## v8 (2026-11-18)
 
@@ -149,19 +156,15 @@ Nothing yet.
   configuration fails it. The check reads `.github/abbreviations-ceiling` and reports against it
   without enforcing it. The scaffold ships an empty `.github/accepted-words`.
 - `label / label` rule 2 no longer dies on `An object with id ... could not be found` when it clones
-  the baseline tag. The labeler checks out with `filter: blob:none`, so the release's files were not
-  on disk, and cargo-semver-checks clones the checkout locally, where a missing file cannot be
-  fetched. `helpers/semver-run.sh` now reads the baseline tag's files first, which fetches them in
-  one batch. The semver selftest covers a blobless clone.
+  the baseline tag from a blobless checkout. `helpers/semver-run.sh` now reads the tag's files
+  first, which fetches them in one batch.
 - Compiled Python files (`helpers/__pycache__/*.pyc`, built by one interpreter version) are no longer
   tracked, and `.gitignore` now ignores `__pycache__/` and `*.pyc`.
 - `weekly / mutation` runs in shards, so a crate with thousands of mutants finishes inside the
-  60-minute job timeout. `mutation-plan` counts the mutants and makes ceil(mutants /
-  `mutants-per-shard`) shards (a new input, default 200). Each `mutation` job tests one shard, and
-  `mutation-verdict`, named `mutation`, judges them together against `.github/mutants-exempts`. A
-  crate under 200 mutants runs as one shard. A mutant that times out now fails the verdict unless
-  exempted, as a survivor does; before, it failed the run only when no mutant survived. One exempt
-  line now covers every survivor on that line, not only the first.
+  60-minute job timeout. `mutation-plan` makes ceil(mutants / `mutants-per-shard`) shards (default
+  200), and `mutation-verdict`, named `mutation`, judges them against `.github/mutants-exempts`. A
+  mutant that times out now fails the verdict unless exempted, as a survivor does. One exempt line
+  covers every survivor on that line.
 - The scaffold's typos gate now passes on the scaffold itself. The release caller's two secret names
   (`NIFE_SMELTER_APP_ID`, `NIFE_SMELTER_PRIVATE_KEY`) tripped the spelling check on their first
   word, so `scaffold/_typos.toml` ignores those two identifiers and nothing else. `script/lint` now
@@ -209,18 +212,13 @@ Nothing yet.
   `_contract` (`helpers/contract_names.py`), and yes-or-no functions named like questions
   (`helpers/question_shape.py`). A package or program has no item to carry an attribute, so it keeps
   a name through the crate root docs: `(<name>, <source>)`.
-- `check / standalone` gains the typos step the README always listed: typos 1.51.1, installed at an
-  exact version with the release checksum the pinned `install-action` holds, run by
-  `helpers/typos_gate.sh` with the en-us locale. A crate repository needs the `_typos.toml` that
-  `scaffold/` carries; the gate fails without it or with another locale. `script/lint` proves the
-  gate passes a clean tree and refuses a misspelling, a British spelling, a missing config and
-  another locale.
-- The labeler's semver rule holds only a break the pull request introduces. When the pull request
-  carries a major break against the previous release tag, `helpers/semver-rule.sh` checks its
-  merge base against the same tag. `helpers/semver_major.py` keeps only the major findings the
-  merge base did not have, so a break already on `main` does not hold a later pull request. The
-  rule runs only when the diff touches a `.rs` file or a `Cargo.toml`; `Cargo.lock` stays out. The
-  `selftest (semver rule)` job proves five cases against a throwaway crate repository.
+- `check / standalone` gains the typos step the README always listed: typos 1.51.1 at an exact
+  version, run by `helpers/typos_gate.sh` with the en-us locale. A crate repository needs the
+  `_typos.toml` that `scaffold/` carries; the gate fails without it or with another locale.
+- The labeler's semver rule holds only a break the pull request introduces: `helpers/semver-rule.sh`
+  also checks the merge base against the previous release tag, and `helpers/semver_major.py` keeps
+  the major findings the merge base did not have. It runs only when the diff touches a `.rs` file
+  or a `Cargo.toml`.
 - The American-spelling name check also refuses the `ise` forms of two more stems
   (`unrecogn` and `plural`). The doubled-`l` forms stay refused, a stricter reading than typos takes.
 
