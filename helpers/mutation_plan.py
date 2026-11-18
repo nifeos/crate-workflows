@@ -227,9 +227,24 @@ def gh_json(path):
     return json.loads(out)
 
 
+JOBS_PER_PAGE = 50
+
+
+def run_job_names(repository, run_id, fetch=gh_json):
+    """Every job name of a run, page by page. One page of 100 missed the jobs past the hundredth,
+    and the API answers 502 to that page size for some runs while pages of 50 succeed."""
+    names, page = [], 1
+    while True:
+        jobs = fetch('repos/%s/actions/runs/%d/jobs?per_page=%d&page=%d'
+                     % (repository, run_id, JOBS_PER_PAGE, page)).get('jobs', [])
+        names.extend(j.get('name', '') for j in jobs)
+        if len(jobs) < JOBS_PER_PAGE:
+            return names
+        page += 1
+
+
 def run_record(repository, run_id, manifest=ROOT_MANIFEST):
-    jobs = gh_json('repos/%s/actions/runs/%d/jobs?per_page=100' % (repository, run_id))
-    return record_of((j.get('name', '') for j in jobs.get('jobs', [])), manifest)
+    return record_of(run_job_names(repository, run_id), manifest)
 
 
 def history(repository, workflow_ref, branch, manifest=ROOT_MANIFEST):
