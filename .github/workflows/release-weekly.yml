@@ -1,0 +1,155 @@
+# The template's weekly release: on Sunday evening, tag the newest main commit that is green as the
+# next v<N>, create the GitHub release as the latest, and let canary-adopt open the canary's pull
+# request. It runs a few hours before the crate repositories' weekly Dependabot run (Monday morning
+# UTC), so each crate's bump pull request lands on the release just made, and the lag check's grace
+# (helpers/lag-check.sh) covers the days until it merges.
+#
+# It tags nothing when main has no commit since the newest tag, or when no commit since the newest
+# tag has a green selftest run on main. A green commit is one whose `selftest` push run on main
+# concluded success; that run calls every reusable workflow, so it covers the required checks.
+# A newer commit that is red or still running is passed over, never tagged.
+#
+# The tags ruleset lets only the release app create a v* tag, and a release made with github.token
+# triggers no workflows, so canary-adopt would never run. Both use the app's installation token,
+# as release.yml does, and a missing secret is a red job that names what to create.
+
+name: release weekly
+
+on:
+  schedule:
+    # Sundays 22:00 UTC: seven hours before Dependabot's weekly run (Mondays 05:00 UTC by default).
+    - cron: '0 22 * * 0'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-weekly
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  release:
+    name: tag the newest green main commit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    if: ${{ github.ref == 'refs/heads/main' }}
+    permissions:
+      contents: read
+    steps:
+      - name: clock
+        run: echo "JOB_STARTED_AT=$(date +%s)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: choose the commit
+        id: choose
+        run: |
+          set -e
+          latest="$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq .tag_name)"
+          tag_sha="$(gh api "repos/$GITHUB_REPOSITORY/commits/$latest" --jq .sha)"
+          number="${latest#v}"
+          case "$number" in '' | *[!0-9]*) echo "the newest release $latest is not v<number>"; exit 1 ;; esac
+          chosen=""
+          for sha in $(gh api "repos/$GITHUB_REPOSITORY/commits?sha=main&per_page=100" --jq '.[].sha'); do
+            if [ "$sha" = "$tag_sha" ]; then break; fi
+            green="$(gh api "repos/$GITHUB_REPOSITORY/actions/workflows/selftest.yml/runs?head_sha=$sha&branch=main&event=push&status=completed&per_page=20" \
+              --jq '[.workflow_runs[] | select(.conclusion == "success")] | length')"
+            if [ "$green" -gt 0 ]; then chosen="$sha"; break; fi
+          done
+          if [ -z "$chosen" ]; then
+            echo "Nothing to release: main has no green commit since $latest ($tag_sha)." | tee -a "$GITHUB_STEP_SUMMARY"
+            echo "tag=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          {
+            echo "tag=v$((number + 1))"
+            echo "sha=$chosen"
+            echo "previous=$latest"
+          } >> "$GITHUB_OUTPUT"
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - name: the app credentials exist
+        if: steps.choose.outputs.tag != ''
+        run: |
+          missing=""
+          [ -n "$APP_ID" ] || missing="$missing NIFE_SMELTER_APP_ID"
+          [ -n "$APP_KEY" ] || missing="$missing NIFE_SMELTER_PRIVATE_KEY"
+          if [ -n "$missing" ]; then
+            echo "missing secret(s):$missing"
+            echo "Create them as organization secrets (the release app's ID and private key), visible"
+            echo "to this repository."
+            exit 1
+          fi
+        env:
+          APP_ID: ${{ secrets.NIFE_SMELTER_APP_ID }}
+          APP_KEY: ${{ secrets.NIFE_SMELTER_PRIVATE_KEY }}
+      - name: mint the release app's installation token
+        if: steps.choose.outputs.tag != ''
+        id: app
+        uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        with:
+          app-id: ${{ secrets.NIFE_SMELTER_APP_ID }}
+          private-key: ${{ secrets.NIFE_SMELTER_PRIVATE_KEY }}
+          permission-contents: write
+          permission-pull-requests: write
+      # A lightweight tag, as v1 to v8 are: a ref and no tag object. A tag that exists is never
+      # updated, so a re-run after a half-finished one fails here and a person decides.
+      - name: create the tag and the release
+        if: steps.choose.outputs.tag != ''
+        run: |
+          set -e
+          if gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$TAG" >/dev/null 2>&1; then
+            echo "the tag $TAG already exists; a tag is never updated"
+            exit 1
+          fi
+          gh api "repos/$GITHUB_REPOSITORY/git/refs" -f "ref=refs/tags/$TAG" -f "sha=$SHA"
+          echo "created refs/tags/$TAG at $SHA"
+          gh api "repos/$GITHUB_REPOSITORY/contents/CHANGELOG.md?ref=$SHA" -H 'Accept: application/vnd.github.raw' > released-changelog.md
+          {
+            echo "The weekly release: the newest main commit with a green selftest since $PREVIOUS, $SHA."
+            echo
+            echo "What changed since $PREVIOUS (the \`## Unreleased\` section of \`CHANGELOG.md\` at this commit; a pull request folds it under the \`## $TAG\` heading):"
+            echo
+            python3 helpers/changelog_fold.py notes released-changelog.md
+            echo
+            echo "A pin behind $TAG passes the lag check for a week when it is at $PREVIOUS or later; bump it with the Dependabot pull request. Supersedes $PREVIOUS."
+          } > notes.md
+          gh release create "$TAG" --verify-tag --latest --title "$TAG" --notes-file notes.md
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          TAG: ${{ steps.choose.outputs.tag }}
+          SHA: ${{ steps.choose.outputs.sha }}
+          PREVIOUS: ${{ steps.choose.outputs.previous }}
+      # The changelog on main still says Unreleased. A pull request moves the shipped entries
+      # under the new heading; nothing here merges it.
+      - name: open the changelog pull request
+        if: steps.choose.outputs.tag != ''
+        run: |
+          set -e
+          git fetch origin main --depth 1
+          git checkout -q -B "changelog-$TAG" origin/main
+          python3 helpers/changelog_fold.py fold CHANGELOG.md released-changelog.md "$TAG" "$(date -u +%Y-%m-%d)" > folded.md
+          if cmp -s folded.md CHANGELOG.md; then
+            echo "nothing under Unreleased shipped in $TAG; no changelog pull request."
+            exit 0
+          fi
+          mv folded.md CHANGELOG.md
+          git config user.name 'nife-smelter[bot]'
+          git config user.email 'nife-smelter[bot]@users.noreply.github.com'
+          git add CHANGELOG.md
+          git commit -q -m "Fold the entries shipped in $TAG under its heading"
+          git remote set-url origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          git push --force origin "changelog-$TAG"
+          gh pr create --base main --head "changelog-$TAG" --title "Fold the entries shipped in $TAG under its heading" \
+            --body "Automated by \`.github/workflows/release-weekly.yml\`. The entries of \`## Unreleased\` that were in $TAG move under \`## $TAG\`; later entries stay."
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          TAG: ${{ steps.choose.outputs.tag }}
+      - name: budget
+        if: always()
+        run: python3 helpers/job_budget.py check "${{ github.job }}" "$JOB_STARTED_AT"
