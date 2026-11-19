@@ -4,8 +4,7 @@
 # helpers/mutation-diff-selftest.sh: helpers/mutation-diff.sh against the fixture crate, with the
 # real cargo-mutants, on three diffs from fixtures/mutation-diff/:
 #
-# - exempted.patch touches the clamp line, whose one survivor .github/mutants-exempts lists: pass,
-#   although the exemptions also name proof-file lines this run cannot reach;
+# - exempted.patch touches the clamp line, whose one survivor .github/mutants-exempts lists: pass;
 # - untested.patch adds a function no test pins: its survivors fail the check;
 # - a change to sample/README.md alone makes no mutants: pass, saying so;
 # - untested-workspace-member.patch adds the same kind of function to a crate that is a member of

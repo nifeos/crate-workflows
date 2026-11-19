@@ -143,7 +143,7 @@ jobs:
             exit 1
           esac
           cd "$(dirname "$MANIFEST")"
-          mutants=$(cargo mutants --list --json | jq length)
+          mutants=$("$GITHUB_WORKSPACE/.crate-workflows/helpers/cargo-mutants.sh" --list --json | jq length)
           shards=$(( (mutants + PER_SHARD - 1) / PER_SHARD ))
           [ "$shards" -ge 1 ] || shards=1
           if [ "$shards" -gt 256 ]; then
@@ -194,7 +194,7 @@ jobs:
           cd "$(dirname "$MANIFEST")"
           echo "MUTANTS_OUT=$(pwd)/mutants.out" >> "$GITHUB_ENV"
           # --output keeps mutants.out here: cargo-mutants otherwise writes it at the workspace root.
-          cargo mutants --output "$(pwd)" --jobs 2 --timeout 300 --shard "$SHARD/$SHARDS" --sharding round-robin || rc=$?
+          "$GITHUB_WORKSPACE/.crate-workflows/helpers/cargo-mutants.sh" --output "$(pwd)" --jobs 2 --timeout 300 --shard "$SHARD/$SHARDS" --sharding round-robin || rc=$?
           case "${rc:-0}" in
             0 | 2 | 3) ;;
             *) exit "$rc" ;;
