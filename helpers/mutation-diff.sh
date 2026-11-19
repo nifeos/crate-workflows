@@ -57,7 +57,7 @@ git -C "$root" diff --relative "$base" HEAD >"$work/pr.diff"
 rm -rf mutants.out mutants.out.old
 
 rc=0
-timeout --kill-after=30s "${cap}m" cargo mutants --output "$(pwd)" --in-diff "$work/pr.diff" --jobs 2 --timeout 300 || rc=$?
+timeout --kill-after=30s "${cap}m" "$(dirname "$gate")/cargo-mutants.sh" --output "$(pwd)" --in-diff "$work/pr.diff" --jobs 2 --timeout 300 || rc=$?
 case "$rc" in
 0 | 2 | 3) ;;
 124 | 137)

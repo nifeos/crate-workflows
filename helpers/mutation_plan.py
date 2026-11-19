@@ -23,7 +23,7 @@ the failure prints the line to use. A dispatch is never deferred, since a person
 THE FINGERPRINT. The SHA-256 over every tracked file's mode, blob and path, except under `.github/`
 (which keeps `.github/mutants-exempts`) and `docs/`, plus the output of `rustc -vV`, `cargo -V` and
 `cargo mutants --version` in the crate directory (so a rust-toolchain file is resolved), plus the
-template's own `mutation.yml` and `helpers/mutants_gate.py`. So the crate's sources, tests,
+template's own `mutation.yml`, `helpers/mutants_gate.py` and `helpers/cargo-mutants.sh`. So the crate's sources, tests,
 Cargo.lock, rust-toolchain, mutants configuration and exemptions are all in it, as are the resolved
 toolchain and tool versions; a README change is in it too, since a README may carry doctests.
 
@@ -218,7 +218,8 @@ def fingerprint(crate_dir, template_dir):
     versions = [subprocess.run(cmd, cwd=crate_dir, check=True, capture_output=True,
                                text=True).stdout.strip()
                 for cmd in (['rustc', '-vV'], ['cargo', '-V'], ['cargo', 'mutants', '--version'])]
-    names = ('.github/workflows/mutation.yml', 'helpers/mutants_gate.py')
+    names = ('.github/workflows/mutation.yml', 'helpers/mutants_gate.py',
+             'helpers/cargo-mutants.sh')
     template = [(n, (Path(template_dir) / n).read_bytes()) for n in names]
     return fingerprint_of(tracked(repo_root), versions, template)
 

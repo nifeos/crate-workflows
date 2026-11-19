@@ -36,6 +36,7 @@ There is no triage ledger or census here: survive, exempt with a reason, or fail
 """
 
 import json
+import os
 import re
 import sys
 from pathlib import Path
@@ -90,6 +91,40 @@ def parse_exempts(text):
     return lines, problems
 
 
+SUMMARY_LIMIT = 800_000  # bytes; GitHub refuses a step summary over 1 MiB
+
+
+def summary_text(refused, limit=SUMMARY_LIMIT):
+    """Markdown naming every refused mutant, or as many as fit under `limit` bytes with the count
+    left out stated. The job log always holds the whole list."""
+    if not refused:
+        return ''
+    lines = [f'### Mutation: {len(refused)} mutant(s) the tests did not catch and no exemption '
+             'covers\n', '| verdict | where | mutant |', '| --- | --- | --- |']
+    size = sum(len(x) + 1 for x in lines)
+    shown = 0
+    for verdict, key, desc in refused:
+        row = f'| {verdict} | `{key}` | {desc.replace("|", chr(92) + "|")} |'
+        if size + len(row) + 1 > limit:
+            break
+        lines.append(row)
+        size += len(row) + 1
+        shown += 1
+    if shown < len(refused):
+        lines.append(f'\n{len(refused) - shown} more not listed here for size; the job log '
+                     'names every one.')
+    return '\n'.join(lines) + '\n'
+
+
+def write_summary(refused):
+    """Append the refused mutants to `GITHUB_STEP_SUMMARY`, if the runner gave one."""
+    path = os.environ.get('GITHUB_STEP_SUMMARY')
+    text = summary_text(refused)
+    if path and text:
+        with open(path, 'a') as f:
+            f.write(text + '\n')
+
+
 def main(argv):
     if '--selftest' in argv[1:]:
         return selftest()
@@ -138,6 +173,7 @@ def main(argv):
                   file=sys.stderr)
             return 1
     used = set()
+    refused = []
     for f, line, desc, verdict in live:
         key = f'{f}:{line}'
         if key in exempts:
@@ -145,7 +181,9 @@ def main(argv):
             used.add(key)
         else:
             print(f'mutants_gate: {verdict} {key}: {desc}', file=sys.stderr)
+            refused.append((verdict, key, desc))
             bad = True
+    write_summary(refused)
     for key in ([] if diff_only else sorted(k for k in set(exempts) - used if k.startswith(prefix))):
         print(f'mutants_gate: {exempt_path}: {key} is exempted but no such survivor exists now',
               file=sys.stderr)
@@ -277,6 +315,13 @@ def selftest():
     for case, want in (('pass', 0), ('fail', 1)):
         expect('fixture %s' % case,
                run(['gate', str(fixtures / case), str(fixtures / case / 'mutants-exempts')]), want)
+    rows = [('SURVIVOR', f'src/a.rs:{n}', f'replace x{n}') for n in range(5)]
+    whole = summary_text(rows)
+    expect('every survivor listed', all(f'src/a.rs:{n}' in whole for n in range(5)), True)
+    expect('nothing omitted', 'more not listed' in whole, False)
+    cut = summary_text(rows, limit=len(whole) - 40)
+    expect('omission counted', 'more not listed' in cut and 'names every one' in cut, True)
+    expect('clean run writes nothing', summary_text([]), '')
     print('mutants_gate selftest: %s' % ('ok' if ok else 'FAILED'))
     return 0 if ok else 1
 

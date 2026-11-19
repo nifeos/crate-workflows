@@ -87,10 +87,10 @@ jobs:
     uses: ./.github/workflows/mutation.yml
     with:
       manifest-path: sample/Cargo.toml
-      # The fixture has seven mutants and three exempted survivors. Three a shard splits it into
-      # three shards and puts one survivor in each, so mutation-verdict has to merge every shard
-      # before all of its exemptions match.
-      mutants-per-shard: 3
+      # The fixture has five mutants and one exempted survivor; the two in its cfg(kani) proof file
+      # are excluded by the template, so an exemption for one is stale and refused. Two a shard
+      # splits it into three shards, so mutation-verdict has to merge them all.
+      mutants-per-shard: 2
       # Every run tests every mutant here: the fixture's tree is the same on most pull requests, and a
       # skipped run would prove nothing about the shards. The skip rules are mutation_plan.py's
       # selftest, over fixtures/mutation/.
