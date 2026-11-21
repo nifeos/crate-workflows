@@ -15,9 +15,7 @@ call that sits more than one release behind, or behind a release older than 7 da
   release or later and the newest release is at most 7 days old (`LAG_GRACE_DAYS`); otherwise it
   fails. A diverged pin still fails. `helpers/lag-check-selftest.sh` proves each verdict.
 
-- `prose_acronyms.py` and `readme_acronyms.py` accept an expansion whose initials take a letter from a
-  small word (`Request for Comments (RFC)`), as well as one that skips it (`Federal Bureau of
-  Investigation (FBI)`).
+- The acronym gates accept `Request for Comments (RFC)`, which takes a letter from a small word.
 
 ## v8 (2026-11-18)
 
