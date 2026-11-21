@@ -57,7 +57,8 @@ never kept: it takes the spelled-out name, and the source spelling goes in `#[do
 `_REGISTER` (in an inline `mod registers` or a file such as `src/registers.rs`), a mask ends `_MASK`,
 an integer constant that states its own name as its source is renamed with the source spelling in
 `#[doc(alias)]`; an address in memory is virtual or physical, and a size, length or limit carries
-its unit.
+its unit; an operation code that reads as a size is listed in the crate's `.github/opcode-names`
+(`<module path>::<NAME> <reason>`), never kept in a comment.
 `helpers/abbreviations.py` runs beside them as a report, never a failure: it lists each component
 of a name that is not an English, technical or accepted word. A word joins
 `helpers/technical_words.txt` when engineers say it whole, and `[accepted]` when nobody says its

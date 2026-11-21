@@ -1,0 +1,2 @@
+# One entry per line: <module path>::<NAME> <reason>.
+block::SIZE the command that asks the device for its size

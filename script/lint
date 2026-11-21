@@ -198,6 +198,13 @@ for check in register_names british_spelling service_model contract_names questi
 done
 # shellcheck disable=SC2046
 "$py" helpers/service_model.py --prose $(git ls-files sample | grep -v 'Cargo[.]lock$')
+# An opcode named like a size is exempt only through `.github/opcode-names`: the same constant is
+# refused without an entry and accepted with one.
+ro=fixtures/register-names-opcode
+(cd "$ro/bad" && "$py" ../../../helpers/register_names.py src/lib.rs >/dev/null 2>&1) &&
+	fail "register_names accepted an opcode named SIZE with no opcode-names entry"
+(cd "$ro/good" && "$py" ../../../helpers/register_names.py src/lib.rs >/dev/null) ||
+	fail "register_names refused an opcode named SIZE that .github/opcode-names lists"
 # The abbreviations check reports and never fails on a finding, so its run here proves only that the
 # shipped word lists and tables load and that it reads the fixture; its selftest above holds the rule.
 # shellcheck disable=SC2086
