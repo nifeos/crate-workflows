@@ -49,7 +49,36 @@ def call(step, *args, method='POST', json_body=None, input_=None):
     return out
 
 
+def installed_on_all(installations, slug):
+    """True when the organization's installation of the app `slug` covers every repository, so a
+    new repository needs no installation step. `installations` is the parsed answer of
+    `orgs/<org>/installations`; anything else (no such app, selected repositories only) is False."""
+    for item in (installations or {}).get('installations', []):
+        if item.get('app_slug') == slug:
+            return item.get('repository_selection') == 'all'
+    return False
+
+
+def selftest():
+    on_all = {'installations': [{'app_slug': 'a', 'repository_selection': 'all'}]}
+    selected = {'installations': [{'app_slug': 'a', 'repository_selection': 'selected'}]}
+    cases = (('on all', installed_on_all(on_all, 'a'), True),
+             ('selected only', installed_on_all(selected, 'a'), False),
+             ('other app', installed_on_all(on_all, 'b'), False),
+             ('unreadable', installed_on_all(None, 'a'), False),
+             ('empty', installed_on_all({}, 'a'), False))
+    ok = True
+    for name, got, want in cases:
+        if got != want:
+            ok = False
+            print(f'FAIL {name}: expected {want}, got {got}')
+    print('apply-settings selftest: %s' % ('ok' if ok else 'FAILED'))
+    return 0 if ok else 1
+
+
 def main(argv):
+    if argv[1:] == ['--selftest']:
+        return selftest()
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument('repo')
     ap.add_argument('--crate')
@@ -93,6 +122,11 @@ def main(argv):
         'dependabot_alerts': _on(s['security']['dependabot_alerts']),
     }}
     step('security features', f'repos/{repo}', method='PATCH', json_body=sec)
+    # The security_and_analysis block above is accepted and ignored for private vulnerability
+    # reporting; only this endpoint turns it on, and it needs repository Administration write.
+    if s['security']['private_vulnerability_reporting']:
+        step('private vulnerability reporting (its own endpoint)',
+             f'repos/{repo}/private-vulnerability-reporting', method='PUT')
     step('dependabot security updates', f'repos/{repo}/automated-security-fixes', method='PUT')
 
     a = s['actions']
@@ -131,9 +165,21 @@ def main(argv):
          f'orgs/{team["org"]}/teams/{team["slug"]}/repos/{repo}',
          method='PUT', json_body={'permission': team['permission']})
     app = s['app']
-    step(f'app {app["slug"]} gets {app["permission"]} (installation settings; the API refuses a '
-         f'repository token)', f'repos/{repo}/installation', method='PUT',
-         json_body={'permission': app['permission']})
+    # Check before saying the installation is owed: an app installed on all of the organization's
+    # repositories already covers a new one. Reading installations needs an organization scope; a
+    # token without it cannot tell, so the step stays owed.
+    covered = False
+    if not args.dry_run:
+        out = call(f'app {app["slug"]}: installations read', f'orgs/{team["org"]}/installations',
+                   method='GET')
+        covered = bool(out) and installed_on_all(json.loads(out), app['slug'])
+    if covered:
+        print(f'apply-settings: app {app["slug"]} is installed on all repositories of {team["org"]}; '
+              'nothing to do')
+    else:
+        step(f'app {app["slug"]} gets {app["permission"]} (installation settings; the API refuses a '
+             f'repository token)', f'repos/{repo}/installation', method='PUT',
+             json_body={'permission': app['permission']})
 
     existing = set()
     if not args.dry_run:

@@ -6,6 +6,8 @@ call that sits more than one release behind, or behind a release older than 7 da
 
 ## Unreleased
 
+- The Kani lint shim gains `should_panic`, `solver` and `stub`; `apply-settings` enables private
+  vulnerability reporting and checks the app installation first.
 - `register_names` accepts `address_space`, `address_wait` and `address_wake`.
 - A weekly release, `release-weekly.yml`, Sundays 22:00 UTC, seven hours before Dependabot's weekly
   run. It tags the newest main commit since the newest tag with a green `selftest` push run as the

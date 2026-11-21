@@ -13,8 +13,8 @@
 //!
 //! # What this is not
 //!
-//! **It is not Kani, and a clean lint pass is not a proof.** The surface below is the five things
-//! the harnesses use ([`any`], [`assume`], `cover!`, `proof`, `unwind`), with the semantics deleted:
+//! **It is not Kani, and a clean lint pass is not a proof.** The surface below is the eight things
+//! the harnesses use ([`any`], [`assume`], `cover!`, `proof`, `should_panic`, `solver`, `stub`, `unwind`), with the semantics deleted:
 //! [`any`] returns nothing, [`assume`] constrains nothing.
 //!
 //! **It is deliberately looser than the real thing in one place.** Kani's `any` requires
@@ -36,7 +36,7 @@
 
 #![no_std]
 
-pub use kani_attributes::{proof, unwind};
+pub use kani_attributes::{proof, should_panic, solver, stub, unwind};
 
 /// A symbolic value. Under Kani this is the whole point; here it only has to type-check.
 ///
