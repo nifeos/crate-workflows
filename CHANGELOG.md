@@ -15,6 +15,8 @@ call that sits more than one release behind, or behind a release older than 7 da
   release or later and the newest release is at most 7 days old (`LAG_GRACE_DAYS`); otherwise it
   fails. A diverged pin still fails. `helpers/lag-check-selftest.sh` proves each verdict.
 
+- The acronym gates accept `Request for Comments (RFC)`, which takes a letter from a small word.
+
 ## v8 (2026-11-18)
 
 - `check / standalone` refuses a README sentence that states a count of tests (`118 unit tests`) and
