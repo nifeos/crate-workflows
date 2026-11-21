@@ -6,7 +6,9 @@ call that sits more than one release behind, or behind a release older than 7 da
 
 ## Unreleased
 
-Nothing yet.
+- `register_names` reads an optional `.github/opcode-names`: one `<module path>::<NAME> <reason>` per
+  line exempts the unit rule on an integer constant that is an operation code and not a size
+  (`block::SIZE`). No other rule is exempted, and a missing reason fails.
 
 ## v9 (2026-11-21)
 
@@ -29,8 +31,7 @@ Nothing yet.
   says to state the test command instead. The fix is to delete the count.
 - `register_names` accepts `IPV4_ADDRESS`: the `ipv4` qualifier now matches. A bare `ADDRESS` is refused.
 - `helpers/scaffold_fill.py` fills a copied scaffold's `@PINS@` and `@MUTATION_CRON@` and fails on
-  any other `@NAME@` left. An existing repository needs nothing. The contributing text no longer
-  says "nifeos crate repository"; the release secret names stay, since they are real identifiers.
+  any other `@NAME@` left. An existing repository needs nothing.
 - `proofs / loom` runs a crate's loom models (`--cfg loom -D warnings`, release mode) when its
   manifest declares `loom`; otherwise it is skipped. `loom-max-preemptions` bounds them (default
   none). A run with no `loom::model` or no passing test fails. It is required: run
@@ -50,8 +51,7 @@ Nothing yet.
   at `.crate-workflows/`. It lies inside the crate's tree, so a crate without an `include` list
   failed `cargo package` and `cargo publish`.
 - The scaffold's README starting shape gains a "Building and testing" section, and the stranger
-  cadence page lists what a README must say. It names build and test commands, the Kani install, the
-  proofs' cost, one harness, one falsification patch and the minimum Rust version.
+  cadence page lists what a README must say.
 - The unit check refuses `ppm` as the last part of a name with more than one part (`DRIFT_PPM`),
   and asks for `parts_per_million`. A bare `ppm` and one mid-name stay allowed.
 - `check / standalone` compares the notices a crate carries with its `license` field. A

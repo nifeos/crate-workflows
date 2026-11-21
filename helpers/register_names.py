@@ -35,6 +35,16 @@ Four rules, each judged on the names the crate defines (helpers/rust_names.py sa
    holds a word from `[source_words]` (`OpenBSD`, `databook`, `specification`), a file name
    (`dwqereg.h`) or a section number: "(`FBE`, `DU` or `CES`)" lists names and cites nothing.
 
+Rule 4 has one more exception, for a constant that is an operation code and not a quantity, where
+the specification's word is `SIZE` or `LENGTH` (`block::SIZE`, a command that asks for a size). The
+crate lists it in `.github/opcode-names`, one entry per line, `<module path>::<NAME> <reason>`
+(`block::SIZE the command that asks the device for its size`); `#` starts a comment line and a blank
+line is skipped. The entry matches an integer constant whose path (the file's modules, then the
+inline modules) ends with the module path and name, so `block::SIZE` covers `src/block.rs` and
+`mod block`. A reason is required, an entry exempts rule 4 on that one constant and no other rule,
+and an entry that matches no constant is reported and does not fail. The exemption lives in this
+file and never in a doc comment or a `Name:` block. `--exempts PATH` reads another file.
+
 Rules 1, 2 and 5 have no exception: an offset, a mask and a register constant are renamed. Rules 3
 and 4 take the kept form rust_names.py describes (a name that mirrors a specification or the
 standard library opens its doc comment with `(<name>, <source>)` and carries `#[doc(alias)]`),
@@ -191,11 +201,54 @@ def findings(definition, words, path=''):
     return out
 
 
-def judge(path, found, words):
+EXEMPT_RULE = 'a size, a length or a limit carries its unit'
+
+
+def qualified(definition, path):
+    """The module path then the name, lower-cased: `('block', 'size')` for `block::SIZE`."""
+    modules = file_modules(path) + tuple(definition.module) if path else tuple(definition.module)
+    return tuple(c.lower() for c in modules) + (definition.name.lower(),)
+
+
+def load_exempts(path):
+    """`({entry path: reason}, [errors])` from the opcode-names file; a missing file is empty."""
+    entries, errors = {}, []
+    if not path or not os.path.exists(path):
+        return entries, errors
+    for number, line in enumerate(Path(path).read_text(encoding='utf-8').splitlines(), 1):
+        line = line.strip()
+        if not line or line.startswith('#'):
+            continue
+        name, _, reason = line.partition(' ')
+        if not reason.strip() or not re.fullmatch(r'[A-Za-z0-9_]+(::[A-Za-z0-9_]+)*', name):
+            errors.append(f'{path}:{number}: write `<module path>::<NAME> <reason>`; the reason '
+                          f'says why the constant is an operation code and not a size')
+            continue
+        entries[tuple(c.lower() for c in name.split('::'))] = reason.strip()
+    return entries, errors
+
+
+def exempt(definition, path, exempts, used):
+    """Whether an operation-code entry covers `definition` (an integer constant)."""
+    if not (definition.kind in ('const', 'static') and definition.type_name in INTEGERS):
+        return False
+    where = qualified(definition, path)
+    for entry in exempts:
+        if where[len(where) - len(entry):] == entry:
+            used.add(entry)
+            return True
+    return False
+
+
+def judge(path, found, words, exempts=None, used=None):
     bad = []
+    exempts = exempts or {}
+    used = used if used is not None else set()
     for d in found:
         for message, keepable in findings(d, words, path):
             if keepable and rust_names.kept(d)[0]:
+                continue
+            if message.startswith(EXEMPT_RULE) and exempt(d, path, exempts, used):
                 continue
             tail = ''
             if keepable and d.kind not in ('parameter', 'binding') \
@@ -213,20 +266,28 @@ def run(argv):
     parser.add_argument('files', nargs='*')
     parser.add_argument('--manifest', help='accepted for symmetry with the other naming checks')
     parser.add_argument('--words', default=str(rust_names.WORDS))
+    parser.add_argument('--exempts', default='.github/opcode-names',
+                        help='operation-code exemptions for rule 4 (default .github/opcode-names)')
     parser.add_argument('--report', action='store_true')
     parser.add_argument('--selftest', action='store_true')
     args = parser.parse_args(argv)
     if args.selftest:
         return selftest()
     words = rust_names.load_words(args.words)
-    bad, judged = [], 0
+    exempts, errors = load_exempts(args.exempts)
+    bad = list(errors)
+    used, judged = set(), 0
     for path in args.files:
         if not path.endswith('.rs'):
             continue
         found = rust_names.file_definitions(path, Path(path).read_text(encoding='utf-8',
                                                                        errors='replace'))
         judged += len(found)
-        bad += judge(path, found, words)
+        bad += judge(path, found, words, exempts, used)
+    for entry in exempts:
+        if entry not in used:
+            print(f'register_names: note: {args.exempts} entry `{"::".join(entry)}` matches no '
+                  f'size-named integer constant in the files judged here', file=sys.stderr)
     for line in bad:
         print(line, file=sys.stdout if args.report else sys.stderr)
     if args.report or len(bad) <= rust_names.CEILING:
@@ -291,6 +352,7 @@ pub fn count(len: usize) -> usize { let size = len; size }
             failed += 1
             print(f'register_names selftest: no message holds {needle!r}', file=sys.stderr)
     failed += selftest_file_and_false_positives(words)
+    failed += selftest_exempts(words)
     if failed:
         return 1
     print('register_names selftest: ok')
@@ -388,6 +450,42 @@ pub const CARD_DETECT_BIT: u32 = 1;
         failed += 1
         print('register_names selftest: without `bus` in [address_qualifiers] a bus address '
               f'name must be refused, but only {refused} were', file=sys.stderr)
+    return failed
+
+
+def selftest_exempts(words):
+    """An operation-code entry exempts rule 4 on its one constant and nothing else."""
+    import tempfile
+    src = '''
+pub mod block { pub const SIZE: u8 = 3; pub const LENGTH: u8 = 4; }
+pub mod other { pub const SIZE: u8 = 5; }
+pub mod mixed { pub const SIZE_OFFSET: u32 = 4; }
+'''
+    failed = 0
+    with tempfile.TemporaryDirectory() as tmp:
+        good = Path(tmp, 'opcode-names')
+        good.write_text('# opcodes\nblock::SIZE the command that asks the device for its size\n'
+                        'mixed::SIZE_OFFSET only the size rule is exempt\n')
+        exempts, errors = load_exempts(str(good))
+        used = set()
+        bad = judge('src/lib.rs', rust_names.definitions(src), words, exempts, used)
+        got = sorted(line.split(': ')[1] for line in bad)
+        if errors or got != ['const LENGTH', 'const SIZE', 'const SIZE_OFFSET']:
+            failed += 1
+            print(f'register_names selftest: exempts refused {got} with {errors}, wanted '
+                  f'LENGTH, the SIZE in `other` and the offset rule on SIZE_OFFSET', file=sys.stderr)
+        if used != {('block', 'size'), ('mixed', 'size_offset')}:
+            failed += 1
+            print(f'register_names selftest: used {used}', file=sys.stderr)
+        bad = judge('src/block.rs', rust_names.definitions('pub const SIZE: u8 = 3;'), words,
+                    exempts, set())
+        if bad:
+            failed += 1
+            print('register_names selftest: src/block.rs is a module `block`', file=sys.stderr)
+        good.write_text('block::SIZE\n')
+        if not load_exempts(str(good))[1]:
+            failed += 1
+            print('register_names selftest: an entry with no reason must fail', file=sys.stderr)
     return failed
 
 
