@@ -243,12 +243,11 @@ write here) and fails naming the secret when one is missing.
 
 `settings/repository-settings.json` is the one description of what a crate repository is
 configured to be. It covers features (issues on with forms, everything else off) and merge behavior
-(merge commits, strict up-to-date branches, auto-merge, delete on merge). It also covers the two
+(merge commits, strict branches, auto-merge, delete on merge). It also covers the two
 rulesets, the `crates-io` environment with a person as required reviewer, security features, Actions
 permissions, team and app access, metadata and labels. `script/apply-settings` applies it to a repository with `gh api`; a setting the API refuses
-is reported and failed, never skipped silently. `script/check-settings` reads the live settings
-back and fails on any difference. The weekly `settings-drift` job runs it, so a setting changed by
-hand in the web interface is a red run, not a surprise.
+is reported and failed, never skipped. `script/check-settings` reads the live settings
+back and fails on any difference. The weekly `settings-drift` job runs it, so a hand edit is a red run.
 
 The architect rules a crate repository keeps: a dependency new to the crate's graph, and a
 breaking change cargo-semver-checks reports against the previous release tag. The semver rule holds
@@ -278,7 +277,8 @@ check / mutation-diff, proofs / kani, proofs / falsify, proofs / loom, hold / ar
 Copy `scaffold/` into a new crate repository, and replace the pins in the six workflow files. The
 pin is the commit SHA of the release you are adopting: run `git rev-parse v1^{commit}` in a
 checkout of this repository. Then run `script/apply-settings <owner/name>` once, from a checkout,
-as somebody with repository administration rights. `.github/ci-job-budgets` is optional; without
+as somebody with repository administration rights, **before the first push**: without its Actions
+allowlist the first run is rejected. `.github/ci-job-budgets` is optional; without
 it every heavy job assumes 20 minutes. `.github/mutants-exempts` is optional; without it one survivor
 fails `mutation / mutation`.
 
@@ -292,12 +292,14 @@ Adopt the template for a crate called `example_thing`:
 
 ```sh
 gh repo create nifeos/example_thing --public --clone
+script/apply-settings nifeos/example_thing   # before the first push
 cd example_thing
 cp -R ../crate-workflows/scaffold/. .
 sed -i 's/@PINS@/<release SHA>/g' .github/workflows/*.yml
 # put the crate under src/, its proofs under src/ with #[kani::proof],
 # its falsification patches under falsifications/
 git add -A && git commit -m "adopt the shared crate workflows"
+git push
 gh workflow run release.yml -f version=0.1.0 -f dry-run=true
 gh workflow run release.yml -f version=0.1.0 -f dry-run=false -f publish=false  # tag only
 gh workflow run release.yml -f version=0.1.0 -f dry-run=false -f publish=true   # publish
@@ -332,11 +334,11 @@ repository, with contents write.
 ## Testing a release
 
 The canary repository `nifeos/crate-workflows-test` adopts every release before anything depends
-on one. The ritual after cutting a tag: open a pull request there that moves every caller's pin
+on one. After cutting a tag, open a pull request there that moves every caller's pin
 to the new release's commit, expect the eleven required checks green, and merge it. A release is
 not depended on until the canary has adopted it, and a canary pin behind the newest release is
-the lag check's red, by design. The canary is also the configured repository `apply-settings` and
-`check-settings` run against, so the drift check always has a real repository to read.
+the lag check's red, by design. The canary is also the repository `apply-settings` and `check-settings` run
+against, so the drift check always reads a real one.
 
 `.github/workflows/canary-adopt.yml` opens that pull request when a release is published (or on a
 dispatch naming a tag). It copies the release's `scaffold/caller-workflows` into the canary with

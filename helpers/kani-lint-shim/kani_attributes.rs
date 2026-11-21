@@ -38,3 +38,24 @@ pub fn proof(_attr: TokenStream, item: TokenStream) -> TokenStream {
 pub fn unwind(_attr: TokenStream, item: TokenStream) -> TokenStream {
     item
 }
+
+/// `#[kani::should_panic]`: the harness passes only if every failure it reaches is a panic, which
+/// only the model checker can tell.
+#[proc_macro_attribute]
+pub fn should_panic(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    item
+}
+
+/// `#[kani::solver(minisat)]`: which SAT solver the model checker uses, which only it has any use for.
+#[proc_macro_attribute]
+pub fn solver(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    item
+}
+
+/// `#[kani::stub(original, replacement)]`: which function the model checker swaps for another
+/// inside this harness, which only the model checker can do. The replacement is named only here,
+/// so a crate that stubs a function allows `dead_code` on the replacement for this pass.
+#[proc_macro_attribute]
+pub fn stub(_attr: TokenStream, item: TokenStream) -> TokenStream {
+    item
+}

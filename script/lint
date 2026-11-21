@@ -82,7 +82,24 @@ for f in rust_names spelled_out unit_symbols abbreviations register_names britis
 	"$py" "helpers/$f.py" --selftest
 done
 "$py" script/check-settings --selftest
+"$py" script/apply-settings --selftest
 "$py" script/apply-settings --help >/dev/null && echo "apply-settings --help ok"
+echo "ok"
+
+echo "==> the Kani lint shim covers every attribute the harnesses use"
+# check.yml's clippy (--cfg kani) pass compiles harnesses against helpers/kani-lint-shim; an
+# attribute the shim lacks fails that pass in every crate repository that uses it.
+shim_out="$fixtures/kani-shim"
+mkdir -p "$shim_out"
+rustc --edition 2024 --crate-type proc-macro --crate-name kani_attributes \
+	helpers/kani-lint-shim/kani_attributes.rs --out-dir "$shim_out"
+shim_attrs=$(rustc --print file-names --crate-type proc-macro --crate-name kani_attributes \
+	helpers/kani-lint-shim/kani_attributes.rs)
+rustc --edition 2024 --crate-type lib --crate-name kani helpers/kani-lint-shim/kani.rs \
+	--extern kani_attributes="$shim_out/$shim_attrs" --out-dir "$shim_out"
+rustc --edition 2024 --crate-type lib --cfg kani --extern "kani=$shim_out/libkani.rlib" -L "$shim_out" \
+	fixtures/kani-shim/every_attribute.rs --out-dir "$shim_out" ||
+	fail "the Kani lint shim cannot compile a harness using proof, unwind, should_panic, solver and stub"
 echo "ok"
 
 echo "==> a repository of several crates"
