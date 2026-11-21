@@ -6,6 +6,7 @@ call that sits more than one release behind, or behind a release older than 7 da
 
 ## Unreleased
 
+- `register_names` accepts `address_space`, `address_wait` and `address_wake`.
 - A weekly release, `release-weekly.yml`, Sundays 22:00 UTC, seven hours before Dependabot's weekly
   run. It tags the newest main commit since the newest tag with a green `selftest` push run as the
   next `v<N>` and creates the release as latest, which starts `canary-adopt`. It then opens a pull
@@ -39,14 +40,13 @@ call that sits more than one release behind, or behind a release older than 7 da
 
 - The weekly fuzz run starts each target from the crate's committed seeds in
   `fuzz/seeds/<target>/` when that directory exists, beside `fuzz/corpus/<target>/`. New inputs go
-  to the corpus only, so the committed seeds never change. A crate without seeds runs as before.
+  to the corpus only, so the committed seeds never change.
 - The release workflow's `rehearse` and `publish` jobs tell git to ignore the template checkout
   at `.crate-workflows/`. It lies inside the crate's tree, so a crate without an `include` list
-  failed `cargo package` and `cargo publish`. Nothing changes for a crate that already packaged.
+  failed `cargo package` and `cargo publish`.
 - The scaffold's README starting shape gains a "Building and testing" section, and the stranger
   cadence page lists what a README must say. It names build and test commands, the Kani install, the
-  proofs' cost, one harness, one falsification patch and the minimum Rust version. Nothing fails for
-  an existing crate.
+  proofs' cost, one harness, one falsification patch and the minimum Rust version.
 - The unit check refuses `ppm` as the last part of a name with more than one part (`DRIFT_PPM`),
   and asks for `parts_per_million`. A bare `ppm` and one mid-name stay allowed.
 - `check / standalone` compares the notices a crate carries with its `license` field. A
