@@ -6,6 +6,10 @@ call that sits more than one release behind, or behind a release older than 7 da
 
 ## Unreleased
 
+Nothing yet.
+
+## v9 (2026-11-21)
+
 - The Kani lint shim gains `should_panic`, `solver` and `stub`; `apply-settings` enables private
   vulnerability reporting and checks the app installation first.
 - `register_names` accepts `address_space`, `address_wait` and `address_wake`.
@@ -17,7 +21,6 @@ call that sits more than one release behind, or behind a release older than 7 da
 - A lag grace. A pin behind the newest release passes with a notice when it is at the previous
   release or later and the newest release is at most 7 days old (`LAG_GRACE_DAYS`); otherwise it
   fails. A diverged pin still fails. `helpers/lag-check-selftest.sh` proves each verdict.
-
 - The acronym gates accept `Request for Comments (RFC)`, which takes a letter from a small word.
 
 ## v8 (2026-11-18)
