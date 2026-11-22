@@ -372,7 +372,7 @@ jobs:
   # reason under test: a Relaxed store that loom catches, a crate with no model, and a model that
   # never runs.
   loom-broken:
-    name: selftest (loom fails on a broken ordering, a model that checks nothing and a survivor)
+    name: selftest (loom fails on a broken ordering and on a model that checks nothing)
     needs: lint
     runs-on: ubuntu-latest
     timeout-minutes: 15
