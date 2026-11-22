@@ -6,9 +6,6 @@ call that sits more than one release behind, or behind a release older than 7 da
 
 ## Unreleased
 
-- The dependency rule of the label workflow skips `libfuzzer-sys` 0.4 and the path dependency on
-  the crate under test in an unpublished cargo-fuzz `fuzz/Cargo.toml`; every other dependency there
-  still holds the pull request.
 - Pre-release tags are semver baselines.
 - `register_names` reads an optional `.github/opcode-names`: one `<module path>::<NAME> <reason>` per
   line exempts the unit rule on an integer constant that is an operation code and not a size
