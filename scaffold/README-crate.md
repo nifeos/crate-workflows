@@ -62,7 +62,14 @@ git checkout -- src
 ```
 
 Give one real example from the crate in place of these placeholders, and say what the failing run
-prints.
+prints. A crate whose proofs are loom models replays a model's patch the same way, with the loom
+command in place of `cargo kani`:
+
+```sh
+patch -p1 --no-backup-if-mismatch < falsifications/<module>.<model>.patch
+RUSTFLAGS="--cfg loom" cargo test --release --lib <module>::<model> -- --exact   # ends 1 failed
+git checkout -- src
+```
 
 ## BUGS
 
