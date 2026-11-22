@@ -178,6 +178,13 @@ jobs:
         env:
           RUSTUP_TOOLCHAIN: ${{ inputs.toolchain }}
           LOOM_BOUND: ${{ inputs.loom-max-preemptions }}
+      # A loom model may carry a Falsification: record; each patch is applied and its one model
+      # must fail under --cfg loom. A survivor, a stale patch or an unread verdict fails the job. A
+      # crate whose models carry no record has nothing to replay.
+      - name: falsify
+        run: python3 .crate-workflows/helpers/falsify.py --loom --manifest-path "$MANIFEST"
+        env:
+          RUSTUP_TOOLCHAIN: ${{ inputs.toolchain }}
       - name: budget
         if: always()
         run: python3 .crate-workflows/helpers/job_budget.py check "${{ github.job }}" "$JOB_STARTED_AT"

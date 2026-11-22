@@ -28,10 +28,21 @@ run whose summary cannot be parsed is an error, which is neither red nor a survi
 fails. A patch that no longer applies is a failure, never a skip: a stale patch is a record that
 lies.
 
-Exit 0 only when every record holds. Name: provisional, from milestone 887's lane.
+`--loom` reads loom models instead, for the loom job. A loom model is a `#[test]` whose body names
+`loom::model`. Its record is opt-in: a model with no `Falsification:` line above it (attributes
+such as `#[should_panic]` may sit between) is not counted, and a crate whose models carry none has
+nothing to falsify. A record has the same form and the same `--check`. The replay applies the
+patch, runs that one model with `RUSTFLAGS="--cfg loom -D warnings" cargo test --release --lib
+<module path>::<model> -- --exact`, and reads cargo's summary: the patch did its work only when
+exactly one test ran and it failed (`running 1 test`, `test result: FAILED. 0 passed; 1 failed`).
+A model that still passes is a survivor, and a run that selects no test or several is an error.
+
+Exit 0 only when every record holds. Name: provisional, from milestone 887's lane; `--loom` is
+provisional too.
 """
 
 import argparse
+import os
 import re
 import subprocess
 import sys
@@ -193,6 +204,122 @@ def records(root):
     return out
 
 
+TEST_ATTR = re.compile(r'^\s*#\[test\]\s*$')
+LOOM_MODEL = re.compile(r'(?:^|[^\w])loom::model(?:[^\w]|$)')
+
+
+def body_of(code, start):
+    """The text of the first `{ ... }` block at or after offset start in blanked code, braces
+    matched, or '' when none opens."""
+    i = code.find('{', start)
+    if i < 0:
+        return ''
+    depth = 0
+    for j in range(i, len(code)):
+        if code[j] == '{':
+            depth += 1
+        elif code[j] == '}':
+            depth -= 1
+            if depth == 0:
+                return code[i:j + 1]
+    return code[i:]
+
+
+def loom_records(root):
+    """[(file, line, fn, state, path, reason)] for every loom model under root that carries a
+    `Falsification:` record. A loom model is a `#[test]` whose body names `loom::model`; a model
+    without a record is skipped, since loom records are opt-in."""
+    out = []
+    for f in sorted((root / 'src').rglob('*.rs')):
+        source = f.read_text()
+        lines = source.splitlines()
+        code = blank_non_code(source)
+        offsets = [0]
+        for line in lines:
+            offsets.append(offsets[-1] + len(line) + 1)
+        nested = inline_modules(source)
+        for n, raw in enumerate(lines):
+            if not TEST_ATTR.match(raw):
+                continue
+            name, at = None, None
+            for k, later in enumerate(lines[n + 1:n + 12], n + 1):
+                m = re.match(r'\s*(?:pub\s+)?(?:async\s+)?fn\s+(\w+)', later)
+                if m:
+                    name, at = m.group(1), k
+                    break
+            if name is None or not LOOM_MODEL.search(body_of(code, offsets[at])):
+                continue
+            if n < len(nested) and nested[n]:
+                name = '::'.join(nested[n] + [name])
+            start = n
+            while start > 0 and lines[start - 1].lstrip().startswith('#['):
+                start -= 1
+            comment = []
+            while start > 0 and lines[start - 1].lstrip().startswith('///'):
+                comment.insert(0, lines[start - 1].lstrip()[3:].strip())
+                start -= 1
+            record = next((i for i, c in enumerate(comment) if c.startswith('Falsification:')), None)
+            if record is None:
+                continue
+            m = re.match(r'Falsification:\s*(\w+)[,: ]*(.*)', ' '.join(comment[record:]))
+            state, rest = m.group(1), m.group(2)
+            if state not in STATES:
+                out.append((f, n + 1, name, state, '',
+                            f'unknown state {state!r}; want replayable or unfalsifiable'))
+                continue
+            pm = re.search(r'`([^`]+\.patch)`', rest)
+            out.append((f, n + 1, name, state, pm.group(1) if pm else '', rest))
+    return out
+
+
+def loom_verdict(out):
+    """('red' | 'survivor' | 'error', detail) from one model's `cargo test` output."""
+    ran = [int(k) for k in re.findall(r'^running (\d+) tests?$', out, re.M)]
+    if not ran:
+        return 'error', 'the test binary never ran; the patch may not compile'
+    if sum(ran) != 1:
+        return 'error', f'the filter selected {sum(ran)} tests, not 1'
+    if re.search(r'test result: ok\. 1 passed', out):
+        return 'survivor', 'the model passed with the patch applied'
+    if re.search(r'test result: FAILED\. 0 passed; 1 failed', out):
+        return 'red', 'the model failed'
+    return 'error', 'no test result line could be read'
+
+
+def replay_loom(root, recs, limit):
+    bad = False
+    env = dict(os.environ, RUSTFLAGS='--cfg loom -D warnings')
+    for f, line, name, state, path, _rest in recs:
+        if state != 'replayable' or not path:
+            continue
+        qualified = module_prefix(f, root) + name
+        apply_in = git_apply(root, Path(path), '')
+        if apply_in.returncode != 0:
+            print(f'falsify: {f.relative_to(root)}:{line}: patch {path} would not apply: '
+                  f'{apply_in.stderr.strip()}', file=sys.stderr)
+            bad = True
+            continue
+        try:
+            r = subprocess.run(['cargo', 'test', '--release', '--lib', qualified, '--', '--exact'],
+                               cwd=root, capture_output=True, text=True, timeout=limit, env=env)
+            verdict, detail = loom_verdict(r.stdout + r.stderr)
+            if verdict == 'red':
+                print(f'==> falsify: {qualified}: red under loom (patch {path})')
+            elif verdict == 'survivor':
+                print(f'falsify: {qualified}: SURVIVOR: {detail} ({path})', file=sys.stderr)
+                bad = True
+            else:
+                print(f'falsify: {qualified}: {detail} (exit {r.returncode})', file=sys.stderr)
+                bad = True
+        except subprocess.TimeoutExpired:
+            print(f'falsify: {qualified}: exceeded {limit}s; raise --limit only with a reason',
+                  file=sys.stderr)
+            bad = True
+        finally:
+            git_apply(root, Path(path), '-R')
+    return bad
+
+
 def module_path(f, root):
     """The crate-relative module path of a file, for the conventional patch name."""
     rel = f.relative_to(root / 'src').with_suffix('')
@@ -295,20 +422,25 @@ def replay(root, recs, limit):
 def main(argv):
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument('--manifest-path', default='Cargo.toml')
-    ap.add_argument('--check', action='store_true', help='form only: no Kani run')
+    ap.add_argument('--check', action='store_true', help='form only: no Kani or loom run')
+    ap.add_argument('--loom', action='store_true',
+                    help='the loom models\' records, replayed under --cfg loom, not the Kani harnesses')
     ap.add_argument('--limit', type=int, default=900)
     ap.add_argument('--selftest', action='store_true')
     args = ap.parse_args(argv[1:])
     if args.selftest:
         return selftest()
     root = Path(args.manifest_path).resolve().parent
-    recs = records(root)
+    recs = loom_records(root) if args.loom else records(root)
     if not recs:
-        print('falsify: no #[kani::proof] harness under src/; nothing to falsify')
+        if args.loom:
+            print('falsify: no loom model under src/ carries a Falsification: record; nothing to falsify')
+        else:
+            print('falsify: no #[kani::proof] harness under src/; nothing to falsify')
         return 0
     bad = check(root, recs)
     if not args.check:
-        bad = replay(root, recs, args.limit) or bad
+        bad = (replay_loom if args.loom else replay)(root, recs, args.limit) or bad
     if bad:
         print('falsify: a record does not hold; see the findings above', file=sys.stderr)
         return 1
@@ -395,6 +527,28 @@ fn check_add() {
         expect('sibling after inline module',
                qualified('lib.rs', 'mod v {\n' + proof + '}\n' + proof.replace('h', 'g')),
                ['v::h', 'g'])
+        for stale in (root / 'src').rglob('*.rs'):
+            stale.unlink()
+        (root / 'src' / 'lib.rs').write_text(
+            '#[cfg(test)]\n#[cfg(loom)]\nmod interleavings {\n'
+            '    /// **A property.**\n'
+            '    ///\n'
+            '    /// Falsification: replayable `falsifications/interleavings.m.patch`\n'
+            '    #[test]\n    fn m() {\n        loom::model(|| {});\n    }\n\n'
+            '    /// Falsification: replayable `falsifications/interleavings.p.patch`\n'
+            '    #[test]\n    #[should_panic]\n    fn p() {\n        loom::model::Builder::new().check(|| {});\n    }\n\n'
+            '    /// No record: not counted.\n'
+            '    #[test]\n    fn q() {\n        loom::model(|| {});\n    }\n\n'
+            '    /// Falsification: replayable `falsifications/interleavings.h.patch`\n'
+            '    #[test]\n    fn h() {\n        let s = "loom::model";\n    }\n}\n')
+        loom = loom_records(root)
+        expect('loom records', [r[2] for r in loom], ['interleavings::m', 'interleavings::p'])
+        expect('loom patch path', loom[0][4], 'falsifications/interleavings.m.patch')
+        expect('loom ignores Kani', records(root), [])
+        expect('loom red', loom_verdict('running 1 test\ntest result: FAILED. 0 passed; 1 failed;')[0], 'red')
+        expect('loom survivor', loom_verdict('running 1 test\ntest result: ok. 1 passed;')[0], 'survivor')
+        expect('loom none selected', loom_verdict('running 0 tests\ntest result: ok. 0 passed;')[0], 'error')
+        expect('loom never ran', loom_verdict('error[E0308]: mismatched types')[0], 'error')
     print('falsify selftest: %s' % ('ok' if ok else 'FAILED'))
     return 0 if ok else 1
 

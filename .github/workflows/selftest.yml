@@ -396,6 +396,19 @@ jobs:
             git apply -R "$patch"
             echo "==> the loom script was red with $patch"
           done
+      # A falsification that strengthens the ordering instead of weakening it leaves the model
+      # green, and the loom replay must call that a survivor.
+      - run: |
+          manifest=fixtures/loom-mailbox/Cargo.toml
+          patch=fixtures/loom-mailbox/falsifications/interleavings.a_reader_sees_the_value_or_nothing.patch
+          sed -i 's/Ordering::Relaxed);/Ordering::SeqCst);/' "$patch"
+          if python3 helpers/falsify.py --loom --manifest-path "$manifest" 2>err; then
+            echo "the loom replay passed a patch that falsifies nothing; the gate is broken"
+            exit 1
+          fi
+          grep -q SURVIVOR err || { cat err; echo "red, but not for a survivor"; exit 1; }
+          git checkout -- "$patch"
+          echo "==> the loom replay refused a survivor"
 
   release:
     name: selftest (release gate refuses a red commit)

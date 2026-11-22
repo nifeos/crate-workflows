@@ -6,6 +6,7 @@ call that sits more than one release behind, or behind a release older than 7 da
 
 ## Unreleased
 
+- `proofs / loom` replays each loom model's falsification patch; a survivor fails.
 - Pre-release tags are semver baselines.
 - `register_names` reads an optional `.github/opcode-names`: one `<module path>::<NAME> <reason>` per
   line exempts the unit rule on an integer constant that is an operation code and not a size
@@ -20,7 +21,6 @@ call that sits more than one release behind, or behind a release older than 7 da
   run. It tags the newest main commit since the newest tag with a green `selftest` push run as the
   next `v<N>` and creates the release as latest, which starts `canary-adopt`. It then opens a pull
   request that folds the `## Unreleased` entries under `## v<N>` (`helpers/changelog_fold.py`).
-  It does nothing without a green commit since the newest tag.
 - A lag grace. A pin behind the newest release passes with a notice when it is at the previous
   release or later and the newest release is at most 7 days old (`LAG_GRACE_DAYS`); otherwise it
   fails. A diverged pin still fails. `helpers/lag-check-selftest.sh` proves each verdict.

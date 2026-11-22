@@ -1,6 +1,6 @@
 --- a/fixtures/loom-mailbox/src/lib.rs
 +++ b/fixtures/loom-mailbox/src/lib.rs
-@@ -87,23 +87,3 @@
+@@ -87,26 +87,3 @@
          assert_eq!(mailbox.take(), Some(7));
      }
  }
@@ -10,6 +10,9 @@
 -    use super::Mailbox;
 -    use loom::{sync::Arc, thread};
 -
+-    /// A reader that finds the mailbox full reads the writer's value.
+-    ///
+-    /// Falsification: replayable `falsifications/interleavings.a_reader_sees_the_value_or_nothing.patch`
 -    #[test]
 -    fn a_reader_sees_the_value_or_nothing() {
 -        loom::model(|| {
