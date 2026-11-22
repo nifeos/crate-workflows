@@ -356,8 +356,9 @@ never merges: a person reads the checks, and a release that renames a required c
   calls. The canary repository's runs are the evidence; if GitHub names the checks
   differently, this section and the ruleset in the settings file are both wrong until they match.
 - The coverage floor here is 85, matching nife's current floor.
-- The semver baseline is the newest `v<x>.<y>.<z>` tag before the commit (`helpers/semver_baseline.py`),
-  passed by revision, so a crate not yet on crates.io has one. With no tag the tool falls back to the
+- The semver baseline is the newest `v<x>.<y>.<z>` tag before the commit by semver precedence,
+  pre-release tags such as `v0.1.0-pre.2` included (`helpers/semver_baseline.py`), passed by
+  revision, so a crate not yet on crates.io has one. With no tag the tool falls back to the
   last published version, and a crate with neither has no baseline, which counts as nothing major.
 - `weekly / semver` and `weekly / stranger` are reports: a semver break between releases is
   deliberate waiting, and the stranger run needs a person, so neither fails a release. The release gate refuses only a record that still reads `none`. The

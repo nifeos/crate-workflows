@@ -6,6 +6,9 @@ call that sits more than one release behind, or behind a release older than 7 da
 
 ## Unreleased
 
+- A pre-release tag (`v0.1.0-pre.2`) is a semver baseline. A crate held from crates.io carries only
+  pre-release tags, so the labeler's semver rule had no baseline and held no break. The newest tag
+  by semver precedence wins, and a release sorts above its own pre-releases.
 - `register_names` reads an optional `.github/opcode-names`: one `<module path>::<NAME> <reason>` per
   line exempts the unit rule on an integer constant that is an operation code and not a size
   (`block::SIZE`). No other rule is exempted, and a missing reason fails.
