@@ -6,6 +6,7 @@ call that sits more than one release behind, or behind a release older than 7 da
 
 ## Unreleased
 
+- Pre-release tags are semver baselines.
 - `register_names` reads an optional `.github/opcode-names`: one `<module path>::<NAME> <reason>` per
   line exempts the unit rule on an integer constant that is an operation code and not a size
   (`block::SIZE`). No other rule is exempted, and a missing reason fails.
