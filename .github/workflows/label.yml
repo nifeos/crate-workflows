@@ -1,7 +1,8 @@
 # The reusable label workflow: the architect rules a crate repository keeps.
 
 # Two rules, both from nife's labeler, reduced to what a standalone crate carries:
-#   1. a dependency new to the crate's graph (helpers/architect-label-rules.py);
+#   1. a dependency new to the crate's graph (helpers/architect-label-rules.py), less the two a
+#      standing approval covers in an unpublished fuzz crate (that helper's header names them);
 #   2. a major break cargo-semver-checks reports against the last release that the pull request
 #      introduces (helpers/semver-rule.sh); a break already on the base branch does not count.
 # The labeler only ever adds `needs-architect`; a recorded ruling swaps it, through
