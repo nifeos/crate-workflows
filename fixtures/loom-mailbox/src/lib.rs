@@ -93,6 +93,9 @@ mod interleavings {
     use super::Mailbox;
     use loom::{sync::Arc, thread};
 
+    /// A reader that finds the mailbox full reads the writer's value.
+    ///
+    /// Falsification: replayable `falsifications/interleavings.a_reader_sees_the_value_or_nothing.patch`
     #[test]
     fn a_reader_sees_the_value_or_nothing() {
         loom::model(|| {

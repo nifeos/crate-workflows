@@ -134,6 +134,8 @@ if helpers/loom-check.sh $loom 2x >/dev/null 2>&1; then fail "loom-check took a 
 for p in fixtures/loom-mailbox-variants/*.patch; do
 	git apply --check "$p" || fail "$p no longer applies to the loom fixture"
 done
+"$py" helpers/falsify.py --loom --check --manifest-path $loom >/dev/null ||
+	fail "the loom fixture's falsification record does not hold its form"
 echo "ok"
 
 echo "==> a crate at the repository root keeps its names"
