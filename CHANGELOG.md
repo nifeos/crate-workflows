@@ -6,6 +6,10 @@ call that sits more than one release behind, or behind a release older than 7 da
 
 ## Unreleased
 
+Nothing yet.
+
+## v10 (2026-11-23)
+
 - `proofs / loom` replays each loom model's falsification patch; a survivor fails.
 - Pre-release tags are semver baselines.
 - `register_names` reads an optional `.github/opcode-names`: one `<module path>::<NAME> <reason>` per
@@ -65,10 +69,9 @@ call that sits more than one release behind, or behind a release older than 7 da
   `.github/workflows/` and `scaffold/caller-workflows/` (placeholders filled in a scratch copy).
   The version and its SHA-256 are pinned in `helpers/install_actionlint.sh`, which the selftest
   runs. Its two findings are fixed.
-- The `mutation` verdict reads a one-shard run. `actions/download-artifact` extracts a lone artifact
-  into the download directory itself, not a subdirectory, so the verdict's `find -mindepth 2` found
-  no `outcomes.json` and failed every one-shard repository. `mutants_gate.py --shards N` now counts
-  both layouts and refuses any count other than N, zero included; a survivor or timeout still fails.
+- The `mutation` verdict reads a one-shard run, whose lone artifact `actions/download-artifact`
+  extracts without a subdirectory. `mutants_gate.py --shards N` counts both layouts and refuses any
+  count other than N, zero included.
 - `check / mutation-diff` is a required check. A repository runs `script/apply-settings` after its
   pin bump brings the job, since a required check that never reports holds every pull request.
 - `release / gate` also needs a green full mutation run at the released commit:
@@ -103,8 +106,7 @@ call that sits more than one release behind, or behind a release older than 7 da
   exemption that names no survivor in it is out of the run's reach, not stale, so the stale check
   is skipped. A survivor or timeout that is not exempted still fails.
 - The step of `mutation / mutation` that runs `mutants_gate.py` is named "judge the survivors
-  against the exemptions" and, when the gate refuses, adds an error annotation saying so. A refusal
-  no longer shows as an exit code on an unnamed step under the artifact download.
+  against the exemptions" and adds an error annotation when the gate refuses.
 - `bus` joins `[address_qualifiers]`, so a bus address (`SYSTEM_MANAGEMENT_BUS_ADDRESS`) passes the
   address rule of `register_names.py`. Its selftest checks that such a name passes and fails when
   the word is removed.
@@ -166,8 +168,7 @@ call that sits more than one release behind, or behind a release older than 7 da
 - `label / label` rule 2 no longer dies on `An object with id ... could not be found` when it clones
   the baseline tag from a blobless checkout. `helpers/semver-run.sh` now reads the tag's files
   first, which fetches them in one batch.
-- Compiled Python files (`helpers/__pycache__/*.pyc`, built by one interpreter version) are no longer
-  tracked, and `.gitignore` now ignores `__pycache__/` and `*.pyc`.
+- `.gitignore` ignores `__pycache__/` and `*.pyc`, and the tree drops its compiled Python files.
 - `weekly / mutation` runs in shards, so a crate with thousands of mutants finishes inside the
   60-minute job timeout. `mutation-plan` makes ceil(mutants / `mutants-per-shard`) shards (default
   200), and `mutation-verdict`, named `mutation`, judges them against `.github/mutants-exempts`. A
@@ -178,10 +179,8 @@ call that sits more than one release behind, or behind a release older than 7 da
   word, so `scaffold/_typos.toml` ignores those two identifiers and nothing else. `script/lint` now
   runs the gate over `scaffold/`, and the stand-alone vocabulary check became
   `helpers/scaffold_alone.sh`, which `script/lint` proves with a bad and a good fixture.
-- A weekly fuzz workflow, `fuzz.yml`, with a scaffold caller. Crash inputs are public, since the run
-  log and the artifact are readable by any signed-in GitHub user. So it fuzzes only when the caller
-  sets `public-crash-inputs: true`. It defaults to false; without it the run passes with a
-  note.
+- A weekly fuzz workflow, `fuzz.yml`, with a scaffold caller. Any signed-in GitHub user can read its
+  crash inputs, so it fuzzes only when the caller sets `public-crash-inputs: true` (default false).
 - An opt-in is refused, naming the file and line, when the crate's shipped source contains `unsafe`
   outside tests (`helpers/unsafe_scan.py`). The run covers every cargo-fuzz target for a bounded time
   on a hosted runner, never on a pull request or a self-hosted runner. It uploads the crashing inputs
@@ -195,12 +194,10 @@ call that sits more than one release behind, or behind a release older than 7 da
 - `check` lints each bare-metal target with `--lib --bins`, not `--all-targets`: the `test` crate
   does not exist on those targets, so a crate with unit tests could never pass. The host run keeps
   `--all-targets`, so tests are still linted once.
-- The Disclosure section of `CONTRIBUTING.md`, in the repository and in `scaffold/`, now says a person
-  outside the project may use any tools they like and need not say which. The first-line rule for
-  agent-written pull requests is unchanged. Ruled 2026-10-31 (UTC).
-- `check` gains three gates from nife, with no baseline files. Passive voice stays at 2 per 1,000
-  prose words in the README, CHANGELOG and `docs/`. History phrases stay out of the README and
-  `docs/`; the CHANGELOG is exempt. Functions stay within 100 code lines. Ruled 2026-10-31 (UTC).
+- The Disclosure section of `CONTRIBUTING.md`, here and in `scaffold/`, lets an outside contributor
+  use any tools without saying which.
+- `check` gains three gates, with no baseline files: passive voice (2 per 1,000 prose words),
+  history phrases (the CHANGELOG is exempt) and functions within 100 code lines.
 - `check / standalone` gains two prose gates, each with a selftest, ceiling 0 and no baseline file,
   over the README, CHANGELOG, `docs/*.md` and Rust doc comments. The acronym gate
   (`helpers/prose_acronyms.py`) requires every acronym of two or more capitals to be expanded at its
