@@ -185,6 +185,7 @@ no credential: `cargo publish --dry-run`, then the door. It publishes nothing.
 | no Unix service model | no name holds `daemon` or ends in a lone `d` component; a crate or program name of four or more characters does not end in `d`; the word `daemon` appears in no tracked text; ceiling 0 | `check / standalone` |
 | contract crates | a package or program name does not end in `proto` or `protocol` (spell it `_contract`) nor glue `contract` on (`fscontract`); ceiling 0 | `check / standalone` |
 | question-shaped functions | a function returning `bool` and taking no `&mut` is named `is_`, `has_`, `can_`, `was_`, `will_`, `all_`, `any_` or with a finite verb; ceiling 0 | `check / standalone` |
+| naming exemptions by path | the naming checks above skip each file the caller's `.github/naming-exempt-paths` lists, one `<path> <reason>` per line (a directory ends `/`), for code another project owns and a fork sends upstream under that project's names; a missing reason, or an entry that covers no file, fails (`helpers/naming_exempt_paths.py`); every other gate still reads those files | `check / standalone` |
 | name provenance blocks, citations, roadmap, branch names, merge drain | dropped: another project's process. A crate carries no `Name:` block, and a TODO in a crate cites an issue there | |
 | audit and stranger cadence | a stranger builds and proves the crate from its README alone; the job fails when the recorded run is overdue | `weekly / stranger` |
 | kernel and image gates | dropped: a library crate has none | |
@@ -295,7 +296,7 @@ gh repo create nifeos/example_thing --public --clone
 script/apply-settings nifeos/example_thing   # before the first push
 cd example_thing
 cp -R ../crate-workflows/scaffold/. .
-sed -i 's/@PINS@/<release SHA>/g' .github/workflows/*.yml
+sed -i 's/@PINS@/@<release SHA>/g' .github/workflows/*.yml
 # put the crate under src/, its proofs under src/ with #[kani::proof],
 # its falsification patches under falsifications/
 git add -A && git commit -m "adopt the shared crate workflows"
