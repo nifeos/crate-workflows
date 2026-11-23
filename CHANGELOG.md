@@ -6,7 +6,9 @@ call that sits more than one release behind, or behind a release older than 7 da
 
 ## Unreleased
 
-Nothing yet.
+- Fork mode in `check / standalone`: a repository that declares its upstream in
+  `.github/fork-upstream.toml` keeps upstream's license field and `[lints]` table; every other check
+  still runs.
 
 ## v10 (2026-11-23)
 

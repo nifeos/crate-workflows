@@ -242,7 +242,11 @@ jobs:
           # One file per argument is the point; shellcheck wants quoting everywhere otherwise.
           # shellcheck disable=SC2086
           flag=${{ inputs.allow-unpublished && '--allow-unpublished' || '' }}
-          python3 .crate-workflows/helpers/standalone.py --manifest-dir "$crate_dir" $flag
+          # A repository that carries another project's crate declares the fork in
+          # .github/fork-upstream.toml; standalone.py then holds the crate to upstream's license and
+          # lint table and to every other check. A missing file is not a fork.
+          python3 .crate-workflows/helpers/standalone.py --manifest-dir "$crate_dir" $flag \
+            --fork-file "$GITHUB_WORKSPACE/.github/fork-upstream.toml"
       - name: prose caps (README, CHANGELOG)
         run: |
           set -e
