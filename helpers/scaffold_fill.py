@@ -5,7 +5,7 @@
     python3 scaffold_fill.py --selftest
 
 DIR is a tree copied from `scaffold/` or `scaffold-workspace/` into a crate repository. Every workflow
-file (`*.yml`, `*.yaml`) under it (`.git` excluded; prose that names a placeholder is left alone) has `@PINS@` replaced by the template commit and `@MUTATION_CRON@`
+file (`*.yml`, `*.yaml`) under it (`.git` excluded; prose that names a placeholder is left alone) has `@PINS@` replaced by `@` and the template commit (the call's `uses: ...yml@PINS@` becomes `...yml@<SHA>`) and `@MUTATION_CRON@`
 by the line `mutation_plan.py schedule <name>` prints: the repository's own weekday (chosen by its name, so
 repositories do not all start together), tried at 08, 10 and 12 UTC, so repositories do not all start at once. Then the
 whole tree is read again, and a file that still holds a token of the form `@NAME@` fails the run,
@@ -40,7 +40,7 @@ def text_files(root):
 
 def fill(root, name, pins):
     """Replace the known placeholders under root; return the lines still holding one."""
-    values = {'@PINS@': pins, '@MUTATION_CRON@': mutation_plan.cron_line(name)}
+    values = {'@PINS@': '@' + pins, '@MUTATION_CRON@': mutation_plan.cron_line(name)}
     for path, text in text_files(root):
         new = text
         for token, value in values.items():
@@ -95,7 +95,7 @@ def selftest():
         expect('known placeholders leave nothing', fill(root, 'entropy_contract', pins), [])
         body = (root / 'mutation.yml').read_text()
         expect('cron line is the planner line',
-               body, "- cron: '%s'\nuses: x%s\n" % (mutation_plan.cron_line('entropy_contract'), pins))
+               body, "- cron: '%s'\nuses: x@%s\n" % (mutation_plan.cron_line('entropy_contract'), pins))
         expect('line is the weekday form at 08, 10 and 12',
                bool(re.fullmatch(r"\d+ 8,10,12 \* \* \d", mutation_plan.cron_line('entropy_contract'))), True)
         (root / 'x.yml').write_text('a: @NEW_THING@\n')

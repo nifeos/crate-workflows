@@ -296,7 +296,7 @@ gh repo create nifeos/example_thing --public --clone
 script/apply-settings nifeos/example_thing   # before the first push
 cd example_thing
 cp -R ../crate-workflows/scaffold/. .
-sed -i 's/@PINS@/<release SHA>/g' .github/workflows/*.yml
+sed -i 's/@PINS@/@<release SHA>/g' .github/workflows/*.yml
 # put the crate under src/, its proofs under src/ with #[kani::proof],
 # its falsification patches under falsifications/
 git add -A && git commit -m "adopt the shared crate workflows"
