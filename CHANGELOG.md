@@ -6,6 +6,10 @@ call that sits more than one release behind, or behind a release older than 7 da
 
 ## Unreleased
 
+Nothing yet.
+
+## v10 (2026-11-23)
+
 - `proofs / loom` replays each loom model's falsification patch; a survivor fails.
 - Pre-release tags are semver baselines.
 - `register_names` reads an optional `.github/opcode-names`: one `<module path>::<NAME> <reason>` per
