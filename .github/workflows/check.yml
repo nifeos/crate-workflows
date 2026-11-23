@@ -276,8 +276,9 @@ jobs:
       # Two prose gates, ceiling 0 and no baseline file. Acronyms: two or more capitals are expanded
       # at the file's first use or sit on helpers/prose_acronyms.toml. Figures: the phrases in
       # helpers/prose_figures.toml, each with its plain replacement. Both read the README, the
-      # CHANGELOG, docs/*.md and Rust doc comments. A step of this job, so the required check names do
-      # not change.
+      # CHANGELOG, docs/*.md and Rust doc comments. A first use in code another project owns may be
+      # listed, one token in one file with its reason, in the caller's .github/acronym-exemptions. A
+      # step of this job, so the required check names do not change.
       - name: acronyms and banned figures (README, CHANGELOG, docs, doc comments)
         run: |
           set -e
@@ -287,10 +288,11 @@ jobs:
           md=$(ls "$crate_dir"/README* "$crate_dir"/CHANGELOG.md "$crate_dir"/docs/*.md 2>/dev/null || true)
           # shellcheck disable=SC2086
           rs=$(git ls-files -- "$crate_dir" | grep '[.]rs$' || true)
-          for check in prose_acronyms prose_figures; do
-            # shellcheck disable=SC2086
-            [ -z "$md$rs" ] || python3 ".crate-workflows/helpers/$check.py" $md $rs
-          done
+          # shellcheck disable=SC2086
+          [ -z "$md$rs" ] || python3 .crate-workflows/helpers/prose_acronyms.py \
+            --exemptions "$GITHUB_WORKSPACE/.github/acronym-exemptions" $md $rs
+          # shellcheck disable=SC2086
+          [ -z "$md$rs" ] || python3 .crate-workflows/helpers/prose_figures.py $md $rs
       # A README states the command that runs the tests, never how many there are: a count in prose
       # goes stale and nothing ties it to the source. helpers/readme_test_counts.py refuses a stated
       # count and names the fix; exemptions, each with a reason, are in
@@ -313,11 +315,13 @@ jobs:
           # shellcheck disable=SC2086
           rs=$(git ls-files -- "$crate_dir" | grep '[.]rs$' || true)
           # shellcheck disable=SC2086
-          [ -z "$rs" ] || python3 .crate-workflows/helpers/file_length.py $rs
+          [ -z "$rs" ] || python3 .crate-workflows/helpers/file_length.py \
+            --exemptions "$GITHUB_WORKSPACE/.github/file-length-exemptions" $rs
           # shellcheck disable=SC2086
           [ -z "$rs" ] || python3 .crate-workflows/helpers/comment_blocks.py $rs
           # shellcheck disable=SC2086
-          [ -z "$rs" ] || python3 .crate-workflows/helpers/function_length.py $rs
+          [ -z "$rs" ] || python3 .crate-workflows/helpers/function_length.py \
+            --exemptions "$GITHUB_WORKSPACE/.github/function-length-exemptions" $rs
       # The naming rules, held after a crate leaves the tree that named it: every name the crate
       # defines spells out the ruled words and its units, follows the register rules, uses American spelling, claims no Unix
       # service model, and a function answering yes or no is named like a question; a contract

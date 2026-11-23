@@ -1,6 +1,6 @@
 """An acronym is expanded at its first use in a file, or it is on the allowlist.
 
-    python3 prose_acronyms.py FILE...
+    python3 prose_acronyms.py [--exemptions FILE] FILE...
     python3 prose_acronyms.py --selftest
 
 A reader meets EFI, MMIO or LBA cold unless the prose says what the letters stand for. In a crate's
@@ -45,6 +45,12 @@ the words is fine. Expanding a token later in the file does not excuse an earlie
 **Allowlist.** `prose_acronyms.toml` beside this file, key `allow`: acronyms every reader of a Rust
 crate knows. A name that is not on it is expanded, not added.
 
+**Code another project owns.** A fork keeps such code as that project wrote it, so its fixes can go
+upstream. The caller's `.github/acronym-exemptions` lists one first use the fork may not reword as
+`<path> <token> <reason>`, with the path relative to the repository root. That file's first use of
+that token then passes, and an entry that matches no finding fails (`exemptions_file.py` reads the
+entries). The allowlist stays template-wide; an entry here covers one token in one file.
+
 Name: provisional, from the prose gates lane.
 """
 import re
@@ -54,6 +60,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from prose_text import prose_lines  # noqa: E402
+import exemptions_file  # noqa: E402
 
 TOKEN = re.compile(r'\b[A-Z]{2,}[A-Za-z0-9]*\b')
 STOP = {'of', 'the', 'and', 'for', 'to', 'in', 'on', 'or', 'a', 'an', 'with', 'by'}
@@ -188,6 +195,22 @@ def crate_violations(files, allow):
     return out
 
 
+def apply_exemptions(hits, entries, name='acronym-exemptions'):
+    """`([finding text], [kept (path, token)])`: the hits no entry covers, then each unused entry."""
+    found, kept = [], []
+    for path, line, token in hits:
+        key = (exemptions_file.normal_path(path), token)
+        if key in entries:
+            kept.append(key)
+        else:
+            found.append(f'{path}:{line}: {token} is not expanded at its first use')
+    for key, entry in entries.items():
+        if key not in kept:
+            found.append(f'{name}:{entry["line"]}: {key[0]} {key[1]} is not an unexpanded first use '
+                         'in this run; remove the entry')
+    return found, kept
+
+
 def load_allow():
     path = Path(__file__).resolve().with_name('prose_acronyms.toml')
     table = tomllib.loads(path.read_text(encoding='utf-8'))
@@ -273,6 +296,15 @@ def selftest():
         if got != want:
             failed += 1
             print(f'FAIL crate {files} gave {got}, wanted {want}', file=sys.stderr)
+    hits = crate_violations([('src/a.rs', '/// The EFI and the MMIO.\n')], ALLOW)
+    held = {('src/a.rs', 'EFI'): {'line': 1}, ('src/b.rs', 'EFI'): {'line': 2}}
+    want = (['src/a.rs:1: MMIO is not expanded at its first use',
+             'acronym-exemptions:2: src/b.rs EFI is not an unexpanded first use in this run; '
+             'remove the entry'], [('src/a.rs', 'EFI')])
+    got = apply_exemptions(hits, held)
+    if got != want:
+        failed += 1
+        print(f'FAIL exemptions gave {got}, wanted {want}', file=sys.stderr)
     print('prose_acronyms selftest: %s' % ('FAILED' if failed else 'ok'))
     return 1 if failed else 0
 
@@ -280,28 +312,38 @@ def selftest():
 def main(argv):
     if '--selftest' in argv:
         return selftest()
-    if not argv[1:]:
+    args, exemptions = argv[1:], None
+    if args[:1] == ['--exemptions']:
+        exemptions, args = args[1], args[2:]
+    if not args:
         print(__doc__, file=sys.stderr)
+        return 2
+    entries, errors = exemptions_file.load(exemptions, ('path', 'token'))
+    for e in errors:
+        print(f'prose_acronyms: {e}', file=sys.stderr)
+    if errors:
         return 2
     allow = load_allow()
     files = []
-    for f in argv[1:]:
+    for f in args:
         try:
             files.append((f, open(f, encoding='utf-8').read()))
         except (UnicodeDecodeError, OSError):
             continue
-    bad = 0
-    for path, line, token in crate_violations(files, allow):
-        print(f'prose_acronyms: {path}:{line}: {token} is not expanded at its first use', file=sys.stderr)
-        bad += 1
-    if bad:
+    found, kept = apply_exemptions(crate_violations(files, allow), entries,
+                                   Path(exemptions).name if exemptions else 'acronym-exemptions')
+    for path, token in kept:
+        print(f'==> acronyms: {path} {token} is exempt at its first use')
+    for f in found:
+        print(f'prose_acronyms: {f}', file=sys.stderr)
+    if found:
         print("prose_acronyms: write the words first, then the acronym in parentheses "
               "('Extensible Firmware Interface (EFI)'), or the acronym first with the words in "
               "parentheses. Words every reader knows go in helpers/prose_acronyms.toml.",
               file=sys.stderr)
     else:
         print(f'==> acronyms: all expanded in {len(files)} files')
-    return 1 if bad else 0
+    return 1 if found else 0
 
 
 if __name__ == '__main__':

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """A Rust function stays at 100 code lines, counted the way clippy's `too_many_lines` counts (nife's limit).
 
-    python3 function_length.py [--limit 100] [--all] FILE...
+    python3 function_length.py [--limit 100] [--all] [--exemptions FILE] FILE...
     python3 function_length.py --selftest
 
 Nife holds every function to 100 code lines, which is clippy's `too_many_lines` at its default
@@ -30,6 +30,13 @@ only shrink, and cross-checks this derivation against clippy's saved diagnostics
 repository starts under the limit, so there is no baseline, and a function over 100 code lines is
 a split. There is no cross-check against clippy here either: this count is the only one.
 
+The one exception is code another project owns, which a fork keeps as that project wrote it so its
+fixes can go upstream. The caller's `.github/function-length-exemptions` lists such a function as
+`<path> <name> <code lines> <reason>`, with the path relative to the repository root, the name as
+this script reports it and the count as measured. The function then passes while it is exactly that
+long; a different count, or an entry for a function that is not over the limit, fails
+(`exemptions_file.py` reads the entries).
+
 The scan is lexer-shaped, not a parser. Comments and literals are blanked first (the same
 stripper nife uses for its source censuses), then braces are matched. Block comments do not nest
 in the stripper, which Rust's do; a nested one could only add to a count, so it fails loud.
@@ -39,6 +46,10 @@ Name: provisional, from the gates lane. The file takes nife's helper name.
 
 import re
 import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import exemptions_file  # noqa: E402
 
 DEFAULT_LIMIT = 100
 
@@ -250,12 +261,52 @@ def selftest():
     expect('names', names, ['S::a', 'Tr::d', 'outer', 'outer::inner'])
     expect('the start line is the qualifier',
            functions('\n\npub(crate) const unsafe fn g() { h(); }\n')[0][1], 3)
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmp:
+        source = Path(tmp) / 'long.rs'
+        source.write_text(fn(4) + 'fn short() {\n    a();\n}\n')
+        path = exemptions_file.normal_path(str(source))
+        expect('a function over the limit fails', findings([str(source)], 3, {}),
+               ([f'{path}:1 long is 4 code lines, over the 3-line limit'], []))
+        held = {(path, 'long'): {'code_lines': 4, 'line': 1}}
+        expect('an exemption at the measured count passes', findings([str(source)], 3, held),
+               ([], [(path, 'long')]))
+        expect('a function that grew past its exemption fails',
+               findings([str(source)], 3, {(path, 'long'): {'code_lines': 3, 'line': 1}})[0],
+               [f'{path} long is 4 code lines, but its exemption (function-length-exemptions:1) '
+                'records 3; an exemption holds the length it was written for'])
+        expect('an exemption for a function within the limit fails',
+               findings([str(source)], 3, {**held, (path, 'short'): {'code_lines': 1, 'line': 2}})[0],
+               [f'function-length-exemptions:2: {path} short is not over the limit in this run; '
+                'remove the entry'])
     print('function_length selftest: %s' % ('ok' if ok else 'FAILED'))
     return 0 if ok else 1
 
 
+def findings(files, limit, entries, name='function-length-exemptions', show_all=False):
+    """`([finding], [kept (path, name)])` for the files, with the exemption entries applied."""
+    over, shown = {}, []
+    for f in files:
+        try:
+            text = open(f, encoding='utf-8').read()
+        except UnicodeDecodeError:
+            continue
+        path = exemptions_file.normal_path(f)
+        for fn_name, start, n in functions(text):
+            if n > limit:
+                over[(path, fn_name)] = (n, start)
+            elif show_all:
+                print(f'{n}\t{f}:{start}\t{fn_name}')
+    measured = {key: n for key, (n, _start) in over.items()}
+    unexempted, found, kept = exemptions_file.length_verdicts(
+        entries, measured, name, 'code_lines', lambda key: f'{key[0]} {key[1]}', 'code lines')
+    found = [f'{key[0]}:{over[key][1]} {key[1]} is {over[key][0]} code lines, over the {limit}-line '
+             'limit' for key in unexempted] + found
+    return found, kept
+
+
 def main(argv):
-    limit, show_all, files = DEFAULT_LIMIT, False, []
+    limit, show_all, exemptions, files = DEFAULT_LIMIT, False, None, []
     args = argv[1:]
     i = 0
     while i < len(args):
@@ -265,27 +316,30 @@ def main(argv):
             limit = int(args[i + 1]); i += 2
         elif args[i] == '--all':
             show_all = True; i += 1
+        elif args[i] == '--exemptions':
+            exemptions = args[i + 1]; i += 2
         else:
             files.append(args[i]); i += 1
     if not files:
         print(__doc__, file=sys.stderr)
         return 2
-    bad = False
-    for f in files:
-        try:
-            text = open(f, encoding='utf-8').read()
-        except UnicodeDecodeError:
-            continue
-        for name, start, n in functions(text):
-            if n > limit:
-                print(f'function_length: {f}:{start} {name} is {n} code lines, over the {limit}-line '
-                      f'limit', file=sys.stderr)
-                bad = True
-            elif show_all:
-                print(f'{n}\t{f}:{start}\t{name}')
-    if not bad:
-        print(f'==> function length: every function is within {limit} code lines')
-    return 1 if bad else 0
+    entries, errors = exemptions_file.load(exemptions, ('path', 'name', 'code_lines'),
+                                           ('code_lines',))
+    for e in errors:
+        print(f'function_length: {e}', file=sys.stderr)
+    if errors:
+        return 2
+    found, kept = findings(files, limit, entries,
+                           Path(exemptions).name if exemptions else 'function-length-exemptions',
+                           show_all)
+    for path, fn_name in kept:
+        print(f'==> function length: {path} {fn_name} is over the limit and exempt at its measured '
+              'length')
+    for f in found:
+        print(f'function_length: {f}', file=sys.stderr)
+    if not found:
+        print(f'==> function length: every other function is within {limit} code lines')
+    return 1 if found else 0
 
 
 if __name__ == '__main__':

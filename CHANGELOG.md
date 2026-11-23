@@ -9,6 +9,11 @@ call that sits more than one release behind, or behind a release older than 7 da
 - Fork mode in `check / standalone`: a repository that declares its upstream in
   `.github/fork-upstream.toml` keeps upstream's license field and `[lints]` table; every other check
   still runs.
+- Per-entry exemptions for code another project owns: `.github/file-length-exemptions`,
+  `.github/function-length-exemptions` and `.github/acronym-exemptions` each list one finding with
+  its reason, a length entry at the measured length. The coverage floor now matches
+  `.github/coverage-exemptions` entries relative to the repository root, and an entry that exempts
+  nothing fails.
 
 ## v10 (2026-11-23)
 

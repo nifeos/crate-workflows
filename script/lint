@@ -77,7 +77,7 @@ if ! "$py" -c 'import tomllib' 2>/dev/null; then
 fi
 # The helpers that carry their own tests, named here so a helper without a selftest is a visible
 # gap in this list rather than an invisible gap in a grep.
-for f in rust_names spelled_out unit_symbols abbreviations register_names british_spelling service_model contract_names question_shape standalone prose_caps passive_voice history_phrases prose_text prose_acronyms prose_figures readme_test_counts readme_documents readme_acronyms inflated_wording readme_sections readme_badges function_length orphan_modules check_links falsify architect-label-rules \
+for f in rust_names spelled_out unit_symbols abbreviations register_names british_spelling service_model contract_names question_shape standalone prose_caps passive_voice history_phrases prose_text prose_acronyms prose_figures readme_test_counts readme_documents readme_acronyms inflated_wording readme_sections readme_badges function_length file_length exemptions_file orphan_modules check_links falsify architect-label-rules \
 	mutants_gate mutation_plan job_budget workflow_shape kani_bump publish_mode semver_baseline semver_major crate_info settings_members scaffold_fill changelog_fold naming_exempt_paths; do
 	"$py" "helpers/$f.py" --selftest
 done
@@ -183,6 +183,21 @@ echo "ok"
 echo "==> the lag check's grace and refusals"
 # Runs helpers/lag-check.sh against a stand-in gh: no network, no release.
 sh helpers/lag-check-selftest.sh
+echo "ok"
+
+echo "==> the coverage floor reads exemptions relative to the repository root"
+# lcov names files by absolute path; an exemption names them from the repository root, and an
+# entry that no longer exempts anything fails.
+c="$fixtures/coverage"
+mkdir -p "$c"
+printf 'SF:%s/src/low.rs\nLF:10\nLH:5\nend_of_record\nSF:%s/src/high.rs\nLF:10\nLH:9\nend_of_record\n' "$c" "$c" >"$c/lcov.info"
+if (cd "$c" && sh "$OLDPWD/helpers/coverage-floor.sh" 85 lcov.info) >/dev/null 2>&1; then fail "coverage floor passed a file under it"; fi
+printf './src/low.rs # 50%%, upstream code, unchanged\n' >"$c/exempt"
+(cd "$c" && sh "$OLDPWD/helpers/coverage-floor.sh" 85 lcov.info exempt) >/dev/null || fail "coverage floor ignored a relative exemption"
+printf 'src/low.rs # 50%%\nsrc/gone.rs # 0%%\n' >"$c/exempt"
+if (cd "$c" && sh "$OLDPWD/helpers/coverage-floor.sh" 85 lcov.info exempt) >/dev/null 2>&1; then fail "coverage floor kept an exemption for a file not in the report"; fi
+printf 'src/low.rs # 50%%\nsrc/high.rs # 90%%\n' >"$c/exempt"
+if (cd "$c" && sh "$OLDPWD/helpers/coverage-floor.sh" 85 lcov.info exempt) >/dev/null 2>&1; then fail "coverage floor kept an exemption for a file at the floor"; fi
 echo "ok"
 
 echo "==> the naming checks hold the template's own Rust"
