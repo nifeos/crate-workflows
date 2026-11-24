@@ -4,7 +4,9 @@
     script/check-settings <owner/name> [--settings PATH] [--member CRATE]...
 
 The weekly `settings-drift` job runs this against the pinned template's own settings file, so the
-comparison is always against the version of the template the caller actually runs. A setting
+comparison is always against the version of the template the caller actually runs. The values that
+differ by organization come from the file's `owners` entry for the repository's owner
+(helpers/settings_owner.py). A setting
 changed by hand in the web interface is a red run, not a surprise; the run's output names the
 setting, the value the file rules, and the value the repository now has.
 
@@ -22,6 +24,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / 'helpers'))
 import settings_members  # noqa: E402
+import settings_owner  # noqa: E402
 
 SETTINGS = Path(__file__).resolve().parent.parent / 'settings' / 'repository-settings.json'
 
@@ -232,7 +235,8 @@ def main(argv):
         print(__doc__, file=sys.stderr)
         return 2
     repo = args[0]
-    s = settings_members.expand(json.loads(settings.read_text()), members)
+    s = settings_members.expand(
+        settings_owner.for_owner(json.loads(settings.read_text()), repo.split('/')[0]), members)
     diffs = []
 
     live, err = api(f'repos/{repo}')

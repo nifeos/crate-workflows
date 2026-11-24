@@ -5,7 +5,9 @@
 
 `--crate` fills the metadata (description's first word and the docs.rs homepage); `--topic` appends
 the crate's domain topic. A repository of several crates passes each crate with `--member`, which
-names the required checks and the tag patterns for each (helpers/settings_members.py).
+names the required checks and the tag patterns for each (helpers/settings_members.py). The values
+that differ by organization come from the file's `owners` entry for the repository's owner
+(helpers/settings_owner.py).
 Every step reports what it did and what the API refused. A refusal is a
 finding, never a silent skip: some settings (organization teams, app installation permissions, the
 org Actions allowlist) need scopes a repository-scoped token does not carry, and the honest output
@@ -20,6 +22,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / 'helpers'))
 import settings_members  # noqa: E402
+import settings_owner  # noqa: E402
 
 SETTINGS = Path(__file__).resolve().parent.parent / 'settings' / 'repository-settings.json'
 
@@ -87,7 +90,9 @@ def main(argv):
     ap.add_argument('--dry-run', action='store_true')
     ap.add_argument('--settings', default=str(SETTINGS))
     args = ap.parse_args(argv[1:])
-    s = settings_members.expand(json.loads(open(args.settings).read()), args.member)
+    s = settings_members.expand(
+        settings_owner.for_owner(json.loads(open(args.settings).read()), args.repo.split('/')[0]),
+        args.member)
     refusals = []
 
     def step(label, *api, **kw):

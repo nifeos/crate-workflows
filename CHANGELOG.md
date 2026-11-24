@@ -14,6 +14,8 @@ call that sits more than one release behind, or behind a release older than 7 da
   its reason, a length entry at the measured length. The coverage floor now matches
   `.github/coverage-exemptions` entries relative to the repository root, and an entry that exempts
   nothing fails.
+- Settings by owner: the settings file's `owners` table holds the values that differ in another
+  organization, which `apply-settings` and `check-settings` merge over the shared ones.
 
 ## v10 (2026-11-23)
 
