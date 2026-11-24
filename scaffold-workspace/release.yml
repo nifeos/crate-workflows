@@ -27,7 +27,7 @@ jobs:
     permissions:
       contents: read
       id-token: write
-    uses: nifeos/crate-workflows/.github/workflows/release.yml@PINS@
+    uses: partsfoundry/crate-workflows/.github/workflows/release.yml@PINS@
     with:
       manifest-path: first_crate/Cargo.toml
       version: ${{ inputs.version }}
@@ -42,7 +42,7 @@ jobs:
     permissions:
       contents: read
       id-token: write
-    uses: nifeos/crate-workflows/.github/workflows/release.yml@PINS@
+    uses: partsfoundry/crate-workflows/.github/workflows/release.yml@PINS@
     with:
       manifest-path: second_crate/Cargo.toml
       version: ${{ inputs.version }}

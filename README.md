@@ -1,16 +1,16 @@
 # crate-workflows
 
-One CI template for every crate repository under `nifeos`. A crate repository's own workflow files
+One CI template for every crate repository under `partsfoundry`. A crate repository's own workflow files
 are a few lines each that call the reusable workflows here, pinned by commit SHA, the way nife pins
 every action it runs.
 
 A repository of several crates calls each workflow once for each crate; see
 `scaffold-workspace/README.md`.
 
-The ruling behind it: 857's Fork 1 put one repository per crate under `nifeos` and said every one
+The ruling behind it: 857's Fork 1 put one repository per crate under the organization and said every one
 of them uses one shared CI template (Kani, lint, release) through reusable workflows. Fork 4 ruled
 the proof job and that a release refuses to publish while it is red. Fork 6 ruled trusted
-publishing from a `nifeos` workflow. This repository is where all three land.
+publishing from a `partsfoundry` workflow. This repository is where all three land.
 
 ## The reusable workflows
 
@@ -294,8 +294,8 @@ Before the first release, run the stranger test and record its date as `Last run
 Adopt the template for a crate called `example_thing`:
 
 ```sh
-gh repo create nifeos/example_thing --public --clone
-script/apply-settings nifeos/example_thing   # before the first push
+gh repo create partsfoundry/example_thing --public --clone
+script/apply-settings partsfoundry/example_thing   # before the first push
 cd example_thing
 cp -R ../crate-workflows/scaffold/. .
 sed -i 's/@PINS@/@<release SHA>/g' .github/workflows/*.yml
@@ -311,7 +311,7 @@ gh workflow run release.yml -f version=0.1.0 -f dry-run=false -f publish=true   
 Run the settings drift check by hand:
 
 ```sh
-script/check-settings nifeos/example_thing
+script/check-settings partsfoundry/example_thing
 ```
 
 Record an architect ruling on a pull request:
@@ -336,7 +336,7 @@ repository, with contents write.
 
 ## Testing a release
 
-The canary repository `nifeos/crate-workflows-test` adopts every release before anything depends
+The canary repository `partsfoundry/crate-workflows-test` adopts every release before anything depends
 on one. After cutting a tag, open a pull request there that moves every caller's pin
 to the new release's commit, expect the eleven required checks green, and merge it. A release is
 not depended on until the canary has adopted it, and a canary pin behind the newest release is

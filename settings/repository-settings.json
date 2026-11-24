@@ -51,7 +51,7 @@
   },
 
   "team": {
-    "org": "nifeos",
+    "org": "partsfoundry",
     "slug": "crate-maintainers",
     "permission": "maintain"
   },

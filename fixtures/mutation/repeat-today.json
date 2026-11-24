@@ -1,6 +1,6 @@
 {
   "why": "The 08:12 try ran (and was red); the 10:12 try the same day tests nothing.",
-  "repository": "nifeos/example_thing",
+  "repository": "partsfoundry/example_thing",
   "event": "schedule",
   "now": "2026-11-15T10:12:00Z",
   "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",

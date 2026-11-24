@@ -1,5 +1,5 @@
 # The canary's release ritual, opened by machine: after each template release, one pull request on
-# nifeos/crate-workflows-test moves every caller to the release's commit, copied from that
+# partsfoundry/crate-workflows-test moves every caller to the release's commit, copied from that
 # release's scaffold/caller-workflows with the pin filled in, so the canary runs exactly what a
 # crate would adopt. A person still reads the eleven required checks and merges; nothing here merges.
 #
@@ -112,7 +112,7 @@ jobs:
           branch="adopt-$TAG"
           title="Adopt release $TAG (the canary ritual)"
           body="$(printf '%s\n' \
-            "Automated by \`nifeos/crate-workflows/.github/workflows/canary-adopt.yml\`. Every caller moves to $TAG (\`${GITHUB_REPOSITORY}@$SHA\`), copied from that release's \`scaffold/caller-workflows\` with the pin filled in." \
+            "Automated by \`partsfoundry/crate-workflows/.github/workflows/canary-adopt.yml\`. Every caller moves to $TAG (\`${GITHUB_REPOSITORY}@$SHA\`), copied from that release's \`scaffold/caller-workflows\` with the pin filled in." \
             "" \
             "Release notes: $RELEASE_URL" \
             "" \

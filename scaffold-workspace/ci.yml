@@ -14,7 +14,7 @@ jobs:
     permissions:
       contents: read
       security-events: write
-    uses: nifeos/crate-workflows/.github/workflows/check.yml@PINS@
+    uses: partsfoundry/crate-workflows/.github/workflows/check.yml@PINS@
     with:
       manifest-path: first_crate/Cargo.toml
       targets: ''
@@ -22,7 +22,7 @@ jobs:
     permissions:
       contents: read
       security-events: write
-    uses: nifeos/crate-workflows/.github/workflows/check.yml@PINS@
+    uses: partsfoundry/crate-workflows/.github/workflows/check.yml@PINS@
     with:
       manifest-path: second_crate/Cargo.toml
       targets: ''
