@@ -31,7 +31,7 @@ runs; a change that only edits YAML and never sees a green selftest is not done.
 ## Comments and names
 
 Crate repositories follow nife's comment standard (ruled 2026-11-01 UTC), which is
-[section 267 of partsfoundry/nife](https://github.com/partsfoundry/nife/blob/main/design/decisions/0267-a-comment-states-the-constraint-as-it-is-now.md)
+[section 267 of nifeos/nife](https://github.com/nifeos/nife/blob/main/design/decisions/0267-a-comment-states-the-constraint-as-it-is-now.md)
 (a comment states the constraint as it is now).
 
 Two prose gates run in `check / standalone` beside the passive-voice and history gates, with a
