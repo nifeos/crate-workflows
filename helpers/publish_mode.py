@@ -23,7 +23,7 @@ import urllib.error
 import urllib.request
 
 API = 'https://crates.io/api/v1/crates/'
-AGENT = 'nifeos-crate-workflows publish-mode (https://github.com/nifeos/crate-workflows)'
+AGENT = 'nifeos-crate-workflows publish-mode (https://github.com/partsfoundry/crate-workflows)'
 SECRET = 'CRATES_IO_FIRST_PUBLISH_TOKEN'
 
 

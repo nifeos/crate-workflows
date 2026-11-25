@@ -6,4 +6,4 @@ permissions:
   pull-requests: read
 jobs:
   hold:
-    uses: nifeos/crate-workflows/.github/workflows/hold.yml@PINS@
+    uses: partsfoundry/crate-workflows/.github/workflows/hold.yml@PINS@

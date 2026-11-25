@@ -20,7 +20,7 @@ import urllib.request
 
 API = 'https://crates.io/api/v1/crates/kani-verifier'
 # crates.io asks for a contact in the User-Agent.
-AGENT = 'nifeos-crate-workflows kani-bump (https://github.com/nifeos/crate-workflows)'
+AGENT = 'nifeos-crate-workflows kani-bump (https://github.com/partsfoundry/crate-workflows)'
 STABLE = re.compile(r'^(\d+)\.(\d+)\.(\d+)$')
 
 

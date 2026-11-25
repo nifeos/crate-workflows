@@ -9,10 +9,10 @@ permissions:
   contents: read
 jobs:
   proofs-first_crate:
-    uses: nifeos/crate-workflows/.github/workflows/proofs.yml@PINS@
+    uses: partsfoundry/crate-workflows/.github/workflows/proofs.yml@PINS@
     with:
       manifest-path: first_crate/Cargo.toml
   proofs-second_crate:
-    uses: nifeos/crate-workflows/.github/workflows/proofs.yml@PINS@
+    uses: partsfoundry/crate-workflows/.github/workflows/proofs.yml@PINS@
     with:
       manifest-path: second_crate/Cargo.toml

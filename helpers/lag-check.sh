@@ -30,7 +30,7 @@
 
 set -eu
 
-repo="${TEMPLATE_REPO:-nifeos/crate-workflows}"
+repo="${TEMPLATE_REPO:-partsfoundry/crate-workflows}"
 pin="${JOB_WORKFLOW_SHA:-}"
 grace_days="${LAG_GRACE_DAYS:-7}"
 now="${LAG_NOW:-$(date +%s)}"

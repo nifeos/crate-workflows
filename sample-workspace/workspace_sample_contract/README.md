@@ -1,9 +1,9 @@
 # workspace_sample_contract
 
-[![check](https://github.com/nifeos/crate-workflows/actions/workflows/selftest.yml/badge.svg?branch=main)](https://github.com/nifeos/crate-workflows/actions/workflows/selftest.yml?query=branch%3Amain)
-[![proofs](https://github.com/nifeos/crate-workflows/actions/workflows/selftest.yml/badge.svg?branch=main)](https://github.com/nifeos/crate-workflows/actions/workflows/selftest.yml?query=branch%3Amain)
-[![license](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](https://github.com/nifeos/crate-workflows#license)
-[![minimum Rust version](https://img.shields.io/badge/rust-1.85%2B-blue.svg)](https://github.com/nifeos/crate-workflows/blob/main/sample-workspace/workspace_sample_contract/Cargo.toml)
+[![check](https://github.com/partsfoundry/crate-workflows/actions/workflows/selftest.yml/badge.svg?branch=main)](https://github.com/partsfoundry/crate-workflows/actions/workflows/selftest.yml?query=branch%3Amain)
+[![proofs](https://github.com/partsfoundry/crate-workflows/actions/workflows/selftest.yml/badge.svg?branch=main)](https://github.com/partsfoundry/crate-workflows/actions/workflows/selftest.yml?query=branch%3Amain)
+[![license](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](https://github.com/partsfoundry/crate-workflows#license)
+[![minimum Rust version](https://img.shields.io/badge/rust-1.85%2B-blue.svg)](https://github.com/partsfoundry/crate-workflows/blob/main/sample-workspace/workspace_sample_contract/Cargo.toml)
 
 One crate of the template's fixture for a repository of several: one function, its tests, one proof, and a falsification patch. The
 selftest workflow runs every reusable workflow against this crate, once for each crate of the

@@ -436,7 +436,7 @@ def selftest():
         ok_, _ = verify(case['sha_runs'], sources.get, '.github/workflows/mutation.yml')
         expect('release %s' % path.stem, ok_, case['expect'])
 
-    expect('cron line', cron_line('nifeos/example_thing'), '9 8,10,12 * * 0')
+    expect('cron line', cron_line('partsfoundry/example_thing'), '9 8,10,12 * * 0')
     expect('name only, any case', cron_line('Example_Thing'), cron_line('other/example_thing'))
     expect('record from job names', record_of(['mutation / lag (template release)',
                                                'mutation / mutation record: full ' + 'a' * 64]),

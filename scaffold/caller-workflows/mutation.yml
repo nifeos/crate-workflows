@@ -9,4 +9,4 @@ permissions:
   contents: read
 jobs:
   mutation:
-    uses: nifeos/crate-workflows/.github/workflows/mutation.yml@PINS@
+    uses: partsfoundry/crate-workflows/.github/workflows/mutation.yml@PINS@

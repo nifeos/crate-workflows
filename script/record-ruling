@@ -6,7 +6,7 @@
 # keeps the pull request red until the swap lands.
 #
 #     script/record-ruling 12 --text 'The new dependency is fine: no_std, and proven.'
-#     script/record-ruling 12 --link https://github.com/nifeos/example/pull/12#issuecomment-1
+#     script/record-ruling 12 --link https://github.com/partsfoundry/example/pull/12#issuecomment-1
 #     script/record-ruling 12 --partial --text 'Fork 1: "Yes."'
 #
 # # What it does

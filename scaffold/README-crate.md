@@ -1,9 +1,9 @@
 # <crate>
 
-[![check](https://github.com/nifeos/<crate>/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/nifeos/<crate>/actions/workflows/ci.yml?query=branch%3Amain)
-[![proofs](https://github.com/nifeos/<crate>/actions/workflows/proofs.yml/badge.svg?branch=main)](https://github.com/nifeos/<crate>/actions/workflows/proofs.yml?query=branch%3Amain)
-[![license](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](https://github.com/nifeos/<crate>#license)
-[![minimum Rust version](https://img.shields.io/badge/rust-<rust-version>%2B-blue.svg)](https://github.com/nifeos/<crate>/blob/main/Cargo.toml)
+[![check](https://github.com/partsfoundry/<crate>/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/partsfoundry/<crate>/actions/workflows/ci.yml?query=branch%3Amain)
+[![proofs](https://github.com/partsfoundry/<crate>/actions/workflows/proofs.yml/badge.svg?branch=main)](https://github.com/partsfoundry/<crate>/actions/workflows/proofs.yml?query=branch%3Amain)
+[![license](https://img.shields.io/badge/license-MIT%20OR%20Apache--2.0-blue.svg)](https://github.com/partsfoundry/<crate>#license)
+[![minimum Rust version](https://img.shields.io/badge/rust-<rust-version>%2B-blue.svg)](https://github.com/partsfoundry/<crate>/blob/main/Cargo.toml)
 
 One line: what the crate is for.
 
