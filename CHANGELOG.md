@@ -6,9 +6,9 @@ call that sits more than one release behind, or behind a release older than 7 da
 
 ## Unreleased
 
-- Fork mode in `check / standalone`: a repository that declares its upstream in
-  `.github/fork-upstream.toml` keeps upstream's license field and `[lints]` table; every other check
-  still runs.
+- Fork mode: a repository that declares its upstream in `.github/fork-upstream.toml` keeps
+  upstream's license and `[lints]` in `check / standalone`, and carries no crates.io pair in
+  `weekly / crates.io badges`.
 - Per-entry exemptions for code another project owns: `.github/file-length-exemptions`,
   `.github/function-length-exemptions` and `.github/acronym-exemptions` each list one finding with
   its reason, a length entry at the measured length. The coverage floor now matches

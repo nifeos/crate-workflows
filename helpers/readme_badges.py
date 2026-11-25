@@ -4,6 +4,7 @@
     python3 readme_badges.py [--crate-dir DIR] [--repository OWNER/NAME]
                              [--workflows-dir .github/workflows] [--published unknown|yes|no|lookup]
                              [--published-only] [--report-only] [--summary FILE]
+                             [--fork-file .github/fork-upstream.toml]
     python3 readme_badges.py --add-published [--crate-dir DIR] [--repository OWNER/NAME]
     python3 readme_badges.py --selftest
 
@@ -39,6 +40,12 @@ published, so their badges wait for the first publish. `--published unknown` (th
 `lookup` asks the crates.io API and is `yes` on 200, `no` on 404, and a failure otherwise. The
 weekly workflow runs `--published lookup --published-only`, which judges only the pair. After the
 first publish, `--add-published` writes the pair at the head of the row, once.
+
+**A fork.** A repository that declares its upstream in `.github/fork-upstream.toml` keeps
+upstream's package name, so crates.io answers for upstream's releases, not for the fork. With
+`--fork-file` naming that file, `lookup` is `no` while the file exists, without asking crates.io:
+the fork's README carries no pair, which would show upstream's version and documentation as the
+fork's.
 
 **Exit.** 1 on a finding, 0 with `--report-only` whatever it finds, 2 on a README or manifest that
 cannot be read or a lookup that fails.
@@ -256,6 +263,7 @@ def run(argv, lookup=None):
     parser.add_argument('--report-only', action='store_true')
     parser.add_argument('--add-published', action='store_true')
     parser.add_argument('--summary')
+    parser.add_argument('--fork-file')
     parser.add_argument('--selftest', action='store_true')
     args = parser.parse_args(argv)
     if args.selftest:
@@ -277,6 +285,10 @@ def run(argv, lookup=None):
                                          else 'the crates.io and docs.rs badges are already there'))
         return 0
     published = args.published
+    if published == 'lookup' and args.fork_file and Path(args.fork_file).is_file():
+        print(f'{LABEL}: {args.fork_file} declares a fork, whose name on crates.io is upstream\'s; '
+              'judging the README as unpublished')
+        published = 'no'
     if published == 'lookup':
         if lookup is None:
             import publish_mode
@@ -395,6 +407,17 @@ def selftest():
             raise OSError('offline')
         if run(base + ['--published', 'lookup'], lookup=broken) != 2:
             failed.append('a failed lookup is not exit 2')
+        fork = Path(scratch, 'fork-upstream.toml')
+        forked = base + ['--published', 'lookup', '--fork-file', str(fork)]
+        if run(forked, lookup=lambda name: True) != 1:
+            failed.append('without its fork file, a published crate without the pair passes the lookup')
+        fork.write_text('[upstream]\n')
+        if run(forked, lookup=broken) != 0:
+            failed.append('a fork without the pair fails, or asks crates.io')
+        (crate / 'README.md').write_text(GOOD.replace(ROW, PAIR + ROW))
+        if run(forked, lookup=lambda name: True) != 1:
+            failed.append("a fork that carries upstream's pair passes")
+        (crate / 'README.md').write_text(GOOD)
         run(base + ['--add-published'])
         if run(base + ['--published', 'yes']) != 0:
             failed.append('--add-published does not satisfy --published yes')
