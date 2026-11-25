@@ -2,9 +2,14 @@
   "_readme": "The one description of what a crate repository is configured to be. script/apply-settings applies it with gh api and refuses a setting the API rejects, never silently skips it. script/check-settings reads the live settings back and fails on any difference, so a setting changed by hand in the web interface is a red run. Names here are provisional until calef's naming pass.",
 
   "metadata": {
-    "description": "A standalone nifeos crate: proven with Kani, released through the shared workflows",
+    "description": "{crate}: a standalone Rust crate, proven with Kani, released through the shared workflows",
     "homepage": "https://docs.rs",
     "topics": ["rust", "no-std", "formal-verification", "kani"]
+  },
+
+  "descriptions": {
+    "_readme": "A repository's own description, under its name without the owner, in place of metadata.description with {crate} filled in. helpers/settings_description.py refuses one that names nife; apply-settings writes it and check-settings reads it back.",
+    "block_roster_contract": "The block-device roster page: which drives are attached, written once by the kernel and read by a program that was granted the mapping. no_std, proven with Kani"
   },
 
   "features": {

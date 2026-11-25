@@ -3,8 +3,9 @@
 
     script/apply-settings <owner/name> [--crate NAME] [--member CRATE]... [--topic extra-topic] [--dry-run]
 
-`--crate` fills the metadata (description's first word and the docs.rs homepage); `--topic` appends
-the crate's domain topic. A repository of several crates passes each crate with `--member`, which
+`--crate` fills the metadata (the crate name in the description and the docs.rs homepage); `--topic`
+appends the crate's domain topic. The description is the file's template, or the repository's own
+entry in its `descriptions` table (helpers/settings_description.py). A repository of several crates passes each crate with `--member`, which
 names the required checks and the tag patterns for each (helpers/settings_members.py). The values
 that differ by organization come from the file's `owners` entry for the repository's owner
 (helpers/settings_owner.py).
@@ -22,6 +23,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / 'helpers'))
 import settings_members  # noqa: E402
+import settings_description  # noqa: E402
 import settings_owner  # noqa: E402
 
 SETTINGS = Path(__file__).resolve().parent.parent / 'settings' / 'repository-settings.json'
@@ -108,7 +110,7 @@ def main(argv):
     repo = args.repo
     crate = args.crate or repo.split('/')[-1]
     body = dict(s['metadata'])
-    body['description'] = body['description'].replace('A standalone nifeos crate', f'{crate}: a standalone nifeos crate')
+    body['description'] = settings_description.description(s, repo, crate)
     body['homepage'] = f'https://docs.rs/{crate}'
     body.update(s['features'])
     body.update(s['merging'])

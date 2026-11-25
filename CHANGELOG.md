@@ -16,6 +16,8 @@ call that sits more than one release behind, or behind a release older than 7 da
   nothing fails.
 - Settings by owner: the settings file's `owners` table holds the values that differ in another
   organization, which `apply-settings` and `check-settings` merge over the shared ones.
+- Descriptions never name nife; `descriptions` holds a repository's own, and `check-settings`
+  reads it back.
 
 ## v10 (2026-11-23)
 
