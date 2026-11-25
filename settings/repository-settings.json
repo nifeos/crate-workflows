@@ -2,9 +2,17 @@
   "_readme": "The one description of what a crate repository is configured to be. script/apply-settings applies it with gh api and refuses a setting the API rejects, never silently skips it. script/check-settings reads the live settings back and fails on any difference, so a setting changed by hand in the web interface is a red run. Names here are provisional until calef's naming pass.",
 
   "metadata": {
-    "description": "A standalone nifeos crate: proven with Kani, released through the shared workflows",
+    "description": "{crate}: a standalone Rust crate, proven with Kani, released through the shared workflows",
     "homepage": "https://docs.rs",
     "topics": ["rust", "no-std", "formal-verification", "kani"]
+  },
+
+  "descriptions": {
+    "_readme": "A repository's own description, under its name without the owner, in place of metadata.description with {crate} filled in. helpers/settings_description.py refuses one that names nife; apply-settings writes it and check-settings reads it back.",
+    "block_roster_contract": "The block-device roster page: which drives are attached, written once by the kernel and read by a program that was granted the mapping. no_std, proven with Kani",
+    "designware_mobile_storage": "SD and eMMC driver logic for the Synopsys DesignWare Mobile Storage Host Controller: no_std, no unsafe, proven with Kani",
+    "e1000e": "Intel e1000e-family (82574L, I219) network controller logic: registers, descriptors and ring logic behind small traits, proven with Kani",
+    "extensible_host_controller_interface": "xHCI (USB 3) host controller logic as pure computation: register offsets and decode, TRBs, rings, contexts and port status, proven with Kani"
   },
 
   "features": {
@@ -59,6 +67,30 @@
   "app": {
     "slug": "nife-smelter",
     "permission": "write"
+  },
+
+  "owners": {
+    "_readme": "The values that differ by the organization that owns the repository, merged over the ones above by helpers/settings_owner.py: a dictionary key by key, rulesets by name, anything else replaced. An owner with no entry here takes the values above as they are.",
+    "partsfoundry": {
+      "_readme": "A crate repository in partsfoundry still calls the reusable workflows of nifeos/crate-workflows, which a selected-actions allowlist admits only by a pattern, since only the owner's own reusable workflows are allowed without one. The team lives in partsfoundry, and the release app there is partsfoundry-smelter (actor_id 5911990, read from GET /apps/partsfoundry-smelter), which partsfoundry owns and which is installed on all of its repositories.",
+      "actions": {
+        "patterns_allowed": ["taiki-e/install-action@*", "nifeos/crate-workflows/.github/workflows/*@*"]
+      },
+      "team": {
+        "org": "partsfoundry"
+      },
+      "app": {
+        "slug": "partsfoundry-smelter"
+      },
+      "rulesets": [
+        {
+          "name": "tags: only the release workflow makes one",
+          "bypass_actors": [
+            { "actor_id": 5911990, "actor_type": "Integration", "bypass_mode": "always" }
+          ]
+        }
+      ]
+    }
   },
 
   "labels": [
