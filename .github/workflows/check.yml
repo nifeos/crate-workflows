@@ -178,7 +178,7 @@ jobs:
           ref: ${{ job.workflow_sha }}
           path: .crate-workflows
           persist-credentials: false
-      - uses: taiki-e/install-action@ab49d3c64680143e184118bed66a46419fc15519 # v2.90.5
+      - uses: taiki-e/install-action@fe3acb53a98b62c772db35de75ce0e4595e7ca8c # v2.90.8
         with:
           tool: cargo-llvm-cov
       - run: rustup toolchain install "$TOOLCHAIN" --profile minimal --component llvm-tools
@@ -394,7 +394,7 @@ jobs:
       # exact version, which checks the release archive against the checksum its manifest holds at
       # the pinned action commit; a bump is a new version here and a new action pin together.
       # helpers/typos_gate.sh refuses a crate without its own _typos.toml or with another locale.
-      - uses: taiki-e/install-action@ab49d3c64680143e184118bed66a46419fc15519 # v2.90.5
+      - uses: taiki-e/install-action@fe3acb53a98b62c772db35de75ce0e4595e7ca8c # v2.90.8
         with:
           tool: typos@1.51.1
       - name: typos (en-us spelling over the tree)
@@ -449,7 +449,7 @@ jobs:
               | grep -vE 'uses:[[:space:]]+\./' \
               | grep -vE 'uses:[[:space:]]+[^@[:space:]]+@[0-9a-f]{40}([[:space:]]|$)' || true)"
           [ -z "$unpinned" ] || { echo "$unpinned"; exit 1; }
-      - uses: taiki-e/install-action@ab49d3c64680143e184118bed66a46419fc15519 # v2.90.5
+      - uses: taiki-e/install-action@fe3acb53a98b62c772db35de75ce0e4595e7ca8c # v2.90.8
         with:
           tool: cargo-deny@0.20.2
       # nife's policy without its exceptions: no rayon skip, no advisory ignore, no vendored tree.
@@ -479,13 +479,13 @@ jobs:
           suffix=$(.crate-workflows/helpers/crate-slug.sh "$MANIFEST")
           [ -z "$suffix" ] || echo "CODEQL_CATEGORY=/crate:${suffix#-}" >> "$GITHUB_ENV"
       - name: CodeQL (Rust, build-mode none)
-        uses: github/codeql-action/init@33d7b85da1a04171e211befe2c739303b9a4c066 # v4
+        uses: github/codeql-action/init@1bd86f2fdb4b86187fa4059f16f31a3202acc9ea # v4
         with:
           languages: rust
           build-mode: none
       # The analyze action uploads its own SARIF; nife's split-job retry exists for its four-language
       # matrix, and one language in one job does not need it.
-      - uses: github/codeql-action/analyze@33d7b85da1a04171e211befe2c739303b9a4c066 # v4
+      - uses: github/codeql-action/analyze@1bd86f2fdb4b86187fa4059f16f31a3202acc9ea # v4
         with:
           category: ${{ env.CODEQL_CATEGORY }}
       - name: budget
@@ -517,7 +517,7 @@ jobs:
           path: .crate-workflows
           persist-credentials: false
       - run: rustup toolchain install "$TOOLCHAIN" --profile minimal
-      - uses: taiki-e/install-action@ab49d3c64680143e184118bed66a46419fc15519 # v2.90.5
+      - uses: taiki-e/install-action@fe3acb53a98b62c772db35de75ce0e4595e7ca8c # v2.90.8
         with:
           tool: cargo-mutants@27.1.0
       # A pull request's checkout is the merge of its head into its base, so the first parent is
