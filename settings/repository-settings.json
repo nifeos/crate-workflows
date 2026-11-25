@@ -9,7 +9,10 @@
 
   "descriptions": {
     "_readme": "A repository's own description, under its name without the owner, in place of metadata.description with {crate} filled in. helpers/settings_description.py refuses one that names nife; apply-settings writes it and check-settings reads it back.",
-    "block_roster_contract": "The block-device roster page: which drives are attached, written once by the kernel and read by a program that was granted the mapping. no_std, proven with Kani"
+    "block_roster_contract": "The block-device roster page: which drives are attached, written once by the kernel and read by a program that was granted the mapping. no_std, proven with Kani",
+    "designware_mobile_storage": "SD and eMMC driver logic for the Synopsys DesignWare Mobile Storage Host Controller: no_std, no unsafe, proven with Kani",
+    "e1000e": "Intel e1000e-family (82574L, I219) network controller logic: registers, descriptors and ring logic behind small traits, proven with Kani",
+    "extensible_host_controller_interface": "xHCI (USB 3) host controller logic as pure computation: register offsets and decode, TRBs, rings, contexts and port status, proven with Kani"
   },
 
   "features": {
