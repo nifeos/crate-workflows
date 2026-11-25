@@ -72,9 +72,9 @@
   "owners": {
     "_readme": "The values that differ by the organization that owns the repository, merged over the ones above by helpers/settings_owner.py: a dictionary key by key, rulesets by name, anything else replaced. An owner with no entry here takes the values above as they are.",
     "partsfoundry": {
-      "_readme": "A crate repository in partsfoundry still calls the reusable workflows of nifeos/crate-workflows, which a selected-actions allowlist admits only by a pattern, since only the owner's own reusable workflows are allowed without one. The team lives in partsfoundry, and the release app there is partsfoundry-smelter (actor_id 5911990, read from GET /apps/partsfoundry-smelter), which partsfoundry owns and which is installed on all of its repositories.",
+      "_readme": "A crate repository in partsfoundry calls the reusable workflows of partsfoundry/crate-workflows, which a selected-actions allowlist admits only by a pattern. The team lives in partsfoundry, and the release app there is partsfoundry-smelter (actor_id 5911990, read from GET /apps/partsfoundry-smelter), which partsfoundry owns and which is installed on all of its repositories.",
       "actions": {
-        "patterns_allowed": ["taiki-e/install-action@*", "nifeos/crate-workflows/.github/workflows/*@*"]
+        "patterns_allowed": ["taiki-e/install-action@*", "partsfoundry/crate-workflows/.github/workflows/*@*"]
       },
       "team": {
         "org": "partsfoundry"
