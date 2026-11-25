@@ -1,6 +1,6 @@
 {
   "why": "The newest green full run tested another tree: this run tests every mutant.",
-  "repository": "nifeos/example_thing",
+  "repository": "partsfoundry/example_thing",
   "event": "schedule",
   "now": "2026-11-15T08:12:00Z",
   "fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",

@@ -1,6 +1,6 @@
 {
   "why": "A deferred try earlier today tested nothing, so this try runs.",
-  "repository": "nifeos/example_thing",
+  "repository": "partsfoundry/example_thing",
   "event": "schedule",
   "now": "2026-11-15T10:12:00Z",
   "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",

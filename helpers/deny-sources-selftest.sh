@@ -19,7 +19,7 @@ fail() {
 }
 
 # A landed commit of an allowed repository, and one of a repository outside the organization.
-allowed_url="https://github.com/nifeos/block_roster_contract"
+allowed_url="https://github.com/partsfoundry/block_roster_contract"
 allowed_rev="8454327d86017e741090dcfe333669d7725cb78c"
 other_url="https://github.com/rust-lang/cfg-if"
 other_rev="14432a28e180ec717933714aed7828fc7ed2fd29"

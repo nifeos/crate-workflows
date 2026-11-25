@@ -1,6 +1,6 @@
 {
   "why": "An unchanged run is never the source: the record names the green full run behind it.",
-  "repository": "nifeos/example_thing",
+  "repository": "partsfoundry/example_thing",
   "event": "schedule",
   "now": "2026-11-22T08:12:00Z",
   "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",

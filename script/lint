@@ -247,7 +247,7 @@ echo "==> the badge row gate (README badges)"
 # The sample's row points at this repository's selftest workflow, which is what calls check.yml
 # and proofs.yml on it. The scaffold's row, with its placeholders filled the way a new repository
 # fills them, passes against the scaffold's own caller workflows, so a new repository starts green.
-"$py" helpers/readme_badges.py --crate-dir sample --repository nifeos/crate-workflows >/dev/null ||
+"$py" helpers/readme_badges.py --crate-dir sample --repository partsfoundry/crate-workflows >/dev/null ||
 	fail "the sample's badge row has a finding"
 b="$fixtures/badges"
 mkdir -p "$b/good"
@@ -256,7 +256,7 @@ printf '[package]\nname = "example_crate"\nlicense = "MIT OR Apache-2.0"\nrust-v
 badges() {
 	dir="$b/$1"
 	shift
-	"$py" helpers/readme_badges.py --crate-dir "$dir" --repository nifeos/example_crate \
+	"$py" helpers/readme_badges.py --crate-dir "$dir" --repository partsfoundry/example_crate \
 		--workflows-dir scaffold/caller-workflows "$@" >/dev/null 2>&1
 }
 badges good || fail "the scaffold's badge row, filled in, has a finding"
@@ -267,7 +267,7 @@ for bad in no-row other-repository stale-rust; do
 	cp "$b/good/Cargo.toml" "$b/$bad/"
 done
 grep -v '^\[!\[' "$b/good/README.md" >"$b/no-row/README.md"
-sed 's#nifeos/example_crate/actions/workflows/ci.yml?#other/repository/actions/workflows/ci.yml?#' \
+sed 's#partsfoundry/example_crate/actions/workflows/ci.yml?#other/repository/actions/workflows/ci.yml?#' \
 	"$b/good/README.md" >"$b/other-repository/README.md"
 sed 's#rust-1.88%2B#rust-1.85%2B#' "$b/good/README.md" >"$b/stale-rust/README.md"
 for bad in no-row other-repository stale-rust; do

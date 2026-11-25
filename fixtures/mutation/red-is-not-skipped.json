@@ -1,6 +1,6 @@
 {
   "why": "The newest full run was red for this same tree; an older green one does not let this run skip, so it stays red until fixed.",
-  "repository": "nifeos/example_thing",
+  "repository": "partsfoundry/example_thing",
   "event": "schedule",
   "now": "2026-11-22T08:12:00Z",
   "fingerprint": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",

@@ -9,10 +9,10 @@ permissions:
   contents: read
 jobs:
   mutation-first_crate:
-    uses: nifeos/crate-workflows/.github/workflows/mutation.yml@PINS@
+    uses: partsfoundry/crate-workflows/.github/workflows/mutation.yml@PINS@
     with:
       manifest-path: first_crate/Cargo.toml
   mutation-second_crate:
-    uses: nifeos/crate-workflows/.github/workflows/mutation.yml@PINS@
+    uses: partsfoundry/crate-workflows/.github/workflows/mutation.yml@PINS@
     with:
       manifest-path: second_crate/Cargo.toml
