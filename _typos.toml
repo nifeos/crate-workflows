@@ -25,3 +25,6 @@ extend-exclude = [
 # The project this template serves. typos reads it as a misspelling of "knife"; the template's own
 # files name it, which a crate repository's files never do (scaffold/_typos.toml has no entry).
 nife = "nife"
+# The vendor of the DesignWare controllers, named in designware_mobile_storage's description in
+# settings/repository-settings.json; typos reads it as a misspelling of "synopsis".
+Synopsys = "Synopsys"
