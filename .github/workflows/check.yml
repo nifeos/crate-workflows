@@ -515,8 +515,12 @@ jobs:
 
   # The pull request's changed lines, mutated (helpers/mutation-diff.sh): a survivor or a timeout
   # on a line this pull request changed fails unless .github/mutants-exempts lists it with a
-  # reason. The cargo-mutants run has a 20-minute cap, and reaching it fails. The full run over
-  # every mutant is mutation.yml's. On a push there is no pull request diff, so the job is skipped.
+  # reason. The cargo-mutants run has a 20-minute cap. Reaching it fails unless the caller's full
+  # mutation workflow (mutation.yml) has a green run at the pull request's exact head commit, which
+  # judged every mutant; the failure names the dispatch command. The run listing is read with this
+  # job's token, which reads a public repository's Actions runs with contents: read (the mutation
+  # plan and the release gate read them the same way), so the caller grants nothing more. On a push
+  # there is no pull request diff, so the job is skipped.
   mutation-diff:
     name: mutation-diff
     if: github.event_name == 'pull_request'
@@ -553,6 +557,11 @@ jobs:
             exit 1
           fi
           .crate-workflows/helpers/mutation-diff.sh "$MANIFEST" HEAD^1 "$GITHUB_WORKSPACE/.github/mutants-exempts" 20
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MUTATION_DIFF_REPOSITORY: ${{ github.repository }}
+          MUTATION_DIFF_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          MUTATION_DIFF_HEAD_REF: ${{ github.event.pull_request.head.ref }}
       - name: budget
         if: always()
         run: python3 .crate-workflows/helpers/job_budget.py check "${{ github.job }}" "$JOB_STARTED_AT"

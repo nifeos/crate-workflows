@@ -14,12 +14,20 @@
 # `mutants_gate.py --diff`, against the same exemptions as the full run, without the stale check
 # (a changed-lines run reaches only some survivors; the full run calls an exemption stale).
 #
-# The cap (default 20 minutes) is on the cargo-mutants run, and reaching it fails: a pull request
-# whose changed lines take longer is split, or its survivors are judged by a full run. A diff with
+# The cap (default 20 minutes) is on the cargo-mutants run. Reaching it fails, unless the
+# repository's full mutation workflow (`mutation.yml`) has a completed, green run at the pull
+# request's exact head commit, as `mutation_plan.py verify` judges it for the release gate: a run
+# that recorded `full`, or `unchanged` since a green `full` run of the same fingerprint. That run's
+# own gate judged every survivor against the exemptions with the stale check, so it is strictly
+# stronger than this one. A run at another commit, a cancelled or red run, and a run that tested
+# nothing (`deferred`, `repeat`) do not count, and there is no label or bypass. The head comes from
+# the environment: MUTATION_DIFF_REPOSITORY (owner/name), MUTATION_DIFF_HEAD_SHA and
+# MUTATION_DIFF_HEAD_REF, read with GH_TOKEN; without the first two a reached cap fails. A diff with
 # no Rust on its changed lines generates no mutants and passes, saying so.
 #
-# Exit 0: no survivor, or every survivor exempted with a reason. Exit 1: anything else, including
-# a broken run, since a required check that fails open examined nothing.
+# Exit 0: no survivor, or every survivor exempted with a reason, or a reached cap with a green full
+# run at the head. Exit 1: anything else, including a broken run, since a required check that fails
+# open examined nothing.
 
 set -eu
 
@@ -61,7 +69,14 @@ timeout --kill-after=30s "${cap}m" "$(dirname "$gate")/cargo-mutants.sh" --outpu
 case "$rc" in
 0 | 2 | 3) ;;
 124 | 137)
-	summary "The changed lines' mutants did not finish inside the $cap-minute cap. Split the pull request, or run the full mutation workflow on its branch. A cap reached is a failure, never a pass."
+	repository="${MUTATION_DIFF_REPOSITORY:-}"
+	head="${MUTATION_DIFF_HEAD_SHA:-}"
+	if [ -n "$repository" ] && [ -n "$head" ] &&
+		python3 "$(dirname "$gate")/mutation_plan.py" verify "$repository" "$head" --workflow mutation.yml --manifest-path "$manifest"; then
+		summary "The changed lines' mutants did not finish inside the $cap-minute cap, and the full mutation workflow has a green run at the head commit $head, which judged every mutant. This pass is that run's."
+		exit 0
+	fi
+	summary "The changed lines' mutants did not finish inside the $cap-minute cap, and no green full mutation run exists at the head commit ${head:-(not given)}. Split the pull request, or dispatch the full run on its head with \`gh workflow run mutation.yml -R ${repository:-<owner>/<name>} --ref ${MUTATION_DIFF_HEAD_REF:-<branch>}\` and, once it is green at that same commit, re-run this check. A run at any other commit does not count. A cap reached without one is a failure, never a pass."
 	exit 1
 	;;
 *)

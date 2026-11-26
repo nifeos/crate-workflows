@@ -188,8 +188,9 @@ jobs:
       stagger: false
 
   # check.yml's mutation-diff job sees this repository's own pull request diffs, which rarely touch
-  # the fixture's Rust. So its script runs here on three fixed diffs (fixtures/mutation-diff/): an
-  # exempted survivor passes, an untested function fails, and a diff with no Rust passes.
+  # the fixture's Rust. So its script runs here on fixed diffs (fixtures/mutation-diff/): an
+  # exempted survivor passes, an untested function fails, and a diff with no Rust passes. A reached
+  # cap passes only beside a green full run at the head commit, read from a stand-in for the API.
   mutation-diff:
     name: selftest (mutation of changed lines)
     needs: lint
