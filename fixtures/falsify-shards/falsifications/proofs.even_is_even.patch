@@ -1,0 +1,13 @@
+diff --git a/src/lib.rs b/src/lib.rs
+index 8b15f55..3816490 100644
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -14,7 +14,7 @@ pub fn half(a: u8) -> u8 {
+ 
+ /// A byte with its lowest bit cleared.
+ pub fn even(a: u8) -> u8 {
+-    a & !1
++    a | 1
+ }
+ 
+ #[cfg(kani)]

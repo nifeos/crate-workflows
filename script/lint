@@ -138,6 +138,20 @@ done
 	fail "the loom fixture's falsification record does not hold its form"
 echo "ok"
 
+echo "==> the falsify plan and its shards agree"
+# proofs.yml's falsify-plan counts the shards and each falsify shard replays one; the live selftest
+# runs the shard fixture in two. Here, without Kani, the count and the refusals.
+fs=fixtures/falsify-shards/Cargo.toml
+"$py" helpers/falsify.py --check --manifest-path $fs >/dev/null || fail "the shard fixture's records do not hold their form"
+[ "$("$py" helpers/falsify.py --plan 2 --manifest-path $fs)" = 2 ] || fail "three records at two a shard are not two shards"
+[ "$("$py" helpers/falsify.py --plan 3 --manifest-path $fs)" = 1 ] || fail "three records at three a shard are not one shard"
+[ "$("$py" helpers/falsify.py --plan 3 --manifest-path $loom)" = 0 ] || fail "a crate with no harness has a falsify shard"
+for bad in '--plan 0' '--shard 2/2' '--shard 0/4' '--shard 1' '--loom --plan 1'; do
+	# shellcheck disable=SC2086 # each case is several words on purpose
+	if "$py" helpers/falsify.py $bad --manifest-path $fs >/dev/null 2>&1; then fail "falsify.py took $bad"; fi
+done
+echo "ok"
+
 echo "==> a crate at the repository root keeps its names"
 # GitHub's `a && b || c` answers c when b is empty, which is how a name once came out as
 # `mutation record [Cargo.toml]` for every existing caller. The expressions that name a crate's

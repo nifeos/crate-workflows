@@ -2,7 +2,9 @@
 """The falsification gate: every proof harness carries a patch or a reason, and each patch turns
 its harness red at its own assertion.
 
-    python3 falsify.py [--manifest-path Cargo.toml] [--check] [--limit 900] [--jobs N]
+    python3 falsify.py [--manifest-path Cargo.toml] [--check] [--loom] [--limit 900]
+    python3 falsify.py --plan PER_SHARD     # the Kani shard count for proofs.yml's matrix
+    python3 falsify.py --shard K/N          # replay Kani shard K of N only
 
 This is nife's falsification sweep reduced to what a standalone crate carries. Kani harnesses
 only: a crate has no kernel tests or swish checks, and a host-test harness cites its patch the way
@@ -36,6 +38,15 @@ patch, runs that one model with `RUSTFLAGS="--cfg loom -D warnings" cargo test -
 <module path>::<model> -- --exact`, and reads cargo's summary: the patch did its work only when
 exactly one test ran and it failed (`running 1 test`, `test result: FAILED. 0 passed; 1 failed`).
 A model that still passes is a survivor, and a run that selects no test or several is an error.
+
+`--plan PER_SHARD` prints how many shards the Kani replays take: the replayable records divided
+by PER_SHARD, rounded up, and 0 when there is none. `--shard K/N` replays only shard K (counted
+from 0) of N and skips the form check, which proofs.yml runs once in its plan job. A record's shard
+is its position among the replayable records, in file order, modulo N: round-robin, so harnesses
+that sit together in one file, and are often slow together, land on different shards. N above the
+replayable records is an error before any replay, since some shard would hold none and the count
+and the records disagree. Neither takes
+`--loom`: the loom job replays its few models in one run.
 
 Exit 0 only when every record holds. Name: provisional, from milestone 887's lane; `--loom` is
 provisional too.
@@ -419,6 +430,28 @@ def replay(root, recs, limit):
     return bad
 
 
+def replayable(recs):
+    return [r for r in recs if r[3] == 'replayable' and r[4]]
+
+
+def shard_count(recs, per_shard):
+    return -(-len(replayable(recs)) // per_shard)
+
+
+def parse_shard(text):
+    """(k, n) from `K/N` with 0 <= K < N, or None."""
+    m = re.fullmatch(r'(\d+)/(\d+)', text or '')
+    if not m:
+        return None
+    k, n = int(m.group(1)), int(m.group(2))
+    return (k, n) if 0 <= k < n else None
+
+
+def shard_of(recs, k, n):
+    """The replayable records shard k of n replays: every nth, starting at the kth."""
+    return replayable(recs)[k::n]
+
+
 def main(argv):
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument('--manifest-path', default='Cargo.toml')
@@ -426,12 +459,43 @@ def main(argv):
     ap.add_argument('--loom', action='store_true',
                     help='the loom models\' records, replayed under --cfg loom, not the Kani harnesses')
     ap.add_argument('--limit', type=int, default=900)
+    ap.add_argument('--plan', type=int, metavar='PER_SHARD',
+                    help='print the Kani shard count for PER_SHARD replays a shard')
+    ap.add_argument('--shard', metavar='K/N', help='replay Kani shard K of N only, no form check')
     ap.add_argument('--selftest', action='store_true')
     args = ap.parse_args(argv[1:])
     if args.selftest:
         return selftest()
     root = Path(args.manifest_path).resolve().parent
+    if args.loom and (args.plan is not None or args.shard is not None):
+        print('falsify: --plan and --shard shard the Kani replays; the loom models run in one job',
+              file=sys.stderr)
+        return 1
     recs = loom_records(root) if args.loom else records(root)
+    if args.plan is not None:
+        if args.plan < 1:
+            print(f'falsify: --plan wants a whole number above zero, got {args.plan}', file=sys.stderr)
+            return 1
+        print(shard_count(recs, args.plan))
+        return 0
+    if args.shard is not None:
+        parsed = parse_shard(args.shard)
+        if parsed is None:
+            print(f'falsify: --shard wants K/N with 0 <= K < N, got {args.shard!r}', file=sys.stderr)
+            return 1
+        k, n = parsed
+        if n > len(replayable(recs)):
+            print(f'falsify: {n} shards for {len(replayable(recs))} replayable record(s); '
+                  f'a shard would hold none, so the shard count and the records disagree',
+                  file=sys.stderr)
+            return 1
+        mine = shard_of(recs, k, n)
+        if replay(root, mine, args.limit):
+            print(f'falsify: shard {k} of {n}: a record does not hold; see the findings above',
+                  file=sys.stderr)
+            return 1
+        print(f'==> falsify: shard {k} of {n}: {len(mine)} patch(es) turn their harness red')
+        return 0
     if not recs:
         if args.loom:
             print('falsify: no loom model under src/ carries a Falsification: record; nothing to falsify')
@@ -527,6 +591,23 @@ fn check_add() {
         expect('sibling after inline module',
                qualified('lib.rs', 'mod v {\n' + proof + '}\n' + proof.replace('h', 'g')),
                ['v::h', 'g'])
+
+        # Sharding: every replayable record lands on exactly one shard, round-robin in file order,
+        # and an unfalsifiable record or a record with no patch is on none.
+        f = root / 'src' / 'lib.rs'
+        fake = [(f, i, f'h{i}', 'replayable', f'falsifications/h{i}.patch', '') for i in range(7)]
+        fake.insert(3, (f, 99, 'u', 'unfalsifiable', '', 'reason'))
+        fake.insert(5, (f, 98, 'p', 'replayable', '', ''))
+        expect('shard count, rounded up', shard_count(fake, 3), 3)
+        expect('shard count, exact', shard_count(fake, 7), 1)
+        expect('shard count, none replayable', shard_count(fake[3:4], 3), 0)
+        names = [[r[2] for r in shard_of(fake, k, 3)] for k in range(3)]
+        expect('round-robin', names, [['h0', 'h3', 'h6'], ['h1', 'h4'], ['h2', 'h5']])
+        expect('each once', sorted(sum(names, [])), sorted(f'h{i}' for i in range(7)))
+        expect('a shard past the records is empty', shard_of(fake, 7, 8), [])
+        expect('parse K/N', parse_shard('2/5'), (2, 5))
+        for bad in ('5/5', '1/0', '-1/3', '1', '', 'a/b', '1/2/3'):
+            expect(f'refuse shard {bad!r}', parse_shard(bad), None)
         for stale in (root / 'src').rglob('*.rs'):
             stale.unlink()
         (root / 'src' / 'lib.rs').write_text(

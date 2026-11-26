@@ -1,6 +1,6 @@
 # Job budgets in minutes, one raise per line with its reason; a raise without a reason is refused.
 # The default is 20 minutes. A repository may raise a budget further, with a reason, in its own copy.
-falsify 30 Kani install plus the replay of every falsification patch
+falsify 30 one falsify shard: Kani install plus the replay of up to harnesses-per-shard patches, about five minutes each for a slow harness
 drift 30 two channels, stable and beta, each building, testing and linting
 msrv 30 installs the manifest's rust-version and builds and tests at it
 semver 30 cargo-semver-checks builds the crate against its previous release tag

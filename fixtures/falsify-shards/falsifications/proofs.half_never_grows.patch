@@ -1,0 +1,13 @@
+diff --git a/src/lib.rs b/src/lib.rs
+index 8b15f55..cf84b66 100644
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -9,7 +9,7 @@ pub fn larger(a: u8, b: u8) -> u8 {
+ 
+ /// A byte halved, rounding down.
+ pub fn half(a: u8) -> u8 {
+-    a / 2
++    a.wrapping_mul(2)
+ }
+ 
+ /// A byte with its lowest bit cleared.
