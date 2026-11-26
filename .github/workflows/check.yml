@@ -133,13 +133,13 @@ jobs:
       - name: clippy (all features)
         run: |
           set -e
-          # shellcheck disable=SC2046
-          flags=$(python3 .crate-workflows/helpers/feature_args.py "$MANIFEST" $EXCLUDE_FEATURES)
-          echo "==> clippy: host, $flags"
-          cargo +"$TOOLCHAIN" clippy --manifest-path "$MANIFEST" $flags --all-targets -- -D warnings
+          read -ra excluded <<< "$EXCLUDE_FEATURES"
+          read -ra flags <<< "$(python3 .crate-workflows/helpers/feature_args.py "$MANIFEST" "${excluded[@]}")"
+          echo "==> clippy: host, ${flags[*]}"
+          cargo +"$TOOLCHAIN" clippy --manifest-path "$MANIFEST" "${flags[@]}" --all-targets -- -D warnings
           for t in $TARGETS; do
-            echo "==> clippy: $t, $flags"
-            cargo +"$TOOLCHAIN" clippy --manifest-path "$MANIFEST" --target "$t" $flags --lib --bins -- -D warnings
+            echo "==> clippy: $t, ${flags[*]}"
+            cargo +"$TOOLCHAIN" clippy --manifest-path "$MANIFEST" --target "$t" "${flags[@]}" --lib --bins -- -D warnings
           done
       # The proof harnesses, which only `--cfg kani` compiles. The shim is enough of Kani's API for
       # clippy to type-check them; a clean pass here is not a proof, and proofs.yml is the thing
