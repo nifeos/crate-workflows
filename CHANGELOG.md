@@ -6,6 +6,7 @@ call that sits more than one release behind, or behind a release older than 7 da
 
 ## Unreleased
 
+- `mutation.yml` takes `max-parallel` (default 2): the most shards that run at once.
 - `proofs / falsify` shards its replays (`harnesses-per-shard`).
 - `check / mutation-diff` passes a reached cap only on a green full mutation run at the pull
   request's head commit, and otherwise names the command that dispatches one.
@@ -92,8 +93,8 @@ call that sits more than one release behind, or behind a release older than 7 da
 - `release / gate` also needs a green full mutation run at the released commit:
   `helpers/release-gate.sh` calls `mutation_plan.py verify`. A green `mutation.yml` run there counts
   when it recorded `full`, or `unchanged <fingerprint> since run N` where run N is a green full run
-  of the same workflow and fingerprint. A deferred or repeat run never counts. The cases are in
-  `fixtures/mutation/release/`. Dispatch `mutation.yml` on main before a release.
+  of the same workflow and fingerprint. A deferred or repeat run does not count. The cases are in
+  `fixtures/mutation/release/`.
 - `check / mutation-diff` mutates each pull request's changed lines (`cargo mutants --in-diff`, the
   diff against the merge's first parent) through `helpers/mutation-diff.sh`. A survivor or timeout
   that `.github/mutants-exempts` does not list fails, through `mutants_gate.py --diff`. The run has
@@ -103,16 +104,15 @@ call that sits more than one release behind, or behind a release older than 7 da
 - The full mutation run runs weekly on each repository's own weekday and tests nothing when nothing
   changed. `helpers/mutation_plan.py` derives the weekday and minute from the repository's name, and
   the new caller `scaffold/caller-workflows/mutation.yml` tries at 08, 10 and 12 UTC (its
-  `@MUTATION_CRON@` line comes from `mutation_plan.py schedule <name>`). A scheduled run that starts
-  outside 08:00-13:00 UTC is deferred, and one on another weekday fails naming the right line. A
-  later try the same day is a repeat. A tree whose fingerprint matches the newest full run, when that run was green, records `unchanged since run N`. Each of
-  these passes in seconds with a notice. Every run names a `mutation-record` job with its record,
+  `@MUTATION_CRON@` line comes from `mutation_plan.py schedule <name>`). A scheduled run outside 08:00-13:00 UTC is deferred, and one on another weekday fails naming the right line. A
+  later try the same day is a repeat. A tree whose fingerprint matches the newest full run, when that run was green, records `unchanged since run N`. Each
+  passes in seconds with a notice. Every run names a `mutation-record` job with its record,
   which the next run reads with the default token. The `skip-unchanged` and `stagger` inputs (both
   on) turn the rules off for the template's selftest. Fixtures are in `fixtures/mutation/`.
 - The full mutation run moves out of `weekly.yml` into its own reusable workflow,
   `.github/workflows/mutation.yml`, with the `mutants-per-shard` input. `mutation-plan`, the
   `mutation` shards and `mutation-verdict` (named `mutation`) are unchanged, except that at most two
-  shards run at once (`max-parallel: 2`); the workflow opens with the `lag` job like the others.
+  shards run at once (`max-parallel`); the workflow opens with the `lag` job like the others.
   `weekly.yml` loses the three jobs and the input. A caller reads `mutation / mutation` where it read
   `weekly / mutation`.
 - `helpers/mutants_gate.py --diff` judges a run over changed lines (`cargo mutants --in-diff`): an

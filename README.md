@@ -31,7 +31,7 @@ Inputs every workflow takes (all optional unless named): `manifest-path` (defaul
 `targets` (space-separated bare-metal targets, default none), `toolchain`
 (`stable`), `coverage-floor` (85). `check.yml` takes `exclude-features` (features the all-features clippy pass skips; default none) and `allow-unpublished` for
 fixture crates with `publish = false`. `proofs.yml` takes `kani-args`, `loom-max-preemptions` and `harnesses-per-shard` (3).
-`weekly.yml` takes `caller-checks` (the settings-drift and stranger jobs, off in the selftest). `mutation.yml` takes `mutants-per-shard` (default 200), `skip-unchanged` and `stagger` (both on). `fuzz.yml` takes `public-crash-inputs` (opt-in, default false), `seconds-per-target` (default 300) and `total-seconds` (default
+`weekly.yml` takes `caller-checks` (the settings-drift and stranger jobs, off in the selftest). `mutation.yml` takes `mutants-per-shard` (default 200), `max-parallel` (default 2), `skip-unchanged` and `stagger` (both on). `fuzz.yml` takes `public-crash-inputs` (opt-in, default false), `seconds-per-target` (default 300) and `total-seconds` (default
 1,200). `release.yml` takes `version` (required, e.g. `0.1.0`) and `dry-run`
 (default true).
 
@@ -42,7 +42,7 @@ mutants inside its 60-minute timeout. `mutation-plan` counts the mutants with `c
 and makes ceil(mutants / `mutants-per-shard`) shards, at least one. Each `mutation` job tests one
 shard (`--shard k/n --sharding round-robin`) and uploads its `mutants.out` as `mutants-shard-k`.
 `mutation-verdict`, named `mutation`, judges every shard's outcomes together against
-`.github/mutants-exempts`. At most two shards run at once.
+`.github/mutants-exempts`. `max-parallel` shards run at once.
 
 A shard holds at most `mutants-per-shard` mutants (200 is about 25 minutes), in at most 256 shards.
 The plan first decides whether to test at all: a scheduled run outside 08:00-13:00 UTC is deferred,
