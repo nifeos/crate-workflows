@@ -28,11 +28,10 @@ publishing from a `partsfoundry` workflow. This repository is where all three la
 | `.github/workflows/ruled.yml` | label events | `clear`, `rerun` |
 
 Inputs every workflow takes (all optional unless named): `manifest-path` (default `Cargo.toml`),
-`targets` (space-separated bare-metal targets to build and lint for, default none), `toolchain`
-(default `stable`), `coverage-floor` (default 85). `check.yml` takes `allow-unpublished` for
-fixture crates that carry `publish = false` on purpose. `proofs.yml` takes `kani-args` and `loom-max-preemptions`.
-`weekly.yml` takes `caller-checks` (the settings-drift and stranger jobs, off for this template's
-own selftest). `mutation.yml` takes `mutants-per-shard` (default 200), `skip-unchanged` and `stagger` (both on). `fuzz.yml` takes `public-crash-inputs` (the opt-in, default false), `seconds-per-target` (default 300) and `total-seconds` (default
+`targets` (space-separated bare-metal targets, default none), `toolchain`
+(default `stable`), `coverage-floor` (default 85). `check.yml` takes `exclude-features` (features the all-features clippy pass skips; default none) and `allow-unpublished` for
+fixture crates with `publish = false`. `proofs.yml` takes `kani-args` and `loom-max-preemptions`.
+`weekly.yml` takes `caller-checks` (the settings-drift and stranger jobs, off in the selftest). `mutation.yml` takes `mutants-per-shard` (default 200), `skip-unchanged` and `stagger` (both on). `fuzz.yml` takes `public-crash-inputs` (opt-in, default false), `seconds-per-target` (default 300) and `total-seconds` (default
 1,200). `release.yml` takes `version` (required, e.g. `0.1.0`) and `dry-run`
 (default true).
 
@@ -136,7 +135,7 @@ no credential: `cargo publish --dry-run`, then the door. It publishes nothing.
 | nife gate | here | where |
 |---|---|---|
 | `script/fmt` (rustfmt) | `cargo fmt --check` on stable; nife's two unstable rustfmt options are refused | `check / fmt`, and `standalone` refuses them in `rustfmt.toml` |
-| clippy `-D warnings` | host, each listed target, and a `--cfg kani` pass over a shipped Kani shim | `check / clippy` |
+| clippy `-D warnings` | host and each listed target, also with `--all-features`, and a `--cfg kani` pass over a shipped Kani shim | `check / clippy` |
 | rustdoc broken links | `-D rustdoc::broken_intra_doc_links -D rustdoc::invalid_html_tags` | `check / standalone` |
 | cargo-machete | `cargo machete` on the manifest | `check / supply-chain` |
 | host tests | `cargo test` | `check / tests` |

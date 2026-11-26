@@ -18,3 +18,6 @@ jobs:
     with:
       # Bare-metal targets the crate builds for, space-separated; empty for a host-only crate.
       targets: ''
+      # Features that cannot be combined, space-separated, left out of the all-features clippy pass.
+      # Empty lints with every feature, the strict default; list a feature only with the reason beside it.
+      exclude-features: ''

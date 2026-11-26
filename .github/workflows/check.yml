@@ -18,6 +18,12 @@ on:
         description: Space-separated bare-metal targets to lint and build for, besides the host.
         type: string
         default: ''
+      exclude-features:
+        description: >-
+          Space-separated features the all-features clippy pass leaves out, for features that
+          cannot be combined. Empty (the default) lints with every feature.
+        type: string
+        default: ''
       toolchain:
         description: The toolchain the pull request gates on; drift is weekly's business.
         type: string
@@ -46,6 +52,7 @@ env:
   MANIFEST: ${{ inputs.manifest-path }}
   TOOLCHAIN: ${{ inputs.toolchain }}
   TARGETS: ${{ inputs.targets }}
+  EXCLUDE_FEATURES: ${{ inputs.exclude-features }}
 
 jobs:
   # The first job of every reusable workflow: a call behind the newest release is red before
@@ -119,6 +126,20 @@ jobs:
           for t in $TARGETS; do
             echo "==> clippy: $t"
             cargo +"$TOOLCHAIN" clippy --manifest-path "$MANIFEST" --target "$t" --lib --bins -- -D warnings
+          done
+      # The same again with every feature on, so the dead_code lint and clippy see code behind
+      # non-default features, on the host and on each target. Features that cannot be combined are
+      # named in the caller's `exclude-features`; the default is none.
+      - name: clippy (all features)
+        run: |
+          set -e
+          read -ra excluded <<< "$EXCLUDE_FEATURES"
+          read -ra flags <<< "$(python3 .crate-workflows/helpers/feature_args.py "$MANIFEST" "${excluded[@]}")"
+          echo "==> clippy: host, ${flags[*]}"
+          cargo +"$TOOLCHAIN" clippy --manifest-path "$MANIFEST" "${flags[@]}" --all-targets -- -D warnings
+          for t in $TARGETS; do
+            echo "==> clippy: $t, ${flags[*]}"
+            cargo +"$TOOLCHAIN" clippy --manifest-path "$MANIFEST" --target "$t" "${flags[@]}" --lib --bins -- -D warnings
           done
       # The proof harnesses, which only `--cfg kani` compiles. The shim is enough of Kani's API for
       # clippy to type-check them; a clean pass here is not a proof, and proofs.yml is the thing

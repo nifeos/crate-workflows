@@ -6,16 +6,17 @@ call that sits more than one release behind, or behind a release older than 7 da
 
 ## Unreleased
 
+- `check / clippy` also lints with `--all-features`; `exclude-features` skips features that
+  cannot be combined.
 - Fork mode: a repository that declares its upstream in `.github/fork-upstream.toml` keeps
   upstream's license and `[lints]` in `check / standalone`, and carries no crates.io pair in
   `weekly / crates.io badges`.
 - Per-entry exemptions for code another project owns: `.github/file-length-exemptions`,
-  `.github/function-length-exemptions` and `.github/acronym-exemptions` each list one finding with
-  its reason, a length entry at the measured length. The coverage floor now matches
-  `.github/coverage-exemptions` entries relative to the repository root, and an entry that exempts
+  `.github/function-length-exemptions` and `.github/acronym-exemptions` list one finding with
+  its reason. Coverage exemptions match relative to the repository root; an entry that exempts
   nothing fails.
-- Settings by owner: the settings file's `owners` table holds the values that differ in another
-  organization, which `apply-settings` and `check-settings` merge over the shared ones.
+- Settings by owner: the `owners` table holds values that differ in another organization;
+  `apply-settings` and `check-settings` merge it over the shared ones.
 - Descriptions never name nife; `descriptions` holds a repository's own, and `check-settings`
   reads it back.
 
