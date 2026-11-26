@@ -28,6 +28,14 @@ on:
           explores every interleaving.
         type: string
         default: ''
+      harnesses-per-shard:
+        description: >-
+          The most falsification patches one falsify shard replays. The replays are split into
+          ceil(replayable records / this) shards, so a crate at or under the figure runs one shard.
+          At about five minutes for a slow harness, three keep a shard near 15 minutes against its
+          30; a crate whose harnesses are slower lowers it.
+        type: number
+        default: 3
 
 permissions:
   contents: read
@@ -96,10 +104,18 @@ jobs:
         if: always()
         run: python3 .crate-workflows/helpers/job_budget.py check "${{ github.job }}" "$JOB_STARTED_AT"
 
-  falsify:
-    name: falsify
+  # The falsification replays, in shards, so the time a crate waits does not grow with its harness
+  # count: falsify-plan runs the form check and counts the replayable records, `falsify` replays one
+  # shard each, and falsify-verdict judges the plan and every shard together. The verdict job
+  # carries the name `falsify`, so `proofs / falsify` stays the one required check. The shard job
+  # keeps the id `falsify`, so a caller's budget line for it still applies.
+  falsify-plan:
+    name: falsify plan (form check, then count the shards)
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 5
+    outputs:
+      shards: ${{ steps.plan.outputs.shards || '[0]' }}
+      count: ${{ steps.plan.outputs.count || '0' }}
     steps:
       - name: clock
         run: echo "JOB_STARTED_AT=$(date +%s)" >> "$GITHUB_ENV"
@@ -110,19 +126,102 @@ jobs:
           ref: ${{ job.workflow_sha }}
           path: .crate-workflows
           persist-credentials: false
-      # The replay runs `cargo kani` itself, so it installs the same pinned Kani as the job above
+      # Form first, once for every shard: every harness carries a patch or a reason, and every
+      # patch applies. It needs no Kani.
+      - name: form check
+        run: python3 .crate-workflows/helpers/falsify.py --manifest-path "$MANIFEST" --check
+      # The shard count is ceil(replayable records / harnesses-per-shard), 0 when there is none, in
+      # which case the shards are skipped. A matrix holds at most 256 jobs, so a count above that is
+      # refused with the input that fixes it.
+      - id: plan
+        env:
+          PER_SHARD: ${{ inputs.harnesses-per-shard }}
+        run: |
+          set -e
+          case "$PER_SHARD" in '' | *[!0-9]* | 0)
+            echo "::error::harnesses-per-shard must be a whole number above zero, got '$PER_SHARD'"
+            exit 1
+          esac
+          shards=$(python3 .crate-workflows/helpers/falsify.py --manifest-path "$MANIFEST" --plan "$PER_SHARD")
+          if [ "$shards" -gt 256 ]; then
+            echo "::error::$shards falsify shards at $PER_SHARD a shard is over the 256 a matrix holds; raise harnesses-per-shard"
+            exit 1
+          fi
+          echo "==> the falsification replays take $shards shard(s) of at most $PER_SHARD"
+          echo "count=$shards" >> "$GITHUB_OUTPUT"
+          echo "shards=$(jq -cn --argjson n "$shards" '[range($n)]')" >> "$GITHUB_OUTPUT"
+      - name: budget
+        if: always()
+        run: python3 .crate-workflows/helpers/job_budget.py check "${{ github.job }}" "$JOB_STARTED_AT"
+
+  falsify:
+    name: falsify shard ${{ matrix.shard }} of ${{ needs.falsify-plan.outputs.count }}
+    needs: falsify-plan
+    if: needs.falsify-plan.outputs.count != '0'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # Every shard at once: falsify runs on every pull request, and a crate with a shard per three
+    # harnesses holds a few hosted runners for minutes, where one job held one for half an hour.
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: ${{ fromJSON(needs.falsify-plan.outputs.shards) }}
+    steps:
+      - name: clock
+        run: echo "JOB_STARTED_AT=$(date +%s)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: .crate-workflows
+          persist-credentials: false
+      # The replay runs `cargo kani` itself, so it installs the same pinned Kani as the kani job
       # (nife measured caching the install as not worth a cache step).
       - name: Install Kani
         run: |
           cd "$RUNNER_TEMP"
           cargo install --locked kani-verifier --version "$(cat "$GITHUB_WORKSPACE/.crate-workflows/.kani-version")"
           cargo kani setup
-      # Form first (every harness carries a patch or a reason), then truth (each patch turns exactly
-      # its own harness red). A survivor, a stale patch, or an unparseable verdict fails the job.
-      - run: python3 .crate-workflows/helpers/falsify.py --manifest-path "$MANIFEST"
+      # Truth: each patch in this shard turns exactly its own harness red. A survivor, a stale
+      # patch, or an unparseable verdict fails the shard. Round-robin spreads the harnesses of one
+      # file, which are often slow together, over every shard.
+      - name: replay
+        env:
+          SHARD: ${{ matrix.shard }}
+          SHARDS: ${{ needs.falsify-plan.outputs.count }}
+        run: python3 .crate-workflows/helpers/falsify.py --manifest-path "$MANIFEST" --shard "$SHARD/$SHARDS"
       - name: budget
         if: always()
         run: python3 .crate-workflows/helpers/job_budget.py check "${{ github.job }}" "$JOB_STARTED_AT"
+
+  # It runs on always(), so a failed plan or shard makes this job red rather than skipped, since a
+  # skipped job would satisfy a required status. Shards skipped because the plan counted none pass.
+  falsify-verdict:
+    name: falsify
+    needs: [falsify-plan, falsify]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - env:
+          PLAN: ${{ needs.falsify-plan.result }}
+          COUNT: ${{ needs.falsify-plan.outputs.count }}
+          SHARDS: ${{ needs.falsify.result }}
+        run: |
+          if [ "$PLAN" != success ]; then
+            echo "::error::falsify plan was $PLAN; its log says why"
+            exit 1
+          fi
+          if [ "$COUNT" = 0 ] && [ "$SHARDS" = skipped ]; then
+            echo "==> falsify: no replayable record, so no shard ran; the form check passed"
+            exit 0
+          fi
+          if [ "$SHARDS" != success ]; then
+            echo "::error::the falsify shards were $SHARDS; the failing shard's log names the record"
+            exit 1
+          fi
+          echo "==> falsify: the form check and all $COUNT shard(s) passed"
 
   loom-plan:
     name: loom plan

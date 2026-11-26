@@ -17,7 +17,7 @@ publishing from a `partsfoundry` workflow. This repository is where all three la
 | workflow | called on | jobs |
 |---|---|---|
 | `.github/workflows/check.yml` | every pull request | `lag`, `fmt`, `clippy`, `tests`, `coverage`, `standalone`, `supply-chain`, `mutation-diff` |
-| `.github/workflows/proofs.yml` | every pull request | `lag`, `kani`, `falsify`, `loom-plan` (named `loom plan`), `loom` |
+| `.github/workflows/proofs.yml` | every pull request | `lag`, `kani`, `falsify-plan`, `falsify` (one per shard), `falsify-verdict` (named `falsify`), `loom-plan` (named `loom plan`), `loom` |
 | `.github/workflows/weekly.yml` | a weekly schedule, no pull request open | `lag`, `drift`, `msrv`, `semver`, `miri`, `settings-drift`, `stranger` |
 | `.github/workflows/mutation.yml` | a schedule and a dispatch, no pull request open | `lag`, `mutation-plan`, `mutation` (one per shard), `mutation-verdict` (named `mutation`) |
 | `.github/workflows/fuzz.yml` | a weekly schedule, no pull request open | `lag`, `fuzz` |
@@ -29,8 +29,8 @@ publishing from a `partsfoundry` workflow. This repository is where all three la
 
 Inputs every workflow takes (all optional unless named): `manifest-path` (default `Cargo.toml`),
 `targets` (space-separated bare-metal targets, default none), `toolchain`
-(default `stable`), `coverage-floor` (default 85). `check.yml` takes `exclude-features` (features the all-features clippy pass skips; default none) and `allow-unpublished` for
-fixture crates with `publish = false`. `proofs.yml` takes `kani-args` and `loom-max-preemptions`.
+(`stable`), `coverage-floor` (85). `check.yml` takes `exclude-features` (features the all-features clippy pass skips; default none) and `allow-unpublished` for
+fixture crates with `publish = false`. `proofs.yml` takes `kani-args`, `loom-max-preemptions` and `harnesses-per-shard` (3).
 `weekly.yml` takes `caller-checks` (the settings-drift and stranger jobs, off in the selftest). `mutation.yml` takes `mutants-per-shard` (default 200), `skip-unchanged` and `stagger` (both on). `fuzz.yml` takes `public-crash-inputs` (opt-in, default false), `seconds-per-target` (default 300) and `total-seconds` (default
 1,200). `release.yml` takes `version` (required, e.g. `0.1.0`) and `dry-run`
 (default true).
@@ -144,7 +144,7 @@ no credential: `cargo publish --dry-run`, then the door. It publishes nothing.
 | Miri, weekly | `cargo +nightly miri test` | `weekly / miri` |
 | mutation | cargo-mutants on a pull request's changed lines (20-minute cap; a reached cap fails unless `mutation.yml` has a green run at the pull request's head commit, which `gh workflow run mutation.yml -R <owner>/<name> --ref <branch>` dispatches), and weekly over every mutant in shards; a survivor or a timeout fails unless `.github/mutants-exempts` lists it with a reason | `check / mutation-diff`, `mutation / mutation` |
 | `script/verify` (Kani) | `cargo kani` at the version in `.kani-version`, on every pull request | `proofs / kani` |
-| falsification sweep | every patch applied with `-p1` must turn its harness red at its own assertion; the form check (every harness carries a patch or a reason) runs beside it | `proofs / falsify` |
+| falsification sweep | every patch applied with `-p1` must turn its harness red at its own assertion; the form check (every harness carries a patch or a reason) runs once in `falsify-plan`, and the replays run in ceil(replayable records / `harnesses-per-shard`) shards, round-robin in file order, which the `falsify` verdict judges together | `proofs / falsify` |
 | kani-reach | dropped: a dispatch-only measurement of nife's reach | |
 | loom interleavings | the tests under `--cfg loom -D warnings` in release mode, when the manifest declares a `loom` dependency of any kind (`helpers/crate_info.py uses-loom`), and skipped otherwise; a crate opts in with `loom` under `[target.'cfg(loom)'.dependencies]`, `cfg(loom)` in its `unexpected_cfgs` list, and its models in `#[cfg(loom)]` tests. A run fails when no Rust file names `loom::model` or no test passes. A model (a `#[test]` whose body names `loom::model`) may carry a `Falsification:` record above it, opt-in; each patch is applied and that one model must fail under `--cfg loom` (`helpers/falsify.py --loom`) | `proofs / loom` |
 | cargo-deny | nife's policy without its exceptions, with git sources allowed on the project's organization only, pinned by `rev` | `check / supply-chain` |
