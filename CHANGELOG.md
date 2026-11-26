@@ -6,6 +6,7 @@ call that sits more than one release behind, or behind a release older than 7 da
 
 ## Unreleased
 
+- `max-parallel` input.
 - `proofs / falsify` shards its replays (`harnesses-per-shard`).
 - `check / mutation-diff` passes a reached cap only on a green full mutation run at the pull
   request's head commit, and otherwise names the command that dispatches one.

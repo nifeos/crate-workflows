@@ -21,6 +21,11 @@ on:
           mutation job's 60; a crate whose tests are slower lowers it.
         type: number
         default: 200
+      max-parallel:
+        description: The most mutation shards that run at once. Each holds one hosted runner, so
+          a large crate raises it only when the organization has runners to spare.
+        type: number
+        default: 2
       skip-unchanged:
         description: Test nothing when the newest full run on this branch was green for the same
           fingerprint (helpers/mutation_plan.py). Off for the template's own selftest.
@@ -163,11 +168,11 @@ jobs:
     if: needs.mutation-plan.outputs.mode == 'full'
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    # At most two shards at once: a large crate's run takes longer, and it never holds more than
-    # two of the organization's hosted runners while other repositories' pull requests wait.
+    # At most max-parallel shards at once (default two): a caller that raises it holds that many
+    # of the organization's hosted runners while other repositories' pull requests wait.
     strategy:
       fail-fast: false
-      max-parallel: 2
+      max-parallel: ${{ inputs.max-parallel }}
       matrix:
         shard: ${{ fromJSON(needs.mutation-plan.outputs.shards) }}
     steps:
