@@ -368,6 +368,19 @@ jobs:
     with:
       manifest-path: fixtures/loom-mailbox/Cargo.toml
 
+  # The falsify shards, live: three harnesses at two a shard make two shards of unequal size, each
+  # replaying its own patches, and the `falsify` verdict passes only when both did. Every other
+  # proofs call above runs one shard.
+  proofs-shards:
+    name: selftest (proofs, falsify in two shards)
+    needs: lint
+    permissions:
+      contents: read
+    uses: ./.github/workflows/proofs.yml
+    with:
+      manifest-path: fixtures/falsify-shards/Cargo.toml
+      harnesses-per-shard: 2
+
   # A reusable workflow's failure cannot be inverted by its caller, so each broken variant runs the
   # script the loom job runs, with the real loom, and passes only when the script is red for the
   # reason under test: a Relaxed store that loom catches, a crate with no model, and a model that

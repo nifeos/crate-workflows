@@ -1,0 +1,13 @@
+diff --git a/src/lib.rs b/src/lib.rs
+index 8b15f55..7d54f91 100644
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -4,7 +4,7 @@
+ 
+ /// The larger of two bytes.
+ pub fn larger(a: u8, b: u8) -> u8 {
+-    if a > b { a } else { b }
++    if a > b { b } else { a }
+ }
+ 
+ /// A byte halved, rounding down.
