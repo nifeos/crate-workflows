@@ -6,6 +6,8 @@ call that sits more than one release behind, or behind a release older than 7 da
 
 ## Unreleased
 
+- `check / mutation-diff` passes a reached cap only on a green full mutation run at the pull
+  request's head commit, and otherwise names the command that dispatches one.
 - `check / clippy` also lints with `--all-features`; `exclude-features` skips features that
   cannot be combined.
 - Fork mode: a repository that declares its upstream in `.github/fork-upstream.toml` keeps
@@ -75,12 +77,12 @@ call that sits more than one release behind, or behind a release older than 7 da
   notice opens with a line `SPDX-License-Identifier: <id>`, in a text file or a `LICENSE-<name>`
   file at the root; the set of those ids, minus `MIT` and `Apache-2.0`, must equal the `AND` terms
   of the field. A notice with no term and a term with no notice each fail, naming the file or the
-  term. A line that merely quotes the marker inside prose is not a notice.
+  term.
 - `actionlint` 1.7.12 is a required gate of `script/lint` and so of the selftest's lint job, no
   longer an optional one: a missing or different binary fails with the install command. It lints
   `.github/workflows/` and `scaffold/caller-workflows/` (placeholders filled in a scratch copy).
   The version and its SHA-256 are pinned in `helpers/install_actionlint.sh`, which the selftest
-  runs. Its two findings are fixed.
+  runs.
 - The `mutation` verdict reads a one-shard run, whose lone artifact `actions/download-artifact`
   extracts without a subdirectory. `mutants_gate.py --shards N` counts both layouts and refuses any
   count other than N, zero included.
@@ -102,9 +104,7 @@ call that sits more than one release behind, or behind a release older than 7 da
   the new caller `scaffold/caller-workflows/mutation.yml` tries at 08, 10 and 12 UTC (its
   `@MUTATION_CRON@` line comes from `mutation_plan.py schedule <name>`). A scheduled run that starts
   outside 08:00-13:00 UTC is deferred, and one on another weekday fails naming the right line. A
-  later try the same day is a repeat. A tree whose fingerprint (tracked files outside `.github/` and
-  `docs/`, the exemptions, the resolved toolchain, cargo-mutants and the mutation files)
-  matches the newest full run, when that run was green, records `unchanged since run N`. Each of
+  later try the same day is a repeat. A tree whose fingerprint matches the newest full run, when that run was green, records `unchanged since run N`. Each of
   these passes in seconds with a notice. Every run names a `mutation-record` job with its record,
   which the next run reads with the default token. The `skip-unchanged` and `stagger` inputs (both
   on) turn the rules off for the template's selftest. Fixtures are in `fixtures/mutation/`.
