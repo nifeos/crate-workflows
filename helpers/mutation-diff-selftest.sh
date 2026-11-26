@@ -12,7 +12,8 @@
 #   diff must be taken from there too, or it matches nothing and the check passes having tested
 #   nothing. The survivors must fail it.
 #
-# Then the cap, reached on purpose with a cap of about a second, and a stand-in `gh` on PATH that
+# Then the cap, reached on purpose and not by runner speed: a stand-in `cargo` on PATH sleeps far
+# past a cap of about a second, so `timeout` always ends the run, and a stand-in `gh` on PATH
 # answers the Actions API reads `mutation_plan.py verify` makes. Its one green run of mutation.yml
 # is at the commit in FAKE_GREEN_SHA, recorded as FAKE_RECORD:
 #
@@ -80,6 +81,15 @@ repos/partsfoundry/example/actions/runs/4242/jobs\?*)
 esac
 GH
 chmod +x "$work/bin/gh"
+# helpers/cargo-mutants.sh execs `cargo mutants`, which this one turns into a sleep that outlasts
+# every cap the cases pass. Any other cargo command (crate_info.py's `cargo metadata`) is the real one.
+real_cargo="$(command -v cargo)"
+cat >"$work/bin/cargo" <<CARGO
+#!/bin/sh
+[ "\$1" = mutants ] && exec sleep 300
+exec "$real_cargo" "\$@"
+CARGO
+chmod +x "$work/bin/cargo"
 full="full $(printf '%064d' 0 | tr 0 a)"
 
 cap_case() {
