@@ -29,7 +29,9 @@ publishing from a `partsfoundry` workflow. This repository is where all three la
 
 Inputs every workflow takes (all optional unless named): `manifest-path` (default `Cargo.toml`),
 `targets` (space-separated bare-metal targets to build and lint for, default none), `toolchain`
-(default `stable`), `coverage-floor` (default 85). `check.yml` takes `allow-unpublished` for
+(default `stable`), `coverage-floor` (default 85). `check.yml` takes `exclude-features` (space-separated
+features the all-features clippy pass leaves out because they cannot be combined; default none, so
+every feature is linted) and `allow-unpublished` for
 fixture crates that carry `publish = false` on purpose. `proofs.yml` takes `kani-args` and `loom-max-preemptions`.
 `weekly.yml` takes `caller-checks` (the settings-drift and stranger jobs, off for this template's
 own selftest). `mutation.yml` takes `mutants-per-shard` (default 200), `skip-unchanged` and `stagger` (both on). `fuzz.yml` takes `public-crash-inputs` (the opt-in, default false), `seconds-per-target` (default 300) and `total-seconds` (default
@@ -136,7 +138,7 @@ no credential: `cargo publish --dry-run`, then the door. It publishes nothing.
 | nife gate | here | where |
 |---|---|---|
 | `script/fmt` (rustfmt) | `cargo fmt --check` on stable; nife's two unstable rustfmt options are refused | `check / fmt`, and `standalone` refuses them in `rustfmt.toml` |
-| clippy `-D warnings` | host, each listed target, and a `--cfg kani` pass over a shipped Kani shim | `check / clippy` |
+| clippy `-D warnings` | host and each listed target, once with default features and once with `--all-features` (less `exclude-features`), and a `--cfg kani` pass over a shipped Kani shim | `check / clippy` |
 | rustdoc broken links | `-D rustdoc::broken_intra_doc_links -D rustdoc::invalid_html_tags` | `check / standalone` |
 | cargo-machete | `cargo machete` on the manifest | `check / supply-chain` |
 | host tests | `cargo test` | `check / tests` |

@@ -6,6 +6,9 @@ call that sits more than one release behind, or behind a release older than 7 da
 
 ## Unreleased
 
+- `check / clippy` also lints with `--all-features` on the host and every listed target, so
+  `dead_code` and clippy see code behind non-default features. The new `exclude-features` input
+  names features that cannot be combined; its default is none.
 - Fork mode: a repository that declares its upstream in `.github/fork-upstream.toml` keeps
   upstream's license and `[lints]` in `check / standalone`, and carries no crates.io pair in
   `weekly / crates.io badges`.
