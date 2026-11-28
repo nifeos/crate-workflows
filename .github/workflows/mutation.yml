@@ -6,6 +6,11 @@
 # workflow_dispatch. Every run records what it did in the name of its `mutation-record` job, which
 # the next run and the release gate read.
 
+# A red scheduled or dispatched run files one issue in the caller's repository, labeled
+# `mutation-survivors`, and a later green full run closes it (the `mutation-issue` job). For that
+# the caller grants `issues: write` on its mutation job; a caller that does not still runs, and the
+# filing ends in a warning.
+
 name: mutation
 
 on:
@@ -37,8 +42,10 @@ on:
         type: boolean
         default: true
 
-permissions:
-  contents: read
+# No top-level permissions: every job below names its own, contents: read, except mutation-issue,
+# which takes what the caller grants (see that job). A top-level block would bind mutation-issue
+# too, and a job here that asked for issues: write by name would fail the caller's whole run at
+# startup whenever the caller had not granted it (helpers/workflow_shape.py, INHERITS_CALLER).
 
 concurrency:
   group: mutation-${{ github.workflow }}-${{ github.ref }}${{ (inputs.manifest-path != 'Cargo.toml' && inputs.manifest-path != './Cargo.toml') && format('-{0}', inputs.manifest-path) || '' }}
@@ -55,6 +62,8 @@ jobs:
   lag:
     name: lag (template release)
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     timeout-minutes: 5
     steps:
       - name: clock
@@ -87,6 +96,8 @@ jobs:
   mutation-plan:
     name: mutation plan (decide, then count the mutants)
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     timeout-minutes: 10
     outputs:
       mode: ${{ steps.window.outputs.mode == 'deferred' && 'deferred' || steps.compare.outputs.mode }}
@@ -167,6 +178,8 @@ jobs:
     needs: mutation-plan
     if: needs.mutation-plan.outputs.mode == 'full'
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     timeout-minutes: 60
     # At most max-parallel shards at once (default two): a caller that raises it holds that many
     # of the organization's hosted runners while other repositories' pull requests wait.
@@ -228,6 +241,8 @@ jobs:
     needs: [mutation-plan, mutation]
     if: always()
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     timeout-minutes: 10
     steps:
       - name: clock
@@ -283,10 +298,20 @@ jobs:
           # own is `<crate>/src/lib.rs:16` in the exemptions, and only the entries under this
           # crate's directory can be called stale by this crate's run.
           prefix=$(python3 .crate-workflows/helpers/crate_info.py prefix "$MANIFEST")
-          if ! python3 .crate-workflows/helpers/mutants_gate.py --shards "$SHARDS" --prefix "$prefix" "$OUT" "$GITHUB_WORKSPACE/.github/mutants-exempts"; then
+          # --findings keeps what the gate refused for mutation-issue, which lists it in the issue.
+          if ! python3 .crate-workflows/helpers/mutants_gate.py --shards "$SHARDS" --prefix "$prefix" \
+            --findings "$RUNNER_TEMP/mutation-findings.json" \
+            "$OUT" "$GITHUB_WORKSPACE/.github/mutants-exempts"; then
             echo "::error::the mutation gate refused this run: each SURVIVOR, TIMEOUT or stale exemption it names is above"
             exit 1
           fi
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        if: always() && steps.ran.outputs.judge == 'true'
+        with:
+          name: mutation-findings${{ env.ARTIFACT_SUFFIX }}
+          path: ${{ runner.temp }}/mutation-findings.json
+          if-no-files-found: ignore
+          retention-days: 7
       - name: budget
         if: always()
         run: python3 .crate-workflows/helpers/job_budget.py check "${{ github.job }}" "$JOB_STARTED_AT"
@@ -303,6 +328,8 @@ jobs:
     needs: [mutation-plan, mutation-verdict]
     if: always()
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     timeout-minutes: 5
     steps:
       - env:
@@ -313,3 +340,59 @@ jobs:
           # The backticks are literal markdown, not command substitution.
           # shellcheck disable=SC2016
           printf '### Mutation record\n\n`%s` (verdict: %s)\n' "${RECORD:-none}" "$VERDICT" >> "$GITHUB_STEP_SUMMARY"
+
+  # The crate's issue for a red full run (helpers/mutation_issue.py has the rules): a red verdict
+  # opens it, or rewrites the open one and comments with the run's link; a green full run comments
+  # and closes it. Scheduled and dispatched runs only: this workflow is not a pull request gate.
+  #
+  # Filing never sets the run's conclusion. Every API refusal is a warning and exit 0, and
+  # continue-on-error keeps any other fault here off the run's conclusion, so the verdict job alone
+  # decides red or green.
+  #
+  # This job names no permissions, so it holds exactly what the caller's mutation job grants. It
+  # needs `issues: write`; a caller that grants only `contents: read` still runs, and this job ends
+  # in a warning that names the missing permission. Each crate of a repository of several has an
+  # issue of its own, told apart by its manifest path, since the calls run at the same time.
+  mutation-issue:
+    name: mutation issue
+    needs: [mutation-plan, mutation-verdict]
+    # The default branch only: a run dispatched on a pull request's branch (check / mutation-diff
+    # names that command) must neither open the issue nor close it.
+    if: >-
+      always() && (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch')
+      && github.ref_name == github.event.repository.default_branch
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    continue-on-error: true
+    steps:
+      - name: clock
+        run: echo "JOB_STARTED_AT=$(date +%s)" >> "$GITHUB_ENV"
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: .crate-workflows
+          persist-credentials: false
+      - name: this crate's artifact names
+        run: echo "ARTIFACT_SUFFIX=$(.crate-workflows/helpers/crate-slug.sh "$MANIFEST")" >> "$GITHUB_ENV"
+      # Absent when the judge never ran (the plan or a shard failed first, or nothing was tested);
+      # the issue then says the judge did not run, so a missing file is not this job's failure.
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8
+        if: needs.mutation-verdict.result == 'failure' || needs.mutation-plan.outputs.mode == 'full'
+        continue-on-error: true
+        with:
+          name: mutation-findings${{ env.ARTIFACT_SUFFIX }}
+          path: ${{ runner.temp }}/mutation-findings
+      - name: open, update or close the issue
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERDICT: ${{ needs.mutation-verdict.result }}
+          MODE: ${{ needs.mutation-plan.outputs.mode }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          python3 .crate-workflows/helpers/mutation_issue.py file --verdict "$VERDICT" --mode "$MODE" \
+            --manifest-path "$MANIFEST" --findings "$RUNNER_TEMP/mutation-findings/mutation-findings.json" \
+            --repository "$GITHUB_REPOSITORY" --run-url "$RUN_URL" --branch "$GITHUB_REF_NAME" --sha "$GITHUB_SHA"
+      - name: budget
+        if: always()
+        run: python3 .crate-workflows/helpers/job_budget.py check "${{ github.job }}" "$JOB_STARTED_AT"
