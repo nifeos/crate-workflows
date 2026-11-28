@@ -184,6 +184,9 @@ jobs:
     with:
       manifest-path: sample-workspace/workspace_sample_fixture/Cargo.toml
       mutants-per-shard: 1
+      # This call's mutants run under nextest, so the tool's install and its arguments are tested
+      # too; the crate's unit tests catch both mutants without its doctest, which nextest skips.
+      test-tool: nextest
       skip-unchanged: false
       stagger: false
 

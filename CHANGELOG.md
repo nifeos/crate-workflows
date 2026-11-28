@@ -8,7 +8,7 @@ call that sits more than one release behind, or behind a release older than 7 da
 
 - `mutation-diff-exempt-author` input (and `-branch-prefix`).
 - `mutation-issue`: an issue for each red crate.
-- `max-parallel` input.
+- `mutation`: `max-parallel` and `test-tool` inputs; baseline timeout.
 - `proofs / falsify` shards its replays (`harnesses-per-shard`).
 - `check / mutation-diff` passes a reached cap only on a green full run at the head
   commit, or names the command that dispatches one.
@@ -107,8 +107,8 @@ call that sits more than one release behind, or behind a release older than 7 da
   the new caller `scaffold/caller-workflows/mutation.yml` tries at 08, 10 and 12 UTC (its
   `@MUTATION_CRON@` line comes from `mutation_plan.py schedule <name>`). A scheduled run that starts
   outside 08:00-13:00 UTC is deferred, and one on another weekday fails naming the right line. A
-  later try the same day is a repeat. A tree whose fingerprint matches the newest full run, when that run was green, records `unchanged since run N`. Each of
-  these passes in seconds with a notice. Every run names a `mutation-record` job with its record,
+  later try the same day is a repeat. A tree whose fingerprint matches the newest full run, when that run was green, records `unchanged since run N`. Each
+  passes in seconds with a notice. Every run names a `mutation-record` job with its record,
   which the next run reads with the default token. The `skip-unchanged` and `stagger` inputs (both
   on) turn the rules off for the template's selftest. Fixtures are in `fixtures/mutation/`.
 - The full mutation run moves out of `weekly.yml` into its own reusable workflow,
@@ -119,7 +119,7 @@ call that sits more than one release behind, or behind a release older than 7 da
   `weekly / mutation`.
 - `helpers/mutants_gate.py --diff` judges a run over changed lines (`cargo mutants --in-diff`): an
   exemption that names no survivor in it is out of the run's reach, not stale, so the stale check
-  is skipped. A survivor or timeout that is not exempted still fails.
+  is skipped. Any survivor or timeout not exempted still fails.
 - The step of `mutation / mutation` that runs `mutants_gate.py` is named "judge the survivors
   against the exemptions" and adds an error annotation when the gate refuses.
 - `bus` joins `[address_qualifiers]`, so a bus address (`SYSTEM_MANAGEMENT_BUS_ADDRESS`) passes the
