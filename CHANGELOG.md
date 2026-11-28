@@ -6,7 +6,7 @@ call that sits more than one release behind, or behind a release older than 7 da
 
 ## Unreleased
 
-- `mutation-diff-exempt-author` input (and `-branch-prefix`).
+- `mutation-diff-exempt-author` (and `-branch-prefix`).
 - `mutation-issue`: an issue for each red crate.
 - `mutation`: `max-parallel` and `test-tool` inputs; baseline timeout.
 - `proofs / falsify` shards its replays (`harnesses-per-shard`).
