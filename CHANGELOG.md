@@ -13,16 +13,16 @@ call that sits more than one release behind, or behind a release older than 7 da
 - `check / mutation-diff` passes a reached cap only on a green full run at the head
   commit, or names the command that dispatches one.
 - `check / clippy` also lints with `--all-features`; `exclude-features` skips features that
-  cannot be combined.
-- Fork mode: a repository that declares its upstream in `.github/fork-upstream.toml` keeps
+  cannot be combined, even all of them.
+- Fork mode: a repository declaring its upstream in `.github/fork-upstream.toml` keeps
   upstream's license and `[lints]`, and carries no crates.io badge pair.
 - Per-entry exemptions for code another project owns: `.github/file-length-exemptions`,
   `.github/function-length-exemptions` and `.github/acronym-exemptions` list one finding with
   its reason. Coverage exemptions match relative to the repository root; an entry that exempts
   nothing fails.
-- Settings by owner: the `owners` table holds values that differ in another organization;
+- Settings by owner: the `owners` table holds values differing in another organization;
   `apply-settings` and `check-settings` merge it over the shared ones.
-- Descriptions never name nife; `descriptions` holds a repository's own, and `check-settings`
+- Descriptions never name nife; `descriptions` holds a repository's own; `check-settings`
   reads it back.
 
 ## v10 (2026-11-23)
