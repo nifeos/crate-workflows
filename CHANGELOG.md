@@ -6,11 +6,12 @@ call that sits more than one release behind, or behind a release older than 7 da
 
 ## Unreleased
 
+- `mutation-diff-exempt-author` input (and `-branch-prefix`).
 - `mutation-issue`: an issue for each red crate.
 - `max-parallel` input.
 - `proofs / falsify` shards its replays (`harnesses-per-shard`).
-- `check / mutation-diff` passes a reached cap only on a green full mutation run at the pull
-  request's head commit, and otherwise names the command that dispatches one.
+- `check / mutation-diff` passes a reached cap only on a green full run at the head
+  commit, or names the command that dispatches one.
 - `check / clippy` also lints with `--all-features`; `exclude-features` skips features that
   cannot be combined.
 - Fork mode: a repository that declares its upstream in `.github/fork-upstream.toml` keeps

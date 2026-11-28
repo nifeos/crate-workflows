@@ -36,6 +36,19 @@ on:
         description: Let the crate carry publish = false (fixture crates only).
         type: boolean
         default: false
+      mutation-diff-exempt-author:
+        description: >-
+          An app's login (`<app>[bot]`) whose pull requests from a branch starting with
+          mutation-diff-exempt-branch-prefix pass mutation-diff without mutating, for the merges of
+          another project's history that the caller's own automation opens. Both inputs must be
+          set; empty (the default) exempts nothing. See helpers/mutation-diff-exempt.sh.
+        type: string
+        default: ''
+      mutation-diff-exempt-branch-prefix:
+        description: >-
+          The head branch prefix of the pull requests mutation-diff-exempt-author opens.
+        type: string
+        default: ''
 
 permissions:
   contents: read
@@ -520,7 +533,11 @@ jobs:
   # judged every mutant; the failure names the dispatch command. The run listing is read with this
   # job's token, which reads a public repository's Actions runs with contents: read (the mutation
   # plan and the release gate read them the same way), so the caller grants nothing more. On a push
-  # there is no pull request diff, so the job is skipped.
+  # there is no pull request diff, so the job is skipped. A pull request that the caller's own app
+  # opened from the caller's exempt branch prefix (mutation-diff-exempt-author and
+  # mutation-diff-exempt-branch-prefix; helpers/mutation-diff-exempt.sh holds the conditions) passes
+  # without mutating: the job still runs and ends green, with the reason in its log, rather than
+  # being skipped.
   mutation-diff:
     name: mutation-diff
     if: github.event_name == 'pull_request'
@@ -541,14 +558,28 @@ jobs:
           ref: ${{ job.workflow_sha }}
           path: .crate-workflows
           persist-credentials: false
-      - run: rustup toolchain install "$TOOLCHAIN" --profile minimal
-      - uses: taiki-e/install-action@fe3acb53a98b62c772db35de75ce0e4595e7ca8c # v2.90.8
+      - name: upstream merge exemption
+        id: exemption
+        run: .crate-workflows/helpers/mutation-diff-exempt.sh
+        env:
+          EXEMPT_AUTHOR: ${{ inputs.mutation-diff-exempt-author }}
+          EXEMPT_BRANCH_PREFIX: ${{ inputs.mutation-diff-exempt-branch-prefix }}
+          AUTHOR: ${{ github.event.pull_request.user.login }}
+          AUTHOR_TYPE: ${{ github.event.pull_request.user.type }}
+          HEAD_REPOSITORY: ${{ github.event.pull_request.head.repo.full_name }}
+          BASE_REPOSITORY: ${{ github.event.pull_request.base.repo.full_name }}
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+      - if: steps.exemption.outputs.exempt != 'true'
+        run: rustup toolchain install "$TOOLCHAIN" --profile minimal
+      - if: steps.exemption.outputs.exempt != 'true'
+        uses: taiki-e/install-action@fe3acb53a98b62c772db35de75ce0e4595e7ca8c # v2.90.8
         with:
           tool: cargo-mutants@27.1.0
       # A pull request's checkout is the merge of its head into its base, so the first parent is
       # the base the pull request is read against. A checkout with one parent cannot say what
       # changed, and fails rather than guesses.
       - name: mutate the changed lines (20-minute cap)
+        if: steps.exemption.outputs.exempt != 'true'
         run: |
           set -e
           parents=$(( $(git rev-list --parents -n 1 HEAD | wc -w) - 1 ))

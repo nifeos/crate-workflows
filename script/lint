@@ -199,6 +199,10 @@ echo "==> the lag check's grace and refusals"
 sh helpers/lag-check-selftest.sh
 echo "ok"
 
+echo "==> mutation-diff exempts only the caller's own app on its own branch"
+sh helpers/mutation-diff-exempt-selftest.sh
+echo "ok"
+
 echo "==> the coverage floor reads exemptions relative to the repository root"
 # lcov names files by absolute path; an exemption names them from the repository root, and an
 # entry that no longer exempts anything fails.
