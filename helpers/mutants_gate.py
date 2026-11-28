@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """A mutation survivor fails the run unless the caller exempted it with a reason.
 
-    python3 mutants_gate.py [--diff] [--shards N] [--prefix DIR/] <mutants.out-dir> [<exempts-file>]
+    python3 mutants_gate.py [--diff] [--shards N] [--prefix DIR/] [--findings FILE] <mutants.out-dir> [<exempts-file>]
 
 cargo-mutants writes `outcomes.json` in its `mutants.out` directory. The directory given here is
 either one such directory, or a directory whose subdirectories each hold one: the shards of one
@@ -31,6 +31,11 @@ generates the mutants of the changed lines only, so an exemption that names no s
 not stale, only out of reach, and the stale-exemption check is skipped. A survivor or a timeout
 that is not exempted fails the same way. The full mutation run, without `--diff`, is the one that
 calls an exemption stale.
+
+`--findings FILE` also writes what the gate refused as JSON, for helpers/mutation_issue.py to
+list in the crate's issue: `refused` ([{verdict, where, mutant}]), `stale` and `malformed` (the
+exemption entries refused, each a string), and `error` (why no mutant could be judged, or null).
+The file is written on every path, green or red, so its absence means the gate never ran.
 
 There is no triage ledger or census here: survive, exempt with a reason, or fail.
 """
@@ -125,6 +130,12 @@ def write_summary(refused):
             f.write(text + '\n')
 
 
+def write_findings(path, findings):
+    """The `--findings` file: what the gate refused, for helpers/mutation_issue.py."""
+    if path:
+        Path(path).write_text(json.dumps(findings, indent=1) + '\n')
+
+
 def main(argv):
     if '--selftest' in argv[1:]:
         return selftest()
@@ -132,6 +143,15 @@ def main(argv):
     args = [a for a in argv[1:] if a != '--diff']
     want_shards = None
     prefix = ''
+    findings_path = None
+    if '--findings' in args:
+        i = args.index('--findings')
+        try:
+            findings_path = args[i + 1]
+        except IndexError:
+            print('mutants_gate: --findings wants a file', file=sys.stderr)
+            return 2
+        del args[i:i + 2]
     if '--prefix' in args:
         i = args.index('--prefix')
         try:
@@ -158,19 +178,25 @@ def main(argv):
             exempts, problems = parse_exempts(open(exempt_path).read())
         except FileNotFoundError:
             problems = []
+    findings = {'refused': [], 'stale': [], 'malformed': [f'{exempt_path}:{p}' for p in problems],
+                'error': None}
     for p in problems:
         print(f'mutants_gate: {exempt_path}:{p}', file=sys.stderr)
     try:
         live = survivors(out_dir)
     except FileNotFoundError as e:
         print(f'mutants_gate: {e}', file=sys.stderr)
+        findings['error'] = str(e)
+        write_findings(findings_path, findings)
         return 1
     bad = bool(problems)
     if want_shards is not None:
         found = len(outcome_files(out_dir))
         if found != want_shards:
-            print(f'mutants_gate: {found} of {want_shards} shards left an outcomes.json',
-                  file=sys.stderr)
+            message = f'{found} of {want_shards} shards left an outcomes.json'
+            print(f'mutants_gate: {message}', file=sys.stderr)
+            findings['error'] = message
+            write_findings(findings_path, findings)
             return 1
     used = set()
     refused = []
@@ -184,10 +210,13 @@ def main(argv):
             refused.append((verdict, key, desc))
             bad = True
     write_summary(refused)
+    findings['refused'] = [{'verdict': v, 'where': k, 'mutant': d} for v, k, d in refused]
     for key in ([] if diff_only else sorted(k for k in set(exempts) - used if k.startswith(prefix))):
         print(f'mutants_gate: {exempt_path}: {key} is exempted but no such survivor exists now',
               file=sys.stderr)
+        findings['stale'].append(key)
         bad = True
+    write_findings(findings_path, findings)
     if not bad:
         print(f'==> mutation: {len(live)} survivor(s), all exempted with reasons'
               if live else '==> mutation: no survivors')
@@ -308,6 +337,25 @@ def selftest():
         exempt.write_text(every + 'no reason here\n')
         expect('--diff still refuses a bad line', run(['gate', '--diff', str(shards), str(exempt)]), 1)
         expect('--diff with no outcomes fails', run(['gate', '--diff', str(Path(tmp) / 'nothing')]), 1)
+
+        # --findings: written on every path, naming what was refused and nothing that passed.
+        found = Path(tmp) / 'findings.json'
+        exempt.write_text('src/a.rs:7 # equivalent\nsrc/c.rs:1 # gone\nno reason here\n')
+        expect('findings: red', run(['gate', '--findings', str(found), str(shards), str(exempt)]), 1)
+        got = json.loads(found.read_text())
+        expect('findings: refused', sorted((r['verdict'], r['where']) for r in got['refused']),
+               [('SURVIVOR', 'src/a.rs:3'), ('TIMEOUT', 'src/b.rs:5')])
+        expect('findings: stale', got['stale'], ['src/c.rs:1'])
+        expect('findings: malformed', len(got['malformed']), 1)
+        expect('findings: no error', got['error'], None)
+        exempt.write_text(every)
+        expect('findings: green', run(['gate', '--findings', str(found), str(shards), str(exempt)]), 0)
+        expect('findings: green is empty', json.loads(found.read_text()),
+               {'refused': [], 'stale': [], 'malformed': [], 'error': None})
+        expect('findings: a missing shard', run(['gate', '--findings', str(found), '--shards', '4',
+                                                 str(shards), str(exempt)]), 1)
+        expect('findings: the error is named', 'shards left' in (json.loads(found.read_text())['error'] or ''), True)
+        expect('findings wants a file', run(['gate', str(shards), '--findings']), 2)
 
     # fixtures/mutation/pass and fail: two shards each, the one survivor in pass exempted, and a
     # second, unexempted survivor in fail's other shard.
