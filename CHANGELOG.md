@@ -8,7 +8,7 @@ call that sits more than one release behind, or behind a release older than 7 da
 
 - `mutation-diff-exempt-author` (and `-branch-prefix`).
 - `mutation-issue`: an issue for each red crate.
-- `mutation`: `max-parallel` and `test-tool` inputs; baseline timeout.
+- `mutation`: `max-parallel`, `test-tool`; baseline timeout, memory cap.
 - `proofs / falsify` shards its replays (`harnesses-per-shard`).
 - `check / mutation-diff` passes a reached cap only on a green full run at the head
   commit, or names the command that dispatches one.

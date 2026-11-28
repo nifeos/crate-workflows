@@ -224,6 +224,8 @@ jobs:
       # unmutated run itself could time out, while a fast suite waited 300 seconds on a real hang.
       # Debug information is off (CARGO_PROFILE_*_DEBUG): nothing reads it here, and writing it
       # costs build time and disk. Debug assertions and overflow checks stay on.
+      # helpers/cargo-mutants.sh holds each test process to a share of the runner's memory, so a
+      # mutant that allocates without end fails its test instead of taking the runner down.
       - env:
           SHARD: ${{ matrix.shard }}
           SHARDS: ${{ needs.mutation-plan.outputs.count }}
