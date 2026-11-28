@@ -19,7 +19,7 @@ publishing from a `partsfoundry` workflow. This repository is where all three la
 | `.github/workflows/check.yml` | every pull request | `lag`, `fmt`, `clippy`, `tests`, `coverage`, `standalone`, `supply-chain`, `mutation-diff` |
 | `.github/workflows/proofs.yml` | every pull request | `lag`, `kani`, `falsify-plan`, `falsify` (one per shard), `falsify-verdict` (named `falsify`), `loom-plan` (named `loom plan`), `loom` |
 | `.github/workflows/weekly.yml` | a weekly schedule, no pull request open | `lag`, `drift`, `msrv`, `semver`, `miri`, `settings-drift`, `stranger` |
-| `.github/workflows/mutation.yml` | a schedule and a dispatch, no pull request open | `lag`, `mutation-plan`, `mutation` (one per shard), `mutation-verdict` (named `mutation`) |
+| `.github/workflows/mutation.yml` | a schedule and a dispatch, no pull request open | `lag`, `mutation-plan`, `mutation` (one per shard), `mutation-verdict` (named `mutation`), `mutation-record`, `mutation-issue` |
 | `.github/workflows/fuzz.yml` | a weekly schedule, no pull request open | `lag`, `fuzz` |
 | `.github/workflows/release.yml` | a dispatch naming a version | `gate`, `tag`, `publish` |
 | `.github/workflows/release-weekly.yml` | this repository only: a weekly schedule and a dispatch | `release` |
@@ -42,12 +42,23 @@ mutants inside its 60-minute timeout. `mutation-plan` counts the mutants with `c
 and makes ceil(mutants / `mutants-per-shard`) shards, at least one. Each `mutation` job tests one
 shard (`--shard k/n --sharding round-robin`) and uploads its `mutants.out` as `mutants-shard-k`.
 `mutation-verdict`, named `mutation`, judges every shard's outcomes together against
-`.github/mutants-exempts`. `max-parallel` shards run at once.
+`.github/mutants-exempts`.
 
 A shard holds at most `mutants-per-shard` mutants (200 is about 25 minutes), in at most 256 shards.
-The plan first decides whether to test at all: a scheduled run outside 08:00-13:00 UTC is deferred,
+The plan first decides whether to test: a scheduled run outside 08:00-13:00 UTC is deferred,
 and an unchanged tree after a green full run is skipped. `helpers/mutation_plan.py` states the
 rules and prints a caller's weekday cron line.
+
+A scheduled or dispatched run on the default branch keeps one `mutation-survivors` issue
+(provisional) per crate, listing each refused mutant and its fix (`helpers/mutation_issue.py`).
+
+| the run | the crate's issue |
+|---|---|
+| red | opened, or its body rewritten and one comment linking the run |
+| green, every mutant tested | a comment linking the run, then closed |
+| tested nothing (deferred, repeat, unchanged) | left as it is |
+
+Callers grant `issues: write`; without it, filing only warns. It never changes the run's conclusion.
 
 ## The weekly fuzz run
 
@@ -102,7 +113,7 @@ the same check, so an untouched repository still finds out. With no release yet 
 
 `release-weekly.yml` runs Sundays at 22:00 UTC, seven hours before the crates' weekly Dependabot run
 (Mondays, 05:00 UTC by default). It tags the newest main commit since the newest tag whose
-`selftest` push run is green as the next `v<N>`, a lightweight tag like `v1` to `v8`. It creates
+`selftest` push run is green as the next `v<N>`, a lightweight tag. It creates
 the release as latest, with the `## Unreleased` entries of `CHANGELOG.md` as notes, which starts
 `canary-adopt`, and opens a pull request that folds those entries under `## v<N>`. With no green
 commit since the newest tag it does nothing.
@@ -210,8 +221,8 @@ the form `helpers/rust_names.py` describes; it never skips an integer constant, 
 `file:line: name: component 'val' is not a word (did you mean 'value'?)`, followed by a count per
 file and a total.
 
-The check is report only. `check / standalone` runs it as its own step and writes the findings to
-the job summary; it never fails on a finding. It fails only on a malformed configuration, such as an
+The check is report only: `check / standalone` writes its findings to the job summary and never
+fails on one. It fails only on a malformed configuration, such as an
 accepted word without a reason. The check reads `.github/abbreviations-ceiling`, one number, and
 compares the total with it; nothing enforces it yet.
 
@@ -236,8 +247,7 @@ Each reports against its own ceiling file under `.github/`, named in its header.
 Wednesday `.github/workflows/kani-bump.yml` compares it with the newest release on crates.io and,
 when that is newer, opens or updates a single pull request that changes only that file. This
 repository's own `selftest (proofs)` run is the verification, and the default is to merge. A crate
-repository receives the new Kani when it next bumps its pin of this template (Dependabot, weekly),
-so the lag is the bump merge plus a template release plus that weekly pin bump. The job authenticates
+repository receives the new Kani at its next weekly pin bump. The job authenticates
 as nife-smelter (`NIFE_SMELTER_APP_ID`, `NIFE_SMELTER_PRIVATE_KEY`, with contents and pull requests
 write here) and fails naming the secret when one is missing.
 
