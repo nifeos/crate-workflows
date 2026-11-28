@@ -31,6 +31,14 @@ on:
           a large crate raises it only when the organization has runners to spare.
         type: number
         default: 2
+      test-tool:
+        description: What runs each mutant's tests, `cargo` (cargo test) or `nextest` (cargo
+          nextest). nextest runs the test binaries side by side instead of one after another and
+          stops at the first failure, which cuts the time of a crate whose tests are spread over
+          many binaries. It does not run doctests, so a crate whose doctests catch mutants keeps
+          `cargo`.
+        type: string
+        default: cargo
       skip-unchanged:
         description: Test nothing when the newest full run on this branch was green for the same
           fingerprint (helpers/mutation_plan.py). Off for the template's own selftest.
@@ -201,18 +209,43 @@ jobs:
       - uses: taiki-e/install-action@fe3acb53a98b62c772db35de75ce0e4595e7ca8c # v2.90.8
         with:
           tool: cargo-mutants@27.1.0
+      - if: inputs.test-tool == 'nextest'
+        uses: taiki-e/install-action@fe3acb53a98b62c772db35de75ce0e4595e7ca8c # v2.90.8
+        with:
+          tool: cargo-nextest@0.9.152
       # cargo-mutants exits 2 when a mutant survives and 3 when one times out. Both are verdicts
       # for mutation-verdict to judge against the exemptions once every shard is in, so this step
       # swallows exactly those two codes and no other. Round-robin spreads each file's mutants
       # over every shard, so one slow file does not land on one shard.
+      #
+      # Each mutant's test timeout is three times the shard's own unmutated test run, measured on
+      # the same runner, rather than a flat figure: a flat 300 seconds sat below a normal pass of a
+      # slow suite on a slow runner, so a surviving mutant was reported as a timeout and the
+      # unmutated run itself could time out, while a fast suite waited 300 seconds on a real hang.
+      # Debug information is off (CARGO_PROFILE_*_DEBUG): nothing reads it here, and writing it
+      # costs build time and disk. Debug assertions and overflow checks stay on.
       - env:
           SHARD: ${{ matrix.shard }}
           SHARDS: ${{ needs.mutation-plan.outputs.count }}
+          TEST_TOOL: ${{ inputs.test-tool }}
+          CARGO_PROFILE_DEV_DEBUG: 0
+          CARGO_PROFILE_TEST_DEBUG: 0
         run: |
           cd "$(dirname "$MANIFEST")"
           echo "MUTANTS_OUT=$(pwd)/mutants.out" >> "$GITHUB_ENV"
+          tool=()
+          case "$TEST_TOOL" in
+            cargo) ;;
+            # nextest stops at the first failure on its own; immediate also ends the tests still
+            # running then, rather than waiting for them.
+            nextest) tool=(--test-tool nextest --cargo-test-arg=--max-fail=1:immediate) ;;
+            *)
+              echo "::error::test-tool is $TEST_TOOL; it takes cargo or nextest"
+              exit 1
+              ;;
+          esac
           # --output keeps mutants.out here: cargo-mutants otherwise writes it at the workspace root.
-          "$GITHUB_WORKSPACE/.crate-workflows/helpers/cargo-mutants.sh" --output "$(pwd)" --jobs 2 --timeout 300 --shard "$SHARD/$SHARDS" --sharding round-robin || rc=$?
+          "$GITHUB_WORKSPACE/.crate-workflows/helpers/cargo-mutants.sh" --output "$(pwd)" --jobs 2 --timeout-multiplier 3 "${tool[@]}" --shard "$SHARD/$SHARDS" --sharding round-robin || rc=$?
           case "${rc:-0}" in
             0 | 2 | 3) ;;
             *) exit "$rc" ;;
