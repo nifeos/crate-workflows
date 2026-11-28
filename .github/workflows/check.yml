@@ -500,13 +500,13 @@ jobs:
           suffix=$(.crate-workflows/helpers/crate-slug.sh "$MANIFEST")
           [ -z "$suffix" ] || echo "CODEQL_CATEGORY=/crate:${suffix#-}" >> "$GITHUB_ENV"
       - name: CodeQL (Rust, build-mode none)
-        uses: github/codeql-action/init@1bd86f2fdb4b86187fa4059f16f31a3202acc9ea # v4
+        uses: github/codeql-action/init@915412ff23e8b7659517e607487dbeae018f2934 # v4
         with:
           languages: rust
           build-mode: none
       # The analyze action uploads its own SARIF; nife's split-job retry exists for its four-language
       # matrix, and one language in one job does not need it.
-      - uses: github/codeql-action/analyze@1bd86f2fdb4b86187fa4059f16f31a3202acc9ea # v4
+      - uses: github/codeql-action/analyze@915412ff23e8b7659517e607487dbeae018f2934 # v4
         with:
           category: ${{ env.CODEQL_CATEGORY }}
       - name: budget
