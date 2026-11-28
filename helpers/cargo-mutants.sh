@@ -20,6 +20,8 @@
 # Every `cargo mutants` call in the template goes through this script, so the full run, the
 # changed-lines run and the shard count all see the same set of mutants.
 
+set -eu
+
 # Each test process is held to an equal share of the machine's memory: the memory the machine has,
 # divided by the mutants tested at once (`--jobs`, one when it is not given) and by its processors,
 # one test process to a processor, and never under 1 GiB. A mutant can turn a loop's step into
@@ -28,6 +30,11 @@
 # the runner receives a shutdown signal and the shard ends with no outcomes, or loses contact and
 # is cancelled when the job's timeout passes. Under the share the allocation fails, the test
 # aborts, and the mutant is caught.
+#
+# The division by processors is exact under nextest, which runs each test in a process of its own.
+# Under cargo test it is deliberately conservative: all of a test binary's tests share one process,
+# so the share binds a whole binary. Dividing by `--jobs` alone would let each job's runaway take
+# half the machine, and two of them take all of it, which is the fault this limit exists to stop.
 #
 # The share is an address-space limit (`prlimit --as`), set as cargo's runner for the host target,
 # so it binds each test binary that cargo test or nextest starts, and not rustc or a build script.
@@ -45,6 +52,10 @@ done
 share=${MUTANTS_TEST_MEMORY_BYTES:-}
 if [ -z "$share" ] && [ -r /proc/meminfo ]; then
 	memory_kibibytes=$(awk '$1 == "MemTotal:" { print $2 }' /proc/meminfo)
+	[ -n "$memory_kibibytes" ] || {
+		echo "cargo-mutants.sh: no MemTotal in /proc/meminfo; set MUTANTS_TEST_MEMORY_BYTES" >&2
+		exit 1
+	}
 	share=$((memory_kibibytes * 1024 / (jobs * $(nproc))))
 	[ "$share" -ge 1073741824 ] || share=1073741824
 fi
